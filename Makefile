@@ -1,10 +1,11 @@
 # Makefile for compiling R/CUDA wrapper
 
 
-R_HOME = $(shell R RHOME)
+#R_HOME = $(shell R RHOME)
+R_HOME = /usr/lib/R
 
 # R headers and compile position-independent code
-CPPFLAGS = -I"$(R_HOME)/include" -D_FORTIFY_SOURCE=2 -fPIC
+CPPFLAGS = -I/usr/share/R/include -D_FORTIFY_SOURCE=2 -fPIC
 
 
 # Linker flags to link against R's librarires
@@ -13,7 +14,7 @@ LDFLAGS = -L"$(R_HOME)/lib" -lR
 
 # CUDA comiper and flags
 NVCC = nvcc
-NVCCFLAGS = -03 -arch=sm_89 --ptxas-options=-v -c -fPIC
+NVCCFLAGS = O3 -arch=sm_89 --ptxas-options=-v -c -Xcompiler -fPIC
 
 
 # name of final shared library
