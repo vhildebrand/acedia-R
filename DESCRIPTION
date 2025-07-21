@@ -1,0 +1,18 @@
+Package: acediaR
+Type: Package
+Title: GPU-Accelerated Computing for R using CUDA
+Version: 0.0.0.9000
+Author: Aleksei M
+Maintainer: Aleksei M <email@example.com>
+Description: Provides CUDA-accelerated linear algebra operations and statistical functions for R, 
+    enabling high-performance computing on NVIDIA GPUs. This package implements GPU kernels for 
+    common mathematical operations including vector arithmetic, matrix operations, and statistical 
+    computations.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+SystemRequirements: CUDA toolkit (>= 11.0), NVIDIA GPU with compute capability >= 5.0
+RoxygenNote: 7.2.0
+Suggests: 
+    testthat (>= 3.0.0),
+    microbenchmark 

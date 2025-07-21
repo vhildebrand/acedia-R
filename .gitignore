@@ -6,3 +6,4 @@
 *.fatbin
 *.o
 *.so
+*.tar.gz

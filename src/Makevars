@@ -1,0 +1,33 @@
+# Makevars for acediaR package
+# Configures compilation of C++ and CUDA source files
+
+# Detect R installation  
+R_HOME = $(shell R RHOME)
+
+# CUDA installation path
+CUDA_HOME ?= /usr/local/cuda
+CUDA_LIB_PATH = $(CUDA_HOME)/lib64
+
+# C++ compiler flags
+PKG_CPPFLAGS = -I$(R_HOME)/include -I$(CUDA_HOME)/include -D_FORTIFY_SOURCE=2 -fPIC
+
+# Linker flags
+PKG_LIBS = -L$(R_HOME)/lib -lR -L$(CUDA_LIB_PATH) -lcudart
+
+# CUDA compiler and flags  
+NVCC = $(CUDA_HOME)/bin/nvcc
+NVCCFLAGS = -O3 -arch=sm_89 --ptxas-options=-v -c -Xcompiler -fPIC
+
+# Define source and object files
+CUDA_SOURCES = $(wildcard *.cu)
+CUDA_OBJECTS = $(CUDA_SOURCES:.cu=.o)
+
+# Include CUDA objects in the build
+OBJECTS = R_interface.o vector_add.o
+
+# Rules for CUDA compilation
+%.o: %.cu
+	$(NVCC) $(NVCCFLAGS) -I$(R_HOME)/include $< -o $@
+
+# Make sure all objects are built before creating shared library
+$(SHLIB): $(OBJECTS) 
