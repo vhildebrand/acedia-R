@@ -164,4 +164,81 @@ bool gpuVector_empty(SEXP gpu_vec_ptr) {
     } catch (const std::exception& e) {
         stop("Error checking if gpuVector is empty: " + std::string(e.what()));
     }
+}
+
+// Forward declarations of CUDA functions for multiplication operations
+extern "C" void multiplyVectorsOnGpu_gpuVector(gpuVector& result, const gpuVector& a, const gpuVector& b);
+extern "C" void scalarMultiplyVectorOnGpu_gpuVector(gpuVector& result, const gpuVector& vec, double scalar);
+extern "C" double dotProductOnGpu_gpuVector(const gpuVector& a, const gpuVector& b);
+
+// [[Rcpp::export]]
+SEXP gpu_multiply_rcpp(SEXP a_ptr, SEXP b_ptr) {
+    try {
+        XPtr<gpuVector> a_vec(a_ptr);
+        XPtr<gpuVector> b_vec(b_ptr);
+        
+        if (!a_vec || !b_vec) {
+            stop("Invalid gpuVector pointer(s)");
+        }
+        
+        if (a_vec->size() != b_vec->size()) {
+            stop("gpuVector sizes must match for multiplication");
+        }
+        
+        gpuVector* result = new gpuVector(a_vec->size());
+        
+        // Call the CUDA function
+        multiplyVectorsOnGpu_gpuVector(*result, *a_vec, *b_vec);
+        
+        // Create external pointer for result
+        XPtr<gpuVector> ptr(result, true);
+        ptr.attr("class") = "gpuVector";
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in GPU vector multiplication: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP gpu_scale_rcpp(SEXP vec_ptr, double scalar) {
+    try {
+        XPtr<gpuVector> vec(vec_ptr);
+        
+        if (!vec) {
+            stop("Invalid gpuVector pointer");
+        }
+        
+        gpuVector* result = new gpuVector(vec->size());
+        
+        // Call the CUDA function
+        scalarMultiplyVectorOnGpu_gpuVector(*result, *vec, scalar);
+        
+        // Create external pointer for result
+        XPtr<gpuVector> ptr(result, true);
+        ptr.attr("class") = "gpuVector";
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in GPU scalar multiplication: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+double gpu_dot_rcpp(SEXP a_ptr, SEXP b_ptr) {
+    try {
+        XPtr<gpuVector> a_vec(a_ptr);
+        XPtr<gpuVector> b_vec(b_ptr);
+        
+        if (!a_vec || !b_vec) {
+            stop("Invalid gpuVector pointer(s)");
+        }
+        
+        if (a_vec->size() != b_vec->size()) {
+            stop("gpuVector sizes must match for dot product");
+        }
+        
+        // Call the CUDA function and return the result
+        return dotProductOnGpu_gpuVector(*a_vec, *b_vec);
+    } catch (const std::exception& e) {
+        stop("Error in GPU dot product: " + std::string(e.what()));
+    }
 } 

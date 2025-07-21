@@ -4,10 +4,12 @@
 \alias{as.vector.gpuVector}
 \title{Convert GPU Vector to R Vector}
 \usage{
-\method{as.vector}{gpuVector}(gpu_vec)
+\method{as.vector}{gpuVector}(x, mode = "any")
 }
 \arguments{
-\item{gpu_vec}{A gpuVector object}
+\item{x}{A gpuVector object}
+
+\item{mode}{The mode to convert to (ignored, always returns numeric)}
 }
 \value{
 A numeric vector containing the data from the GPU

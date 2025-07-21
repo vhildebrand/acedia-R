@@ -106,6 +106,42 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// gpu_multiply_rcpp
+SEXP gpu_multiply_rcpp(SEXP a_ptr, SEXP b_ptr);
+RcppExport SEXP _acediaR_gpu_multiply_rcpp(SEXP a_ptrSEXP, SEXP b_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type a_ptr(a_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type b_ptr(b_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(gpu_multiply_rcpp(a_ptr, b_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gpu_scale_rcpp
+SEXP gpu_scale_rcpp(SEXP vec_ptr, double scalar);
+RcppExport SEXP _acediaR_gpu_scale_rcpp(SEXP vec_ptrSEXP, SEXP scalarSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type vec_ptr(vec_ptrSEXP);
+    Rcpp::traits::input_parameter< double >::type scalar(scalarSEXP);
+    rcpp_result_gen = Rcpp::wrap(gpu_scale_rcpp(vec_ptr, scalar));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gpu_dot_rcpp
+double gpu_dot_rcpp(SEXP a_ptr, SEXP b_ptr);
+RcppExport SEXP _acediaR_gpu_dot_rcpp(SEXP a_ptrSEXP, SEXP b_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type a_ptr(a_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type b_ptr(b_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(gpu_dot_rcpp(a_ptr, b_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 RcppExport SEXP r_gpu_add(SEXP, SEXP);
 
@@ -119,6 +155,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_print_gpuVector", (DL_FUNC) &_acediaR_print_gpuVector, 1},
     {"_acediaR_gpuVector_size", (DL_FUNC) &_acediaR_gpuVector_size, 1},
     {"_acediaR_gpuVector_empty", (DL_FUNC) &_acediaR_gpuVector_empty, 1},
+    {"_acediaR_gpu_multiply_rcpp", (DL_FUNC) &_acediaR_gpu_multiply_rcpp, 2},
+    {"_acediaR_gpu_scale_rcpp", (DL_FUNC) &_acediaR_gpu_scale_rcpp, 2},
+    {"_acediaR_gpu_dot_rcpp", (DL_FUNC) &_acediaR_gpu_dot_rcpp, 2},
     {"r_gpu_add",                     (DL_FUNC) &r_gpu_add,                     2},
     {NULL, NULL, 0}
 };

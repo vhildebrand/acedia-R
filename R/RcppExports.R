@@ -37,3 +37,15 @@ gpuVector_empty <- function(gpu_vec_ptr) {
     .Call(`_acediaR_gpuVector_empty`, gpu_vec_ptr)
 }
 
+gpu_multiply_rcpp <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_gpu_multiply_rcpp`, a_ptr, b_ptr)
+}
+
+gpu_scale_rcpp <- function(vec_ptr, scalar) {
+    .Call(`_acediaR_gpu_scale_rcpp`, vec_ptr, scalar)
+}
+
+gpu_dot_rcpp <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_gpu_dot_rcpp`, a_ptr, b_ptr)
+}
+
