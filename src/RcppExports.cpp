@@ -10,6 +10,36 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// gpu_available
+bool gpu_available();
+RcppExport SEXP _acediaR_gpu_available() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(gpu_available());
+    return rcpp_result_gen;
+END_RCPP
+}
+// gpu_info
+std::string gpu_info();
+RcppExport SEXP _acediaR_gpu_info() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(gpu_info());
+    return rcpp_result_gen;
+END_RCPP
+}
+// gpu_memory_available
+double gpu_memory_available();
+RcppExport SEXP _acediaR_gpu_memory_available() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(gpu_memory_available());
+    return rcpp_result_gen;
+END_RCPP
+}
 // as_gpuVector
 SEXP as_gpuVector(NumericVector x);
 RcppExport SEXP _acediaR_as_gpuVector(SEXP xSEXP) {
@@ -80,13 +110,16 @@ END_RCPP
 RcppExport SEXP r_gpu_add(SEXP, SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_acediaR_gpu_available", (DL_FUNC) &_acediaR_gpu_available, 0},
+    {"_acediaR_gpu_info", (DL_FUNC) &_acediaR_gpu_info, 0},
+    {"_acediaR_gpu_memory_available", (DL_FUNC) &_acediaR_gpu_memory_available, 0},
     {"_acediaR_as_gpuVector", (DL_FUNC) &_acediaR_as_gpuVector, 1},
     {"_acediaR_as_vector_gpuVector", (DL_FUNC) &_acediaR_as_vector_gpuVector, 1},
     {"_acediaR_gpu_add_rcpp", (DL_FUNC) &_acediaR_gpu_add_rcpp, 2},
     {"_acediaR_print_gpuVector", (DL_FUNC) &_acediaR_print_gpuVector, 1},
     {"_acediaR_gpuVector_size", (DL_FUNC) &_acediaR_gpuVector_size, 1},
     {"_acediaR_gpuVector_empty", (DL_FUNC) &_acediaR_gpuVector_empty, 1},
-    {"r_gpu_add", (DL_FUNC) &r_gpu_add, 2},
+    {"r_gpu_add",                     (DL_FUNC) &r_gpu_add,                     2},
     {NULL, NULL, 0}
 };
 

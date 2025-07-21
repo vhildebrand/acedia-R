@@ -80,22 +80,25 @@ test_that("gpuVector addition operator works", {
   expect_equal(result, expected, tolerance = 1e-10)
 })
 
-test_that("gpu_add with use_gpuvector=TRUE works", {
-  # Test the enhanced gpu_add function
+test_that("gpu_add and gpuVector operations produce identical results", {
+  # Test that both approaches (simple gpu_add vs gpuVector objects) work correctly
   a <- c(1.0, 2.0, 3.0, 4.0, 5.0)
   b <- c(2.0, 3.0, 4.0, 5.0, 6.0)
   expected <- a + b
   
-  # Test new implementation
-  result_new <- gpu_add(a, b, use_gpuvector = TRUE)
-  expect_equal(result_new, expected, tolerance = 1e-10)
+  # Simple GPU function approach (CPU↔GPU)
+  simple_result <- gpu_add(a, b)
+  expect_equal(simple_result, expected, tolerance = 1e-10)
   
-  # Test backward compatibility (old implementation)
-  result_old <- gpu_add(a, b, use_gpuvector = FALSE)
-  expect_equal(result_old, expected, tolerance = 1e-10)
+  # GPU object approach (GPU-resident)
+  gpu_a <- as.gpuVector(a)
+  gpu_b <- as.gpuVector(b)
+  gpu_result <- gpu_a + gpu_b
+  object_result <- as.vector(gpu_result)
+  expect_equal(object_result, expected, tolerance = 1e-10)
   
-  # Results should be identical
-  expect_equal(result_new, result_old, tolerance = 1e-10)
+  # Both approaches should produce identical results
+  expect_equal(simple_result, object_result, tolerance = 1e-15)
 })
 
 test_that("gpuVector handles large vectors", {

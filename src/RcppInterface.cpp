@@ -1,5 +1,6 @@
 #include <Rcpp.h>
 #include "gpuVector.h"
+#include "cuda_utils.h"
 
 using namespace Rcpp;
 
@@ -7,8 +8,29 @@ using namespace Rcpp;
 extern "C" void addVectorsOnGpu_gpuVector(gpuVector& result, const gpuVector& a, const gpuVector& b);
 
 // [[Rcpp::export]]
+bool gpu_available() {
+    return cuda_utils::isGpuAvailable();
+}
+
+// [[Rcpp::export]]
+std::string gpu_info() {
+    return cuda_utils::getGpuInfo();
+}
+
+// [[Rcpp::export]]
+double gpu_memory_available() {
+    size_t mem = cuda_utils::getAvailableGpuMemory();
+    return static_cast<double>(mem);
+}
+
+// [[Rcpp::export]]
 SEXP as_gpuVector(NumericVector x) {
     try {
+        // Check GPU availability first
+        if (!cuda_utils::isGpuAvailable()) {
+            stop("GPU not available - cannot create gpuVector objects");
+        }
+        
         gpuVector* gpu_vec;
         if (x.size() == 0) {
             gpu_vec = new gpuVector(0);
