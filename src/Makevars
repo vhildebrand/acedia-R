@@ -8,11 +8,11 @@ R_HOME = $(shell R RHOME)
 CUDA_HOME ?= /usr/local/cuda
 CUDA_LIB_PATH = $(CUDA_HOME)/lib64
 
-# C++ compiler flags
-PKG_CPPFLAGS = -I$(R_HOME)/include -I$(CUDA_HOME)/include -D_FORTIFY_SOURCE=2 -fPIC
+# C++ compiler flags (include Rcpp)
+PKG_CPPFLAGS = -I$(R_HOME)/include -I$(CUDA_HOME)/include $(shell $(R_HOME)/bin/Rscript -e "Rcpp:::CxxFlags()") -D_FORTIFY_SOURCE=2 -fPIC
 
-# Linker flags
-PKG_LIBS = -L$(R_HOME)/lib -lR -L$(CUDA_LIB_PATH) -lcudart
+# Linker flags  
+PKG_LIBS = -L$(R_HOME)/lib -lR -L$(CUDA_LIB_PATH) -lcudart $(shell $(R_HOME)/bin/Rscript -e "Rcpp:::LdFlags()")
 
 # CUDA compiler and flags  
 NVCC = $(CUDA_HOME)/bin/nvcc
@@ -21,9 +21,11 @@ NVCCFLAGS = -O3 -arch=sm_89 --ptxas-options=-v -c -Xcompiler -fPIC
 # Define source and object files
 CUDA_SOURCES = $(wildcard *.cu)
 CUDA_OBJECTS = $(CUDA_SOURCES:.cu=.o)
+CPP_SOURCES = $(wildcard *.cpp)
+CPP_OBJECTS = $(CPP_SOURCES:.cpp=.o)
 
-# Include CUDA objects in the build
-OBJECTS = R_interface.o vector_add.o
+# Include all objects in the build
+OBJECTS = R_interface.o RcppInterface.o RcppExports.o vector_add.o
 
 # Rules for CUDA compilation
 %.o: %.cu

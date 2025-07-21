@@ -2,6 +2,7 @@
 
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include "gpuVector.h"
 
 // CUDA Kernel: executed in multiple threads in parallel
 __global__ void addKernel(double *c, const double *a, const double *b, int n) {
@@ -52,4 +53,35 @@ extern "C" void addVectorsOnGpu(double *h_c, const double *h_a, const double *h_
     cudaFree(d_a);
     cudaFree(d_b);
     cudaFree(d_c);
+}
+
+// New CUDA wrapper function for gpuVector objects
+extern "C" void addVectorsOnGpu_gpuVector(gpuVector& result, const gpuVector& a, const gpuVector& b) {
+    // Validate input sizes
+    if (a.size() != b.size() || result.size() != a.size()) {
+        fprintf(stderr, "gpuVector size mismatch in addition\n");
+        return;
+    }
+    
+    if (a.empty()) {
+        return; // Nothing to do for empty vectors
+    }
+    
+    int n = static_cast<int>(a.size());
+    
+    // Launch kernel using existing device memory
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    
+    addKernel<<<blocksPerGrid, threadsPerBlock>>>(result.data(), a.data(), b.data(), n);
+    
+    // Check for kernel launch errors
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Kernel launch failed: %s\n", cudaGetErrorString(err));
+        return;
+    }
+    
+    // Synchronize to ensure completion
+    cudaDeviceSynchronize();
 }

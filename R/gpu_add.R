@@ -7,6 +7,8 @@
 #'
 #' @param a A numeric vector
 #' @param b A numeric vector of the same length as \code{a}
+#' @param use_gpuvector Logical. If TRUE, uses the new gpuVector implementation 
+#'   which is more efficient for chained operations. Default FALSE for backward compatibility.
 #' 
 #' @return A numeric vector containing the element-wise sum of \code{a} and \code{b}
 #' 
@@ -16,20 +18,28 @@
 #' For small vectors (< 10^4 elements), the CPU version may be faster due to 
 #' memory transfer overhead.
 #' 
+#' When \code{use_gpuvector=TRUE}, the function uses the new gpuVector abstraction
+#' which provides better memory management and is more efficient for sequences of
+#' GPU operations.
+#' 
 #' @examples
 #' \dontrun{
-#' # Add two large vectors on GPU
+#' # Add two large vectors on GPU (original method)
 #' n <- 1e6
 #' a <- runif(n)
 #' b <- runif(n)
 #' result <- gpu_add(a, b)
 #' 
+#' # Using new gpuVector implementation
+#' result2 <- gpu_add(a, b, use_gpuvector = TRUE)
+#' 
 #' # Verify correctness against CPU
 #' all.equal(result, a + b)
+#' all.equal(result2, a + b)
 #' }
 #' 
 #' @export
-gpu_add <- function(a, b) {
+gpu_add <- function(a, b, use_gpuvector = FALSE) {
   # Input validation
   if (!is.numeric(a) || !is.numeric(b)) {
     stop("Both arguments must be numeric vectors")
@@ -43,6 +53,14 @@ gpu_add <- function(a, b) {
     return(numeric(0))
   }
   
-  # Call the C interface function
-  .Call("r_gpu_add", a, b)
+  if (use_gpuvector) {
+    # Use the new gpuVector implementation
+    gpu_a <- as.gpuVector(a)
+    gpu_b <- as.gpuVector(b)
+    gpu_result <- gpu_add_vectors(gpu_a, gpu_b)
+    return(as.vector(gpu_result))
+  } else {
+    # Use the original C interface function for backward compatibility
+    .Call("r_gpu_add", a, b)
+  }
 } 

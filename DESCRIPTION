@@ -12,7 +12,11 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 SystemRequirements: CUDA toolkit (>= 11.0), NVIDIA GPU with compute capability >= 5.0
-RoxygenNote: 7.2.0
+RoxygenNote: 7.3.2
+Imports:
+    Rcpp (>= 1.0.0)
+LinkingTo:
+    Rcpp
 Suggests: 
     testthat (>= 3.0.0),
     microbenchmark 
