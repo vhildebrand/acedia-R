@@ -5,7 +5,7 @@
 
 // forward declartion of CUDA host function from vector_add.cu
 
-extern "C" void addVectorsonGpu(double *h_c, const double *h_a, const double *h_b, int n);
+extern "C" void addVectorsOnGpu(double *h_c, const double *h_a, const double *h_b, int n);
 
 extern "C" SEXP r_gpu_add(SEXP a, SEXP b) {
     // check that inputs are valid numeric vectors
@@ -28,7 +28,7 @@ extern "C" SEXP r_gpu_add(SEXP a, SEXP b) {
     double *h_c = REAL(result_sexp);
 
     // call CUDA host wrapper function
-    addVectorsonGpu(h_c, h_a, h_b, n);
+    addVectorsOnGpu(h_c, h_a, h_b, n);
 
     UNPROTECT(1);
     return result_sexp;

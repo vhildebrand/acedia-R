@@ -7,14 +7,17 @@ R_HOME = /usr/lib/R
 # R headers and compile position-independent code
 CPPFLAGS = -I/usr/share/R/include -D_FORTIFY_SOURCE=2 -fPIC
 
+CUDA_HOME ?= /usr/local/cuda
+CUDA_LIB_PATH = $(CUDA_HOME)/lib64
+
 
 # Linker flags to link against R's librarires
-LDFLAGS = -L"$(R_HOME)/lib" -lR
+LDFLAGS = -L"$(R_HOME)/lib" -lR -L"$(CUDA_LIB_PATH)" -lcudart
 
 
 # CUDA comiper and flags
 NVCC = nvcc
-NVCCFLAGS = O3 -arch=sm_89 --ptxas-options=-v -c -Xcompiler -fPIC
+NVCCFLAGS = -O3 -arch=sm_89 --ptxas-options=-v -c -Xcompiler -fPIC
 
 
 # name of final shared library

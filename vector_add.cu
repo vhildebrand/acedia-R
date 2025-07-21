@@ -18,7 +18,7 @@ __global__ void addKernel(double *c, const double *a, const double *b, int n) {
 
 
 // Host function with C-style linkage to other C/C++ code
-extern "C" void addVectorsonGpu(double *h_c, const double *h_a, const double *h_b, int n) {
+extern "C" void addVectorsOnGpu(double *h_c, const double *h_a, const double *h_b, int n) {
     double *d_a, *d_b, *d_c;
     size_t size = n * sizeof(double);
 
@@ -36,7 +36,7 @@ extern "C" void addVectorsonGpu(double *h_c, const double *h_a, const double *h_
     // calculate blocks needed in grid
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
 
-    addKernel<<blocksPerGrid, threadsPerBlock>>>(d_c, d_a, d_b, n);
+    addKernel<<<blocksPerGrid, threadsPerBlock>>>(d_c, d_a, d_b, n);
 
     // check for kernel launch errors
     cudaError_t err = cudaGetLastError();
