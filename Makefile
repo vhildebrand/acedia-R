@@ -13,7 +13,7 @@ LDFLAGS = -L"$(R_HOME)/lib" -lR
 
 # CUDA comiper and flags
 NVCC = nvcc
-NVCCFLAGS = -03 -arch=sm_75 --ptxas-options=-v -c -fPIC
+NVCCFLAGS = -03 -arch=sm_89 --ptxas-options=-v -c -fPIC
 
 
 # name of final shared library
