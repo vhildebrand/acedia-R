@@ -34,6 +34,11 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
     stop("Data must be numeric")
   }
   
+  # Validate dtype (currently only double/float supported by high-level R interface)
+  if (!dtype %in% c("double", "float")) {
+    stop("Unsupported dtype. Supported dtypes are 'double' and 'float'")
+  }
+
   if (!is.integer(shape)) {
     shape <- as.integer(shape)
   }
@@ -75,6 +80,11 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
 #' 
 #' @export
 empty_tensor <- function(shape, dtype = "double", device = "cuda", requires_grad = FALSE) {
+  # Validate dtype for empty tensor as well
+  if (!dtype %in% c("double", "float")) {
+    stop("Unsupported dtype. Supported dtypes are 'double' and 'float'")
+  }
+
   if (!is.integer(shape)) {
     shape <- as.integer(shape)
   }

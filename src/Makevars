@@ -24,8 +24,9 @@ CUDA_OBJECTS = $(CUDA_SOURCES:.cu=.o)
 CPP_SOURCES = $(wildcard *.cpp)
 CPP_OBJECTS = $(CPP_SOURCES:.cpp=.o)
 
-# Include all objects in the build (modern tensor-only system)
-OBJECTS = RcppInterface.o UnifiedTensorInterface.o RcppExports.o tensor_ops_templated.o
+# Automatically include all compiled C++ and CUDA object files. This way new
+# source files are picked up without manual changes to Makevars.
+OBJECTS = $(CPP_OBJECTS) $(CUDA_OBJECTS)
 
 # Rules for CUDA compilation
 %.o: %.cu
