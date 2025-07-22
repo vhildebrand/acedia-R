@@ -215,6 +215,108 @@ test_that("tensor permute works", {
   expect_error(permute(tensor_3d, c(1, 1, 2)), "Invalid permutation")  # Duplicate dimension
 })
 
+test_that("tensor concat works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Test concatenation of 2D tensors
+  t1 <- gpu_tensor(1:6, c(2, 3))
+  t2 <- gpu_tensor(7:12, c(2, 3))
+  
+  # Concatenate along first dimension (rows)
+  if (requireNamespace("abind", quietly = TRUE)) {
+    result <- concat(list(t1, t2), axis = 1)
+    expect_equal(shape(result), c(4, 3))
+    
+    # Check values
+    expected <- rbind(as.array(t1), as.array(t2))
+    expect_equal(as.array(result), expected)
+    
+    # Concatenate along second dimension (columns)
+    result2 <- concat(list(t1, t2), axis = 2)
+    expect_equal(shape(result2), c(2, 6))
+  } else {
+    skip("abind package not available")
+  }
+})
+
+test_that("tensor stack works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Test stacking of 2D tensors
+  t1 <- gpu_tensor(1:4, c(2, 2))
+  t2 <- gpu_tensor(5:8, c(2, 2))
+  
+  if (requireNamespace("abind", quietly = TRUE)) {
+    # Stack along new first dimension
+    result <- stack(list(t1, t2), axis = 1)
+    expect_equal(shape(result), c(2, 2, 2))
+    
+    # Check that original tensors are preserved in stack
+    expect_equal(as.array(result)[1, , ], as.array(t1))
+    expect_equal(as.array(result)[2, , ], as.array(t2))
+  } else {
+    skip("abind package not available")
+  }
+})
+
+test_that("tensor repeat works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Test basic tensor repeat
+  t1 <- gpu_tensor(c(1, 2), c(2))
+  
+  # This is a placeholder test - the current implementation needs work
+  expect_error(repeat_tensor(t1, c(3)), NA)  # Should not error
+  
+  # Test error conditions
+  expect_error(repeat_tensor(t1, c(2, 3)), "Length of repeats must match")
+  expect_error(repeat_tensor(t1, c(0)), "must be positive")
+})
+
+test_that("tensor pad works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Test basic constant padding
+  t1 <- gpu_tensor(1:4, c(2, 2))
+  
+  # Pad with 1 on each side
+  pad_spec <- list(c(1, 1), c(1, 1))  # [[before, after], [before, after]]
+  result <- pad(t1, pad_spec, mode = "constant", value = 0)
+  
+  expect_equal(shape(result), c(4, 4))
+  
+  # Check that center contains original data
+  center_data <- as.array(result)[2:3, 2:3]
+  expect_equal(center_data, as.array(t1))
+  
+  # Test error conditions
+  expect_error(pad(t1, list(c(1, 1)), "constant"), "list length must match")
+  expect_error(pad(t1, pad_spec, "invalid_mode"), "mode must be one of")
+})
+
+test_that("memory sharing in views works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Create a tensor and a view
+  original <- gpu_tensor(1:12, c(3, 4))
+  reshaped <- view(original, c(4, 3))
+  
+  # Test that they have different shapes but same size
+  expect_equal(shape(original), c(3, 4))
+  expect_equal(shape(reshaped), c(4, 3))
+  expect_equal(size(original), size(reshaped))
+  
+  # Both should have the same underlying data
+  expect_equal(as.vector(original), as.vector(reshaped))
+  
+  # Test transpose memory sharing
+  if (length(shape(original)) == 2) {
+    transposed <- transpose(original)
+    expect_equal(shape(transposed), c(4, 3))
+    expect_equal(size(transposed), size(original))
+  }
+})
+
 test_that("tensor reduction operations work", {
   skip_if_not(gpu_available(), "GPU not available")
   

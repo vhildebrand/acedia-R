@@ -85,6 +85,10 @@ tensor_view_unified <- function(tensor_ptr, new_shape) {
     .Call(`_acediaR_tensor_view_unified`, tensor_ptr, new_shape)
 }
 
+tensor_reshape_unified <- function(tensor_ptr, new_shape) {
+    .Call(`_acediaR_tensor_reshape_unified`, tensor_ptr, new_shape)
+}
+
 tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
     .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
 }

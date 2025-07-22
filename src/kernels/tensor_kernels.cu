@@ -194,7 +194,7 @@ __global__ void strided_copy_kernel(
 // Concatenation kernel along specified axis
 template<typename T>
 __global__ void concat_kernel(
-    T* result, const T** inputs, const int* input_sizes, int num_tensors,
+    T* result, T** inputs, const int* input_sizes, int num_tensors,
     const int* result_strides, const int* input_strides_list, 
     const int* shape, int ndims, int concat_axis, size_t total_elements
 ) {
@@ -238,7 +238,7 @@ __global__ void concat_kernel(
 // Stack kernel - creates new dimension
 template<typename T>
 __global__ void stack_kernel(
-    T* result, const T** inputs, int num_tensors,
+    T* result, T** inputs, int num_tensors,
     const int* input_strides, const int* result_shape, 
     int ndims, int stack_axis, size_t total_elements
 ) {

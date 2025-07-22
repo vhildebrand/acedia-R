@@ -253,6 +253,111 @@ void tensor_sqrt_float64(double* result, const double* input, size_t n) {
     cudaDeviceSynchronize();
 }
 
+// Advanced tensor operations
+
+// Concat operation
+void tensor_concat_float32(float* result, const float** inputs, const int* input_sizes, int num_tensors,
+                          const int* result_strides, const int* input_strides_list, const int* shape, 
+                          int ndims, int concat_axis, size_t total_elements) {
+    // Convert to std::vector for launch helper
+    std::vector<int> result_strides_vec(result_strides, result_strides + ndims);
+    std::vector<int> shape_vec(shape, shape + ndims);
+    
+    std::vector<std::vector<int>> input_strides_vec;
+    for (int i = 0; i < num_tensors; i++) {
+        std::vector<int> strides(input_strides_list + i * ndims, input_strides_list + (i+1) * ndims);
+        input_strides_vec.push_back(strides);
+    }
+    
+    launch_concat(result, inputs, input_sizes, num_tensors, result_strides_vec, input_strides_vec, shape_vec, concat_axis, total_elements);
+    cudaDeviceSynchronize();
+}
+
+void tensor_concat_float64(double* result, const double** inputs, const int* input_sizes, int num_tensors,
+                          const int* result_strides, const int* input_strides_list, const int* shape, 
+                          int ndims, int concat_axis, size_t total_elements) {
+    std::vector<int> result_strides_vec(result_strides, result_strides + ndims);
+    std::vector<int> shape_vec(shape, shape + ndims);
+    
+    std::vector<std::vector<int>> input_strides_vec;
+    for (int i = 0; i < num_tensors; i++) {
+        std::vector<int> strides(input_strides_list + i * ndims, input_strides_list + (i+1) * ndims);
+        input_strides_vec.push_back(strides);
+    }
+    
+    launch_concat(result, inputs, input_sizes, num_tensors, result_strides_vec, input_strides_vec, shape_vec, concat_axis, total_elements);
+    cudaDeviceSynchronize();
+}
+
+// Stack operation
+void tensor_stack_float32(float* result, const float** inputs, int num_tensors,
+                         const int* input_strides, const int* result_shape, int ndims, int stack_axis, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims - 1);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    
+    launch_stack(result, inputs, num_tensors, input_strides_vec, result_shape_vec, stack_axis, total_elements);
+    cudaDeviceSynchronize();
+}
+
+void tensor_stack_float64(double* result, const double** inputs, int num_tensors,
+                         const int* input_strides, const int* result_shape, int ndims, int stack_axis, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims - 1);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    
+    launch_stack(result, inputs, num_tensors, input_strides_vec, result_shape_vec, stack_axis, total_elements);
+    cudaDeviceSynchronize();
+}
+
+// Repeat operation
+void tensor_repeat_float32(float* result, const float* input, const int* input_strides, const int* repeat_counts,
+                          const int* input_shape, const int* result_shape, int ndims, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> repeat_counts_vec(repeat_counts, repeat_counts + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    
+    launch_repeat(result, input, input_strides_vec, repeat_counts_vec, input_shape_vec, result_shape_vec, total_elements);
+    cudaDeviceSynchronize();
+}
+
+void tensor_repeat_float64(double* result, const double* input, const int* input_strides, const int* repeat_counts,
+                          const int* input_shape, const int* result_shape, int ndims, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> repeat_counts_vec(repeat_counts, repeat_counts + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    
+    launch_repeat(result, input, input_strides_vec, repeat_counts_vec, input_shape_vec, result_shape_vec, total_elements);
+    cudaDeviceSynchronize();
+}
+
+// Pad operation
+void tensor_pad_float32(float* result, const float* input, const int* input_strides, const int* input_shape,
+                       const int* pad_before, const int* pad_after, const int* result_shape, 
+                       int ndims, float pad_value, int pad_mode, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> pad_before_vec(pad_before, pad_before + ndims);
+    std::vector<int> pad_after_vec(pad_after, pad_after + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    
+    launch_pad(result, input, input_strides_vec, input_shape_vec, pad_before_vec, pad_after_vec, result_shape_vec, pad_value, pad_mode, total_elements);
+    cudaDeviceSynchronize();
+}
+
+void tensor_pad_float64(double* result, const double* input, const int* input_strides, const int* input_shape,
+                       const int* pad_before, const int* pad_after, const int* result_shape, 
+                       int ndims, double pad_value, int pad_mode, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> pad_before_vec(pad_before, pad_before + ndims);
+    std::vector<int> pad_after_vec(pad_after, pad_after + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    
+    launch_pad(result, input, input_strides_vec, input_shape_vec, pad_before_vec, pad_after_vec, result_shape_vec, pad_value, pad_mode, total_elements);
+    cudaDeviceSynchronize();
+}
+
 // Type conversion functions
 void convert_float32_to_float16(half* output, const float* input, size_t n) {
     launch_type_conversion(output, input, n);

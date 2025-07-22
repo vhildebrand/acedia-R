@@ -195,3 +195,162 @@ void launch_strided_copy(T* dest, const T* src, const std::vector<int>& strides,
     cudaFree(d_strides);
     cudaFree(d_shape);
 } 
+
+// Launch concat operation
+template<typename T>
+void launch_concat(T* result, const T** inputs, const int* input_sizes, int num_tensors,
+                   const std::vector<int>& result_strides, const std::vector<std::vector<int>>& input_strides_list,
+                   const std::vector<int>& shape, int concat_axis, size_t total_elements) {
+    
+    // Prepare device memory for strides
+    int* d_result_strides;
+    int* d_input_strides_list;
+    int* d_input_sizes;
+    int* d_shape;
+    T** d_inputs;
+    
+    int ndims = shape.size();
+    
+    cudaMalloc(&d_result_strides, ndims * sizeof(int));
+    cudaMalloc(&d_input_strides_list, num_tensors * ndims * sizeof(int));
+    cudaMalloc(&d_input_sizes, num_tensors * sizeof(int));
+    cudaMalloc(&d_shape, ndims * sizeof(int));
+    cudaMalloc(&d_inputs, num_tensors * sizeof(T*));
+    
+    cudaMemcpy(d_result_strides, result_strides.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_input_sizes, input_sizes, num_tensors * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_shape, shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_inputs, inputs, num_tensors * sizeof(T*), cudaMemcpyHostToDevice);
+    
+    // Flatten input strides
+    std::vector<int> flattened_strides;
+    for (const auto& strides : input_strides_list) {
+        flattened_strides.insert(flattened_strides.end(), strides.begin(), strides.end());
+    }
+    cudaMemcpy(d_input_strides_list, flattened_strides.data(), num_tensors * ndims * sizeof(int), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    concat_kernel<T><<<grid_size, block_size>>>(
+        result, d_inputs, d_input_sizes, num_tensors,
+        d_result_strides, d_input_strides_list, d_shape, ndims, concat_axis, total_elements
+    );
+    
+    cudaFree(d_result_strides);
+    cudaFree(d_input_strides_list);
+    cudaFree(d_input_sizes);
+    cudaFree(d_shape);
+    cudaFree(d_inputs);
+}
+
+// Launch stack operation
+template<typename T>
+void launch_stack(T* result, const T** inputs, int num_tensors,
+                  const std::vector<int>& input_strides, const std::vector<int>& result_shape,
+                  int stack_axis, size_t total_elements) {
+    
+    int* d_input_strides;
+    int* d_result_shape;
+    T** d_inputs;
+    
+    int ndims = result_shape.size();
+    
+    cudaMalloc(&d_input_strides, (ndims-1) * sizeof(int));
+    cudaMalloc(&d_result_shape, ndims * sizeof(int));
+    cudaMalloc(&d_inputs, num_tensors * sizeof(T*));
+    
+    cudaMemcpy(d_input_strides, input_strides.data(), (ndims-1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_result_shape, result_shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_inputs, inputs, num_tensors * sizeof(T*), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    stack_kernel<T><<<grid_size, block_size>>>(
+        result, d_inputs, num_tensors, d_input_strides, d_result_shape, ndims, stack_axis, total_elements
+    );
+    
+    cudaFree(d_input_strides);
+    cudaFree(d_result_shape);
+    cudaFree(d_inputs);
+}
+
+// Launch repeat operation
+template<typename T>
+void launch_repeat(T* result, const T* input,
+                   const std::vector<int>& input_strides, const std::vector<int>& repeat_counts,
+                   const std::vector<int>& input_shape, const std::vector<int>& result_shape,
+                   size_t total_elements) {
+    
+    int* d_input_strides;
+    int* d_repeat_counts;
+    int* d_input_shape;
+    int* d_result_shape;
+    
+    int ndims = input_shape.size();
+    
+    cudaMalloc(&d_input_strides, ndims * sizeof(int));
+    cudaMalloc(&d_repeat_counts, ndims * sizeof(int));
+    cudaMalloc(&d_input_shape, ndims * sizeof(int));
+    cudaMalloc(&d_result_shape, ndims * sizeof(int));
+    
+    cudaMemcpy(d_input_strides, input_strides.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_repeat_counts, repeat_counts.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_input_shape, input_shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_result_shape, result_shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    repeat_kernel<T><<<grid_size, block_size>>>(
+        result, input, d_input_strides, d_repeat_counts, d_input_shape, d_result_shape, ndims, total_elements
+    );
+    
+    cudaFree(d_input_strides);
+    cudaFree(d_repeat_counts);
+    cudaFree(d_input_shape);
+    cudaFree(d_result_shape);
+}
+
+// Launch pad operation
+template<typename T>
+void launch_pad(T* result, const T* input,
+                const std::vector<int>& input_strides, const std::vector<int>& input_shape,
+                const std::vector<int>& pad_before, const std::vector<int>& pad_after,
+                const std::vector<int>& result_shape, T pad_value, int pad_mode, size_t total_elements) {
+    
+    int* d_input_strides;
+    int* d_input_shape;
+    int* d_pad_before;
+    int* d_pad_after;
+    int* d_result_shape;
+    
+    int ndims = input_shape.size();
+    
+    cudaMalloc(&d_input_strides, ndims * sizeof(int));
+    cudaMalloc(&d_input_shape, ndims * sizeof(int));
+    cudaMalloc(&d_pad_before, ndims * sizeof(int));
+    cudaMalloc(&d_pad_after, ndims * sizeof(int));
+    cudaMalloc(&d_result_shape, ndims * sizeof(int));
+    
+    cudaMemcpy(d_input_strides, input_strides.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_input_shape, input_shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_pad_before, pad_before.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_pad_after, pad_after.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_result_shape, result_shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    pad_kernel<T><<<grid_size, block_size>>>(
+        result, input, d_input_strides, d_input_shape, d_pad_before, d_pad_after, 
+        d_result_shape, ndims, pad_value, pad_mode, total_elements
+    );
+    
+    cudaFree(d_input_strides);
+    cudaFree(d_input_shape);
+    cudaFree(d_pad_before);
+    cudaFree(d_pad_after);
+    cudaFree(d_result_shape);
+} 

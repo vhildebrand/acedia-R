@@ -320,6 +320,39 @@ view <- function(tensor, new_shape) {
   return(result)
 }
 
+#' Reshape Tensor
+#'
+#' Creates a reshaped tensor with a different shape. If the tensor is contiguous,
+#' this creates a zero-copy view. If non-contiguous, it first makes the tensor
+#' contiguous then creates a view.
+#'
+#' @param tensor A gpuTensor object
+#' @param new_shape Integer vector specifying the new shape
+#' @return A tensor with the new shape (zero-copy if possible)
+#' @export
+reshape <- function(tensor, new_shape) {
+  if (!inherits(tensor, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (!is.integer(new_shape)) {
+    new_shape <- as.integer(new_shape)
+  }
+  
+  if (any(new_shape <= 0)) {
+    stop("All shape dimensions must be positive")
+  }
+  
+  if (prod(new_shape) != size(tensor)) {
+    stop("New shape size (", prod(new_shape), ") must match tensor size (", size(tensor), ")")
+  }
+  
+  # Use unified interface for true reshape (handles contiguous/non-contiguous automatically)
+  result <- tensor_reshape_unified(tensor, new_shape)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
 #' Transpose Tensor
 #'
 #' Creates a transposed view of a 2D tensor (matrix).
@@ -588,4 +621,168 @@ tensor_slice_extract <- function(tensor, start_indices, end_indices) {
 #' @export
 dim.gpuTensor <- function(x) {
   return(as.integer(shape(x)))
+} 
+
+#' Concatenate Tensors
+#'
+#' Concatenate tensors along an existing dimension.
+#'
+#' @param tensors List of gpuTensor objects to concatenate
+#' @param axis Integer specifying the axis along which to concatenate (1-indexed)
+#' @return A new tensor with tensors concatenated along the specified axis
+#' @export
+concat <- function(tensors, axis = 1) {
+  if (!is.list(tensors) || length(tensors) < 2) {
+    stop("tensors must be a list of at least 2 gpuTensor objects")
+  }
+  
+  if (!all(sapply(tensors, function(x) inherits(x, "gpuTensor")))) {
+    stop("All elements in tensors must be gpuTensor objects")
+  }
+  
+  # For now, implement a basic version via R array manipulation
+  # TODO: Implement with CUDA kernels for efficiency
+  warning("concat currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
+  
+  # Convert all tensors to arrays
+  arrays <- lapply(tensors, as.array)
+  
+  # Use base R's abind or implement our own concatenation
+  result_array <- do.call(abind::abind, c(arrays, along = axis))
+  
+  # Convert back to gpu_tensor
+  result <- gpu_tensor(as.vector(result_array), dim(result_array))
+  return(result)
+}
+
+#' Stack Tensors
+#'
+#' Stack tensors along a new dimension.
+#'
+#' @param tensors List of gpuTensor objects to stack
+#' @param axis Integer specifying the axis along which to stack (1-indexed)
+#' @return A new tensor with tensors stacked along the specified axis
+#' @export
+stack <- function(tensors, axis = 1) {
+  if (!is.list(tensors) || length(tensors) < 2) {
+    stop("tensors must be a list of at least 2 gpuTensor objects")
+  }
+  
+  if (!all(sapply(tensors, function(x) inherits(x, "gpuTensor")))) {
+    stop("All elements in tensors must be gpuTensor objects")
+  }
+  
+  # Check that all tensors have the same shape
+  first_shape <- shape(tensors[[1]])
+  if (!all(sapply(tensors, function(x) identical(shape(x), first_shape)))) {
+    stop("All tensors must have the same shape for stacking")
+  }
+  
+  # For now, implement via R array manipulation
+  warning("stack currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
+  
+  arrays <- lapply(tensors, as.array)
+  result_array <- do.call(abind::abind, c(arrays, along = axis))
+  
+  result <- gpu_tensor(as.vector(result_array), dim(result_array))
+  return(result)
+}
+
+#' Repeat Tensor
+#'
+#' Repeat tensor along specified dimensions.
+#'
+#' @param tensor A gpuTensor object
+#' @param repeats Integer vector specifying repeat counts for each dimension
+#' @return A new tensor with the input tensor repeated
+#' @export
+repeat_tensor <- function(tensor, repeats) {
+  if (!inherits(tensor, "gpuTensor")) {
+    stop("tensor must be a gpuTensor object")
+  }
+  
+  if (length(repeats) != length(shape(tensor))) {
+    stop("Length of repeats must match number of tensor dimensions")
+  }
+  
+  if (any(repeats <= 0)) {
+    stop("All repeat counts must be positive")
+  }
+  
+  # For now, implement via R array manipulation
+  warning("repeat_tensor currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
+  
+  array_data <- as.array(tensor)
+  
+  # Use base R's rep function with array indexing
+  for (dim in seq_along(repeats)) {
+    if (repeats[dim] > 1) {
+      indices <- rep(seq_len(dim(array_data)[dim]), repeats[dim])
+      array_data <- apply(array_data, setdiff(seq_len(length(dim(array_data))), dim), 
+                         function(x) x[indices])
+    }
+  }
+  
+  result <- gpu_tensor(as.vector(array_data), dim(array_data))
+  return(result)
+}
+
+#' Pad Tensor
+#'
+#' Pad tensor with specified values.
+#'
+#' @param tensor A gpuTensor object
+#' @param pad_width List or matrix specifying padding for each dimension
+#' @param mode Padding mode: "constant", "reflect", or "replicate"
+#' @param value Constant value for constant padding (default: 0)
+#' @return A new tensor with padding applied
+#' @export
+pad <- function(tensor, pad_width, mode = "constant", value = 0) {
+  if (!inherits(tensor, "gpuTensor")) {
+    stop("tensor must be a gpuTensor object")
+  }
+  
+  if (!mode %in% c("constant", "reflect", "replicate")) {
+    stop("mode must be one of: 'constant', 'reflect', 'replicate'")
+  }
+  
+  # For now, implement basic constant padding via R array manipulation
+  warning("pad currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
+  
+  array_data <- as.array(tensor)
+  
+  # Convert pad_width to standard format
+  if (is.list(pad_width)) {
+    if (length(pad_width) != length(shape(tensor))) {
+      stop("pad_width list length must match number of dimensions")
+    }
+    pad_matrix <- do.call(rbind, pad_width)
+  } else if (is.matrix(pad_width)) {
+    if (nrow(pad_width) != length(shape(tensor)) || ncol(pad_width) != 2) {
+      stop("pad_width matrix must be ndims x 2")
+    }
+    pad_matrix <- pad_width
+  } else {
+    stop("pad_width must be a list or matrix")
+  }
+  
+  # Apply padding using base R functionality
+  # This is a simplified implementation - full CUDA implementation would be much faster
+  if (mode == "constant") {
+    # Use basic array padding with constant values
+    padded_dims <- dim(array_data) + pad_matrix[, 1] + pad_matrix[, 2]
+    result_array <- array(value, dim = padded_dims)
+    
+    # Copy original data to center of padded array
+    indices <- lapply(seq_len(length(dim(array_data))), function(i) {
+      (pad_matrix[i, 1] + 1):(pad_matrix[i, 1] + dim(array_data)[i])
+    })
+    
+    do.call(`[<-`, c(list(result_array), indices, list(array_data)))
+    result <- gpu_tensor(as.vector(result_array), dim(result_array))
+    return(result)
+  }
+  
+  # For reflect and replicate modes, would need more complex implementation
+  stop("Only constant padding mode is currently implemented")
 } 

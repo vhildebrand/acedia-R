@@ -660,19 +660,22 @@ public:
     void copy_to_host(T* host_ptr) const {
         if (!data_ || shape_.size() == 0) return;
         
-        if (!is_contiguous()) {
-            throw std::runtime_error("Cannot copy non-contiguous tensor to host");
+        if (is_contiguous()) {
+            // Fast path for contiguous tensors
+            cudaError_t err = cudaMemcpy(host_ptr, data_, shape_.size() * sizeof(T), cudaMemcpyDeviceToHost);
+            cudaSafeCall(err, "Failed to copy contiguous data from GPU to host");
+        } else {
+            // Handle non-contiguous tensors by first making them contiguous
+            gpuTensor<T> contiguous_copy = contiguous();
+            contiguous_copy.copy_to_host(host_ptr);
         }
-        
-        cudaError_t err = cudaMemcpy(host_ptr, data_, shape_.size() * sizeof(T), cudaMemcpyDeviceToHost);
-        cudaSafeCall(err, "Failed to copy data from GPU to host");
     }
     
     void copy_from_host(const T* host_ptr) {
         if (!data_ || shape_.size() == 0) return;
         
         if (!is_contiguous()) {
-            throw std::runtime_error("Cannot copy to non-contiguous tensor from host");
+            throw std::runtime_error("Cannot copy to non-contiguous tensor from host. Use contiguous() first.");
         }
         
         cudaError_t err = cudaMemcpy(data_, host_ptr, shape_.size() * sizeof(T), cudaMemcpyHostToDevice);

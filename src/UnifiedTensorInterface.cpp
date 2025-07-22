@@ -1079,6 +1079,45 @@ SEXP tensor_view_unified(SEXP tensor_ptr, IntegerVector new_shape) {
     } catch (const std::exception& e) {
         stop("Error in unified tensor view: " + std::string(e.what()));
     }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_reshape_unified(SEXP tensor_ptr, IntegerVector new_shape) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        // Convert shape vector
+        std::vector<size_t> shape_dims;
+        for (int i = 0; i < new_shape.size(); ++i) {
+            if (new_shape[i] <= 0) {
+                stop("Shape dimensions must be positive");
+            }
+            shape_dims.push_back(static_cast<size_t>(new_shape[i]));
+        }
+        Shape shape(shape_dims);
+        
+        // Check size compatibility
+        if (shape.size() != tensor->size()) {
+            stop("Reshape shape size must match original tensor size");
+        }
+        
+        // Use the TensorBase reshape method (handles contiguous/non-contiguous automatically)
+        auto result_tensor = tensor->reshape(shape);
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = tensor_dtype_unified(tensor_ptr);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor reshape: " + std::string(e.what()));
+    }
 } 
 
 // [[Rcpp::export]]
