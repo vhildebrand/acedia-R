@@ -17,14 +17,8 @@
 #' }
 #' }
 #' 
-#' @export
-gpu_available <- function() {
-  tryCatch({
-    .Call("_acediaR_gpu_available")
-  }, error = function(e) {
-    FALSE
-  })
-}
+# gpu_available function is auto-generated in RcppExports.R
+# No manual definition needed here
 
 #' Get GPU Information
 #'
@@ -41,14 +35,8 @@ gpu_available <- function() {
 #' cat(gpu_info())
 #' }
 #' 
-#' @export  
-gpu_info <- function() {
-  tryCatch({
-    .Call("_acediaR_gpu_info")
-  }, error = function(e) {
-    paste("GPU information unavailable:", e$message)
-  })
-}
+# gpu_info function is auto-generated in RcppExports.R
+# No manual definition needed here
 
 #' Get Available GPU Memory
 #'
@@ -66,14 +54,8 @@ gpu_info <- function() {
 #' cat("Available GPU memory:", round(mem_gb, 1), "GB\n")
 #' }
 #' 
-#' @export
-gpu_memory_available <- function() {
-  tryCatch({
-    .Call("_acediaR_gpu_memory_available")
-  }, error = function(e) {
-    0
-  })
-}
+# gpu_memory_available function is auto-generated in RcppExports.R
+# No manual definition needed here
 
 #' Comprehensive GPU Status
 #'

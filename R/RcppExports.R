@@ -49,3 +49,55 @@ gpu_dot_rcpp <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_gpu_dot_rcpp`, a_ptr, b_ptr)
 }
 
+create_tensor_unified <- function(data, shape_vec, dtype = "float32") {
+    .Call(`_acediaR_create_tensor_unified`, data, shape_vec, dtype)
+}
+
+create_empty_tensor_unified <- function(shape_vec, dtype = "float32") {
+    .Call(`_acediaR_create_empty_tensor_unified`, shape_vec, dtype)
+}
+
+tensor_to_r_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_to_r_unified`, tensor_ptr)
+}
+
+tensor_shape_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_shape_unified`, tensor_ptr)
+}
+
+tensor_size_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_size_unified`, tensor_ptr)
+}
+
+tensor_dtype_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_dtype_unified`, tensor_ptr)
+}
+
+tensor_info_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_info_unified`, tensor_ptr)
+}
+
+tensor_to_dtype_unified <- function(tensor_ptr, target_dtype) {
+    .Call(`_acediaR_tensor_to_dtype_unified`, tensor_ptr, target_dtype)
+}
+
+tensor_add_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_add_unified`, a_ptr, b_ptr)
+}
+
+tensor_scalar_mul_unified <- function(tensor_ptr, scalar) {
+    .Call(`_acediaR_tensor_scalar_mul_unified`, tensor_ptr, scalar)
+}
+
+tensor_sum_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_sum_unified`, tensor_ptr)
+}
+
+tensor_synchronize_unified <- function(tensor_ptr) {
+    invisible(.Call(`_acediaR_tensor_synchronize_unified`, tensor_ptr))
+}
+
+tensor_is_contiguous_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_is_contiguous_unified`, tensor_ptr)
+}
+

@@ -24,8 +24,8 @@ CUDA_OBJECTS = $(CUDA_SOURCES:.cu=.o)
 CPP_SOURCES = $(wildcard *.cpp)
 CPP_OBJECTS = $(CPP_SOURCES:.cpp=.o)
 
-# Include all objects in the build
-OBJECTS = R_interface.o RcppInterface.o RcppExports.o vector_add.o vector_multiply.o
+# Include all objects in the build (updated for new templated tensor system)
+OBJECTS = R_interface.o RcppInterface.o UnifiedTensorInterface.o RcppExports.o vector_add.o vector_multiply.o tensor_ops_templated.o
 
 # Rules for CUDA compilation
 %.o: %.cu
