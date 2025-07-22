@@ -155,7 +155,7 @@ shape <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
-  return(tensor_shape(tensor))
+  return(tensor_shape_unified(tensor))
 }
 
 #' Get Tensor Size
@@ -167,7 +167,7 @@ size <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
-  return(tensor_size(tensor))
+  return(tensor_size_unified(tensor))
 }
 
 #' Print Tensor Information
@@ -243,8 +243,8 @@ print.gpuTensor <- function(x, ...) {
       stop("Cannot multiply tensors with different dtypes")
     }
     
-    # TODO: Implement tensor_mul_unified for element-wise multiplication
-    stop("Element-wise multiplication not yet implemented in unified interface")
+    # Use unified interface for element-wise multiplication
+    result <- tensor_mul_unified(a, b)
   } else if (is.numeric(b) && length(b) == 1) {
     # Scalar multiplication using unified interface
     result <- tensor_scalar_mul_unified(a, b)
@@ -276,11 +276,8 @@ matmul <- function(a, b) {
     stop("Cannot multiply tensors with different dtypes")
   }
   
-  if (dtype_a == "double") {
-    result <- tensor_matmul_double(a, b)
-  } else {
-    stop("Matrix multiplication not implemented for dtype: ", dtype_a)
-  }
+  # Use unified interface for matrix multiplication
+  result <- tensor_matmul_unified(a, b)
   
   class(result) <- c("gpuTensor", class(result))
   return(result)
@@ -310,13 +307,8 @@ view <- function(tensor, new_shape) {
     stop("Object is not a gpuTensor")
   }
   
-  dtype <- attr(tensor, "dtype", exact=TRUE) %||% "double"
-  
-  if (dtype == "double") {
-    result <- tensor_view_double(tensor, as.integer(new_shape))
-  } else {
-    stop("View not implemented for dtype: ", dtype)
-  }
+  # Use unified interface for view operations
+  result <- tensor_view_unified(tensor, as.integer(new_shape))
   
   class(result) <- c("gpuTensor", class(result))
   return(result)
@@ -331,7 +323,7 @@ is_contiguous <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
-  return(tensor_is_contiguous(tensor))
+  return(tensor_is_contiguous_unified(tensor))
 }
 
 #' Synchronize Tensor Operations
@@ -344,7 +336,7 @@ synchronize <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
-  tensor_synchronize(tensor)
+  tensor_synchronize_unified(tensor)
   invisible(tensor)
 }
 
@@ -361,15 +353,8 @@ requires_grad <- function(tensor, requires_grad = TRUE) {
     stop("Object is not a gpuTensor")
   }
   
-  dtype <- attr(tensor, "dtype", exact=TRUE) %||% "double"
-  
-  if (dtype == "double") {
-    tensor_requires_grad_double(tensor, requires_grad)
-  } else {
-    stop("Autograd not implemented for dtype: ", dtype)
-  }
-  
-  return(tensor)
+  # Autograd not yet implemented in unified interface
+  stop("Autograd not yet implemented in unified interface")
 }
 
 # Utility function for null coalescing

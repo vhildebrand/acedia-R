@@ -6,17 +6,34 @@
 \alias{acediaR-package}
 \title{acediaR: GPU-Accelerated Computing for R using CUDA}
 \description{
-Provides CUDA-accelerated linear algebra operations and statistical functions for R, enabling high-performance computing on NVIDIA GPUs. This package implements GPU kernels for common mathematical operations including vector arithmetic, matrix operations, and statistical computations.
+acediaR: R Interface for CUDA-Accelerated Linear Algebra
+
+This package provides CUDA-accelerated linear algebra operations for R,
+enabling high-performance GPU computation with familiar R syntax.
+
+The package offers:
+\itemize{
+  \item High-level functions like \code{gpu_add()}, \code{gpu_multiply()} for simple operations
+  \item Advanced gpuTensor objects for complex multi-dimensional operations with mixed precision support
+  \item Automatic CPU fallback when GPU is not available
+  \item Memory-efficient tensor operations that minimize data transfers
+}
 }
 \details{
 The acediaR package provides GPU-accelerated computing capabilities for R using CUDA.
 It includes high-performance implementations of common mathematical operations
 including vector arithmetic, matrix operations, and statistical computations.
 
-The package provides two main interfaces:
+Key features:
 \itemize{
-  \item Low-level functions that transfer data to GPU, perform operations, and return to CPU
-  \item High-level gpuVector objects that maintain data on GPU for efficient chained operations
+  \item Templated CUDA kernels supporting mixed precision (half, float, double)
+  \item Unified tensor interface for complex multi-dimensional operations
+  \item Efficient memory management with automatic GPU resource cleanup
+  \item Comprehensive error handling with graceful CPU fallback
+  \item Performance-optimized implementations with parallel reduction algorithms
 }
+
+The package is designed for both simple one-off operations and complex 
+computational workflows requiring sustained GPU computation.
 }
 \keyword{internal}

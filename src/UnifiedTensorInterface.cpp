@@ -573,4 +573,210 @@ bool tensor_is_contiguous_unified(SEXP tensor_ptr) {
     } catch (const std::exception& e) {
         stop("Error checking tensor contiguity: " + std::string(e.what()));
     }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_mul_unified(SEXP a_ptr, SEXP b_ptr) {
+    try {
+        XPtr<TensorBase> a_tensor(a_ptr);
+        XPtr<TensorBase> b_tensor(b_ptr);
+        
+        if (!a_tensor || !b_tensor) {
+            stop("Invalid tensor pointer(s)");
+        }
+        
+        // Check shapes compatibility
+        if (a_tensor->shape() != b_tensor->shape()) {
+            stop("Tensor shapes must match for element-wise multiplication");
+        }
+        
+        DType dtype_a = a_tensor->dtype();
+        DType dtype_b = b_tensor->dtype();
+        
+        if (dtype_a != dtype_b) {
+            stop("Cannot multiply tensors with different dtypes");
+        }
+        
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype_a) {
+            case DType::FLOAT16: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<half>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<half>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
+                }
+                auto result = std::make_shared<gpuTensor<half>>(a_wrapper->tensor().shape());
+                tensor_mul_float16(result->data(), a_wrapper->tensor().data(), 
+                                 b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<half>>(result);
+                break;
+            }
+            case DType::FLOAT32: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
+                }
+                auto result = std::make_shared<gpuTensor<float>>(a_wrapper->tensor().shape());
+                tensor_mul_float32(result->data(), a_wrapper->tensor().data(), 
+                                 b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+                break;
+            }
+            case DType::FLOAT64: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
+                }
+                auto result = std::make_shared<gpuTensor<double>>(a_wrapper->tensor().shape());
+                tensor_mul_float64(result->data(), a_wrapper->tensor().data(), 
+                                 b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+                break;
+            }
+            default:
+                stop("Element-wise multiplication not implemented for dtype: " + dtype_to_string(dtype_a));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = dtype_to_string(dtype_a);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor element-wise multiplication: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
+    try {
+        XPtr<TensorBase> a_tensor(a_ptr);
+        XPtr<TensorBase> b_tensor(b_ptr);
+        
+        if (!a_tensor || !b_tensor) {
+            stop("Invalid tensor pointer(s)");
+        }
+        
+        // Check that both tensors are 2D
+        if (a_tensor->ndims() != 2 || b_tensor->ndims() != 2) {
+            stop("Matrix multiplication requires 2D tensors");
+        }
+        
+        auto a_shape = a_tensor->shape();
+        auto b_shape = b_tensor->shape();
+        
+        // Check dimensions compatibility for matrix multiplication (M x K) * (K x N) = (M x N)
+        if (a_shape.dims[1] != b_shape.dims[0]) {
+            stop("Incompatible dimensions for matrix multiplication");
+        }
+        
+        size_t M = a_shape.dims[0];
+        size_t K = a_shape.dims[1];
+        size_t N = b_shape.dims[1];
+        
+        DType dtype_a = a_tensor->dtype();
+        DType dtype_b = b_tensor->dtype();
+        
+        if (dtype_a != dtype_b) {
+            stop("Cannot multiply tensors with different dtypes");
+        }
+        
+        Shape result_shape({M, N});
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype_a) {
+            case DType::FLOAT16: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<half>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<half>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
+                }
+                auto result = std::make_shared<gpuTensor<half>>(result_shape);
+                tensor_matmul_float16(result->data(), a_wrapper->tensor().data(), 
+                                    b_wrapper->tensor().data(), M, N, K);
+                result_tensor = std::make_unique<TensorWrapper<half>>(result);
+                break;
+            }
+            case DType::FLOAT32: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
+                }
+                auto result = std::make_shared<gpuTensor<float>>(result_shape);
+                tensor_matmul_float32(result->data(), a_wrapper->tensor().data(), 
+                                    b_wrapper->tensor().data(), M, N, K);
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+                break;
+            }
+            case DType::FLOAT64: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
+                }
+                auto result = std::make_shared<gpuTensor<double>>(result_shape);
+                tensor_matmul_float64(result->data(), a_wrapper->tensor().data(), 
+                                    b_wrapper->tensor().data(), M, N, K);
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+                break;
+            }
+            default:
+                stop("Matrix multiplication not implemented for dtype: " + dtype_to_string(dtype_a));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = dtype_to_string(dtype_a);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor matrix multiplication: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_view_unified(SEXP tensor_ptr, IntegerVector new_shape) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        // Convert shape vector
+        std::vector<size_t> shape_dims;
+        for (int i = 0; i < new_shape.size(); ++i) {
+            if (new_shape[i] <= 0) {
+                stop("Shape dimensions must be positive");
+            }
+            shape_dims.push_back(static_cast<size_t>(new_shape[i]));
+        }
+        Shape shape(shape_dims);
+        
+        // Check size compatibility
+        if (shape.size() != tensor->size()) {
+            stop("View shape size must match original tensor size");
+        }
+        
+        // Use the TensorBase view method
+        auto result_tensor = tensor->view(shape);
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = tensor_dtype_unified(tensor_ptr);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor view: " + std::string(e.what()));
+    }
 } 

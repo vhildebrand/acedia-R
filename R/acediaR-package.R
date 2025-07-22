@@ -1,21 +1,18 @@
-#' @details
-#' The acediaR package provides GPU-accelerated computing capabilities for R using CUDA.
-#' It includes high-performance implementations of common mathematical operations
-#' including vector arithmetic, matrix operations, and statistical computations.
-#' 
-#' The package provides two main interfaces:
-#' \itemize{
-#'   \item Low-level functions that transfer data to GPU, perform operations, and return to CPU
-#'   \item High-level gpuVector objects that maintain data on GPU for efficient chained operations
-#' }
+#' acediaR: R Interface for CUDA-Accelerated Linear Algebra
 #'
-#' @keywords internal
-"_PACKAGE"
-
-#' @useDynLib acediaR, .registration=TRUE
-#' @importFrom Rcpp evalCpp sourceCpp
-#' @import methods
-#' @exportPattern "^[[:alpha:]]+"
+#' This package provides CUDA-accelerated linear algebra operations for R,
+#' enabling high-performance GPU computation with familiar R syntax.
+#'
+#' The package offers:
+#'   \item High-level functions like \code{gpu_add()}, \code{gpu_multiply()} for simple operations
+#'   \item Advanced gpuTensor objects for complex multi-dimensional operations with mixed precision support
+#'   \item Automatic CPU fallback when GPU is not available
+#'   \item Memory-efficient tensor operations that minimize data transfers
+#'
+#' @docType package
+#' @name acediaR
+#' @useDynLib acediaR, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
 NULL
 
 # Package initialization

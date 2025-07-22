@@ -13,42 +13,6 @@ gpu_memory_available <- function() {
     .Call(`_acediaR_gpu_memory_available`)
 }
 
-as_gpuVector <- function(x) {
-    .Call(`_acediaR_as_gpuVector`, x)
-}
-
-as_vector_gpuVector <- function(gpu_vec_ptr) {
-    .Call(`_acediaR_as_vector_gpuVector`, gpu_vec_ptr)
-}
-
-gpu_add_rcpp <- function(a_ptr, b_ptr) {
-    .Call(`_acediaR_gpu_add_rcpp`, a_ptr, b_ptr)
-}
-
-print_gpuVector <- function(gpu_vec_ptr) {
-    invisible(.Call(`_acediaR_print_gpuVector`, gpu_vec_ptr))
-}
-
-gpuVector_size <- function(gpu_vec_ptr) {
-    .Call(`_acediaR_gpuVector_size`, gpu_vec_ptr)
-}
-
-gpuVector_empty <- function(gpu_vec_ptr) {
-    .Call(`_acediaR_gpuVector_empty`, gpu_vec_ptr)
-}
-
-gpu_multiply_rcpp <- function(a_ptr, b_ptr) {
-    .Call(`_acediaR_gpu_multiply_rcpp`, a_ptr, b_ptr)
-}
-
-gpu_scale_rcpp <- function(vec_ptr, scalar) {
-    .Call(`_acediaR_gpu_scale_rcpp`, vec_ptr, scalar)
-}
-
-gpu_dot_rcpp <- function(a_ptr, b_ptr) {
-    .Call(`_acediaR_gpu_dot_rcpp`, a_ptr, b_ptr)
-}
-
 create_tensor_unified <- function(data, shape_vec, dtype = "float32") {
     .Call(`_acediaR_create_tensor_unified`, data, shape_vec, dtype)
 }
@@ -99,5 +63,17 @@ tensor_synchronize_unified <- function(tensor_ptr) {
 
 tensor_is_contiguous_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_is_contiguous_unified`, tensor_ptr)
+}
+
+tensor_mul_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_mul_unified`, a_ptr, b_ptr)
+}
+
+tensor_matmul_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_matmul_unified`, a_ptr, b_ptr)
+}
+
+tensor_view_unified <- function(tensor_ptr, new_shape) {
+    .Call(`_acediaR_tensor_view_unified`, tensor_ptr, new_shape)
 }
 

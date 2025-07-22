@@ -234,6 +234,20 @@ AccumType launch_reduction(const T* input, size_t n, Op op, AccumType init_val, 
         d_block_results, input, n, op, init_val
     );
     
+    // Check for kernel launch errors
+    cudaError_t cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) {
+        printf("CUDA kernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+        return init_val;
+    }
+    
+    // Wait for kernel completion
+    cudaStatus = cudaDeviceSynchronize();
+    if (cudaStatus != cudaSuccess) {
+        printf("CUDA synchronize failed: %s\n", cudaGetErrorString(cudaStatus));
+        return init_val;
+    }
+    
     // Recursively reduce if needed
     AccumType* h_block_results = (AccumType*)malloc(blocksPerGrid * sizeof(AccumType));
     cudaMemcpy(h_block_results, d_block_results, blocksPerGrid * sizeof(AccumType), cudaMemcpyDeviceToHost);

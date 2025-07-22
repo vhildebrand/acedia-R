@@ -21,9 +21,9 @@
 #' If GPU is not available or GPU operations fail, the function automatically
 #' falls back to CPU computation with an optional warning.
 #' 
-#' For chained GPU operations or advanced workflows, consider using \code{as.gpuVector()}
+#' For chained GPU operations or advanced workflows, consider using \code{gpu_tensor()}
 #' to create GPU-resident objects and use the \code{+} operator directly:
-#' \code{gpu_a + gpu_b} where \code{gpu_a} and \code{gpu_b} are gpuVector objects.
+#' \code{tensor_a + tensor_b} where \code{tensor_a} and \code{tensor_b} are gpuTensor objects.
 #' 
 #' @examples
 #' \dontrun{
@@ -36,11 +36,11 @@
 #' # Force CPU implementation for testing
 #' result_cpu <- gpu_add(a, b, force_cpu = TRUE)
 #' 
-#' # For chained operations, use gpuVector objects:
-#' gpu_a <- as.gpuVector(a)
-#' gpu_b <- as.gpuVector(b) 
-#' gpu_result <- gpu_a + gpu_b  # Stays on GPU
-#' result2 <- as.vector(gpu_result)  # Transfer back when needed
+#' # For chained operations, use gpuTensor objects:
+#' tensor_a <- gpu_tensor(a, length(a))
+#' tensor_b <- gpu_tensor(b, length(b)) 
+#' tensor_result <- tensor_a + tensor_b  # Stays on GPU
+#' result2 <- as.vector(tensor_result)  # Transfer back when needed
 #' 
 #' # Verify correctness against CPU
 #' all.equal(result, a + b)
@@ -68,7 +68,11 @@ gpu_add <- function(a, b, force_cpu = FALSE, warn_fallback = TRUE) {
   if (should_use_gpu) {
     # Try GPU implementation first
     tryCatch({
-      .Call("r_gpu_add", a, b)
+      # Create gpuTensor objects and perform addition (element-wise)
+      tensor_a <- gpu_tensor(a, length(a))
+      tensor_b <- gpu_tensor(b, length(b))
+      result_tensor <- tensor_a + tensor_b
+      as.vector(result_tensor)
     }, error = function(e) {
       # GPU failed, fall back to CPU
       if (warn_fallback) {
