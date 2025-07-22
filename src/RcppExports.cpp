@@ -260,6 +260,29 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_transpose_unified
+SEXP tensor_transpose_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_transpose_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_transpose_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_permute_unified
+SEXP tensor_permute_unified(SEXP tensor_ptr, IntegerVector dims);
+RcppExport SEXP _acediaR_tensor_permute_unified(SEXP tensor_ptrSEXP, SEXP dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type dims(dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_permute_unified(tensor_ptr, dims));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_gpu_available", (DL_FUNC) &_acediaR_gpu_available, 0},
@@ -284,6 +307,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_tensor_matmul_unified", (DL_FUNC) &_acediaR_tensor_matmul_unified, 2},
     {"_acediaR_tensor_view_unified", (DL_FUNC) &_acediaR_tensor_view_unified, 2},
     {"_acediaR_tensor_scalar_add_unified", (DL_FUNC) &_acediaR_tensor_scalar_add_unified, 2},
+    {"_acediaR_tensor_transpose_unified", (DL_FUNC) &_acediaR_tensor_transpose_unified, 1},
+    {"_acediaR_tensor_permute_unified", (DL_FUNC) &_acediaR_tensor_permute_unified, 2},
     {NULL, NULL, 0}
 };
 

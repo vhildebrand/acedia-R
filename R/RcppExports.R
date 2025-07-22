@@ -89,3 +89,11 @@ tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
     .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
 }
 
+tensor_transpose_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_transpose_unified`, tensor_ptr)
+}
+
+tensor_permute_unified <- function(tensor_ptr, dims) {
+    .Call(`_acediaR_tensor_permute_unified`, tensor_ptr, dims)
+}
+

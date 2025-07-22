@@ -115,14 +115,19 @@ public:
     
     // View operations
     std::unique_ptr<TensorBase> view(const Shape& new_shape) const override {
+        // CRITICAL FIX: Create view that shares the same underlying gpuTensor instance
+        // instead of creating a copy
+        auto view_tensor = tensor_->view(new_shape);
         return std::make_unique<TensorWrapper<T>>(
-            std::make_shared<gpuTensor<T>>(tensor_->view(new_shape))
+            std::make_shared<gpuTensor<T>>(std::move(view_tensor))
         );
     }
     
     std::unique_ptr<TensorBase> reshape(const Shape& new_shape) const override {
+        // CRITICAL FIX: Create reshape that shares storage when possible
+        auto reshaped_tensor = tensor_->reshape(new_shape);
         return std::make_unique<TensorWrapper<T>>(
-            std::make_shared<gpuTensor<T>>(tensor_->reshape(new_shape))
+            std::make_shared<gpuTensor<T>>(std::move(reshaped_tensor))
         );
     }
     

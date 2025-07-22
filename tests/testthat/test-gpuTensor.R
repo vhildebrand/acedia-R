@@ -166,6 +166,55 @@ test_that("tensor views and reshaping work", {
   expect_error(view(tensor, c(5, 5)), "View shape size must match")
 })
 
+test_that("tensor transpose works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Test 2D matrix transpose
+  data_2d <- 1:6
+  tensor_2d <- gpu_tensor(data_2d, c(2, 3))
+  
+  transposed <- transpose(tensor_2d)
+  
+  expect_equal(shape(transposed), c(3, 2))
+  expect_equal(size(transposed), size(tensor_2d))
+  
+  # Check values are correct
+  original_array <- as.array(tensor_2d)
+  transposed_array <- as.array(transposed)
+  expect_equal(transposed_array, t(original_array))
+  
+  # Test error for non-2D tensors
+  tensor_1d <- gpu_tensor(1:6, c(6))
+  expect_error(transpose(tensor_1d), "2D tensors only")
+  
+  tensor_3d <- gpu_tensor(1:24, c(2, 3, 4))
+  expect_error(transpose(tensor_3d), "2D tensors only")
+})
+
+test_that("tensor permute works", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  # Test 3D tensor permutation
+  data_3d <- 1:24
+  tensor_3d <- gpu_tensor(data_3d, c(2, 3, 4))
+  
+  # Permute dimensions: (2,3,4) -> (3,4,2)
+  permuted <- permute(tensor_3d, c(2, 3, 1))
+  
+  expect_equal(shape(permuted), c(3, 4, 2))
+  expect_equal(size(permuted), size(tensor_3d))
+  
+  # Check values using R's aperm as reference
+  original_array <- as.array(tensor_3d)
+  permuted_array <- as.array(permuted)
+  expected_array <- aperm(original_array, c(2, 3, 1))
+  expect_equal(permuted_array, expected_array)
+  
+  # Test invalid permutation
+  expect_error(permute(tensor_3d, c(1, 2)), "must match tensor dimensions")
+  expect_error(permute(tensor_3d, c(1, 1, 2)), "Invalid permutation")  # Duplicate dimension
+})
+
 test_that("tensor reduction operations work", {
   skip_if_not(gpu_available(), "GPU not available")
   

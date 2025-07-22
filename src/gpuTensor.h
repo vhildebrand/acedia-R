@@ -573,6 +573,47 @@ public:
         }
     }
     
+    // Transpose (2D only for now)
+    gpuTensor transpose() const {
+        if (ndims() != 2) {
+            throw std::runtime_error("Transpose currently supports 2D tensors only");
+        }
+        
+        // Create transposed shape and strides
+        Shape new_shape({shape_[1], shape_[0]});  // Swap dimensions
+        std::vector<size_t> new_strides({strides_[1], strides_[0]});  // Swap strides
+        
+        return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
+    }
+    
+    // Permute dimensions (general case)
+    gpuTensor permute(const std::vector<int>& dims) const {
+        if (dims.size() != ndims()) {
+            throw std::runtime_error("Permute dimensions must match tensor dimensions");
+        }
+        
+        // Validate dimensions
+        std::vector<bool> used(ndims(), false);
+        for (size_t i = 0; i < dims.size(); ++i) {
+            if (dims[i] < 0 || dims[i] >= (int)ndims() || used[dims[i]]) {
+                throw std::runtime_error("Invalid permutation dimensions");
+            }
+            used[dims[i]] = true;
+        }
+        
+        // Create new shape and strides
+        std::vector<size_t> new_shape_dims(ndims());
+        std::vector<size_t> new_strides(ndims());
+        
+        for (size_t i = 0; i < ndims(); ++i) {
+            new_shape_dims[i] = shape_[dims[i]];
+            new_strides[i] = strides_[dims[i]];
+        }
+        
+        Shape new_shape(new_shape_dims);
+        return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
+    }
+    
     // Create a contiguous copy
     gpuTensor contiguous() const {
         if (is_contiguous()) {

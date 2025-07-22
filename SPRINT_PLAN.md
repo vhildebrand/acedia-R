@@ -108,7 +108,19 @@ The project is organized into 6 sprints, each building upon the previous work to
 
 ## Current Status
 
-✅ **Sprint 1: COMPLETED** - Foundation and core infrastructure established
+✅ **Sprint 1: 90% COMPLETED** - Core tensor semantics mostly implemented
+- ✅ Broadcasting (Shape::broadcast_with() with CUDA kernels)
+- ✅ Strided/non-contiguous tensors (contiguous() + strided copy kernels)
+- ✅ Scalar operations (tensor + scalar, overloaded operators)
+- ✅ Basic indexing/slicing (tensor[1, ], contiguous ranges)
+- ⚠️ More math ops: Basic arithmetic done (+-*/), missing exp/log/sqrt/comparisons/reductions
+
+**Remaining for Sprint 1:**
+- exp, log, sqrt, comparisons (>, <, ==)
+- max, min, argmax, softmax activation functions
+- Additional reductions: mean, var, prod  
+- transpose/permute dims, concat, stack, repeat, pad operations
+
 ✅ **Sprint 2: COMPLETED** - Abstractions, data management, and robustness implemented
 ✅ **Sprint 3: COMPLETED** - Foundational Operations (BLAS Level 1) implemented
 🎯 **Current Achievement:** Complete BLAS Level 1 operations with comprehensive testing

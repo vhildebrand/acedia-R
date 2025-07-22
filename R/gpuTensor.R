@@ -320,6 +320,51 @@ view <- function(tensor, new_shape) {
   return(result)
 }
 
+#' Transpose Tensor
+#'
+#' Creates a transposed view of a 2D tensor (matrix).
+#'
+#' @param tensor A 2D gpuTensor object
+#' @return A transposed tensor that shares memory with the original
+#' @export
+transpose <- function(tensor) {
+  if (!inherits(tensor, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (length(shape(tensor)) != 2) {
+    stop("Transpose currently supports 2D tensors only")
+  }
+  
+  # Use unified interface for true transpose views
+  result <- tensor_transpose_unified(tensor)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Permute Tensor Dimensions
+#'
+#' Reorder the dimensions of a tensor.
+#'
+#' @param tensor A gpuTensor object
+#' @param dims Integer vector specifying the new order of dimensions (1-indexed)
+#' @return A tensor with permuted dimensions
+#' @export
+permute <- function(tensor, dims) {
+  if (!inherits(tensor, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (length(dims) != length(shape(tensor))) {
+    stop("Number of dimensions in 'dims' must match tensor dimensions")
+  }
+  
+  # Use unified interface for true permute views
+  result <- tensor_permute_unified(tensor, as.integer(dims))
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
 #' Check if Tensor is Contiguous
 #'
 #' @param tensor A gpuTensor object
