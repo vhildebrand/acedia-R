@@ -1,0 +1,208 @@
+* using log directory ‘/home/alekseim/Documents/gauntlet/acediaR/..Rcheck’
+* using R version 4.3.3 (2024-02-29)
+* using platform: x86_64-pc-linux-gnu (64-bit)
+* R was compiled by
+    gcc (Ubuntu 13.2.0-23ubuntu3) 13.2.0
+    GNU Fortran (Ubuntu 13.2.0-23ubuntu3) 13.2.0
+* running under: Ubuntu 24.04.2 LTS
+* using session charset: UTF-8
+* using options ‘--no-manual --no-build-vignettes’
+* checking for file ‘./DESCRIPTION’ ... OK
+* checking extension type ... Package
+* this is package ‘acediaR’ version ‘0.0.0.9000’
+* package encoding: UTF-8
+* checking package namespace information ... OK
+* checking package dependencies ... OK
+* checking if this is a source package ... WARNING
+Subdirectory ‘acediaR/src’ contains apparent object files/libraries
+  RcppExports.o RcppInterface.o UnifiedTensorInterface.o acediaR.so
+  tensor_ops_templated.o tensor_ops_templated_DEPRECATED.o
+Object files/libraries should not be included in a source package.
+
+In addition to the above warning(s), found the following notes:
+
+Found the following apparent object files/libraries:
+  src/kernels/tensor_wrappers.o
+Object files/libraries should not be included in a source package.
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... NOTE
+Found the following hidden files and directories:
+  .gitignore
+  ..Rcheck
+  .git
+These were most likely included in error. See section ‘Package
+structure’ in the ‘Writing R Extensions’ manual.
+* checking for portable file names ... OK
+* checking for sufficient/correct file permissions ... OK
+* checking whether package ‘acediaR’ can be installed ... WARNING
+Found the following significant warnings:
+  Warning: acediaR.Rd:14: unknown macro '\item'
+  Warning: acediaR.Rd:15: unknown macro '\item'
+  Warning: acediaR.Rd:16: unknown macro '\item'
+  Warning: acediaR.Rd:17: unknown macro '\item'
+See ‘/home/alekseim/Documents/gauntlet/acediaR/..Rcheck/00install.out’ for details.
+* used C++ compiler: ‘g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0’
+* checking installed package size ... NOTE
+  installed size is  5.5Mb
+  sub-directories of 1Mb or more:
+    libs   5.3Mb
+* checking package directory ... OK
+* checking DESCRIPTION meta-information ... NOTE
+Checking should be performed on sources prepared by ‘R CMD build’.
+* checking top-level files ... OK
+* checking for left-over files ... OK
+* checking index information ... OK
+* checking package subdirectories ... WARNING
+Found the following directory with the name of a check directory:
+  ./..Rcheck
+Most likely, these were included erroneously.
+* checking R files for non-ASCII characters ... OK
+* checking R files for syntax errors ... OK
+* checking whether the package can be loaded ... OK
+* checking whether the package can be loaded with stated dependencies ... OK
+* checking whether the package can be unloaded cleanly ... OK
+* checking whether the namespace can be loaded with stated dependencies ... OK
+* checking whether the namespace can be unloaded cleanly ... OK
+* checking loading without being on the library search path ... OK
+* checking startup messages can be suppressed ... OK
+* checking dependencies in R code ... WARNING
+'::' or ':::' import not declared from: ‘abind’
+* checking S3 generic/method consistency ... WARNING
+as.array:
+  function(x, ...)
+as.array.gpuTensor:
+  function(tensor)
+See section ‘Generic functions and methods’ in the ‘Writing R
+Extensions’ manual.
+* checking replacement functions ... OK
+* checking foreign function calls ... OK
+* checking R code for possible problems ... NOTE
+benchmark_gpu_multiply: no visible global function definition for
+  ‘runif’
+benchmark_gpu_multiply: no visible global function definition for
+  ‘median’
+Undefined global functions or variables:
+  median runif
+Consider adding
+  importFrom("stats", "median", "runif")
+to your NAMESPACE file.
+* checking Rd files ... WARNING
+prepare_Rd: acediaR.Rd:14: unknown macro '\item'
+prepare_Rd: acediaR.Rd:15: unknown macro '\item'
+prepare_Rd: acediaR.Rd:16: unknown macro '\item'
+prepare_Rd: acediaR.Rd:17: unknown macro '\item'
+* checking Rd metadata ... OK
+* checking Rd cross-references ... OK
+* checking for missing documentation entries ... WARNING
+Undocumented code objects:
+  ‘*.gpuTensor’ ‘+.gpuTensor’ ‘-.gpuTensor’ ‘/.gpuTensor’
+  ‘as.vector.gpuTensor’ ‘concat’ ‘create_empty_tensor_unified’
+  ‘create_tensor_unified’ ‘exp.gpuTensor’ ‘gpu_available’ ‘gpu_info’
+  ‘gpu_memory_available’ ‘log.gpuTensor’ ‘max.gpuTensor’
+  ‘mean.gpuTensor’ ‘min.gpuTensor’ ‘pad’ ‘permute’ ‘repeat_tensor’
+  ‘reshape’ ‘sqrt.gpuTensor’ ‘stack’ ‘tensor_add_unified’
+  ‘tensor_div_unified’ ‘tensor_dtype_unified’ ‘tensor_exp_unified’
+  ‘tensor_info_unified’ ‘tensor_is_contiguous_unified’
+  ‘tensor_log_unified’ ‘tensor_matmul_unified’ ‘tensor_max_unified’
+  ‘tensor_mean_unified’ ‘tensor_min_unified’ ‘tensor_mul_unified’
+  ‘tensor_permute_unified’ ‘tensor_reshape_unified’
+  ‘tensor_scalar_add_unified’ ‘tensor_scalar_mul_unified’
+  ‘tensor_shape_unified’ ‘tensor_size_unified’ ‘tensor_slice_extract’
+  ‘tensor_sqrt_unified’ ‘tensor_sub_unified’ ‘tensor_sum_unified’
+  ‘tensor_synchronize_unified’ ‘tensor_to_dtype_unified’
+  ‘tensor_to_r_unified’ ‘tensor_transpose_unified’
+  ‘tensor_view_unified’ ‘transpose’
+All user-level objects in a package should have documentation entries.
+See chapter ‘Writing R documentation files’ in the ‘Writing R
+Extensions’ manual.
+* checking for code/documentation mismatches ... OK
+* checking Rd \usage sections ... WARNING
+Undocumented arguments in documentation object 'contiguous'
+  ‘tensor’
+
+Undocumented arguments in documentation object 'dim.gpuTensor'
+  ‘x’
+
+Undocumented arguments in documentation object '[.gpuTensor'
+  ‘x’ ‘...’ ‘drop’
+
+Undocumented arguments in documentation object 'sum.gpuTensor'
+  ‘...’
+
+Functions with \usage entries need to have the appropriate \alias
+entries, and all their arguments documented.
+The \usage entries must correspond to syntactically valid R code.
+See chapter ‘Writing R documentation files’ in the ‘Writing R
+Extensions’ manual.
+* checking Rd contents ... OK
+* checking for unstated dependencies in examples ... ERROR
+Warning: parse error in file 'lines':
+5: unexpected symbol
+186: 
+187: Get GPU
+         ^
+** will not attempt to run examples
+* checking LazyData ... NOTE
+  'LazyData' is specified without a 'data' directory
+* checking line endings in C/C++/Fortran sources/headers ... NOTE
+Found the following sources/headers not terminated with a newline:
+  src/AutogradOperations.h
+  src/ComputationGraph.h
+  src/GraphCompiler.h
+  src/RcppInterface.cpp
+  src/TensorRegistry.h
+  src/UnifiedTensorInterface.cpp
+  src/cuda_utils.h
+  src/gpuTensor.h
+Some compilers warn on such files.
+* checking line endings in Makefiles ... NOTE
+Found the following Makefile(s) without a final LF:
+  src/Makevars
+Some ‘make’ programs ignore lines not ending in LF.
+* checking compilation flags in Makevars ... WARNING
+Non-portable flags in variable 'PKG_CPPFLAGS':
+  -fPIC
+* checking for GNU extensions in Makefiles ... WARNING
+Found the following file(s) containing GNU extensions:
+  src/Makevars
+Portable Makefiles do not use GNU extensions such as +=, :=, $(shell),
+$(wildcard), ifeq ... endif, .NOTPARALLEL See section ‘Writing portable
+packages’ in the ‘Writing R Extensions’ manual.
+* checking for portable use of $(BLAS_LIBS) and $(LAPACK_LIBS) ... OK
+* checking use of PKG_*FLAGS in Makefiles ... OK
+* checking compiled code ... WARNING
+File ‘acediaR/libs/acediaR.so’:
+  Found ‘__printf_chk’, possibly from ‘printf’ (C)
+    Object: ‘kernels/tensor_wrappers.o’
+  Found ‘exit’, possibly from ‘exit’ (C)
+    Object: ‘kernels/tensor_wrappers.o’
+
+Compiled code should not call entry points which might terminate R nor
+write to stdout/stderr instead of to the console, nor use Fortran I/O
+nor system RNGs nor [v]sprintf.
+
+See ‘Writing portable packages’ in the ‘Writing R Extensions’ manual.
+* checking examples ... SKIPPED
+* checking for unstated dependencies in ‘tests’ ... OK
+* checking tests ... ERROR
+  Running ‘testthat.R’
+Running the tests in ‘tests/testthat.R’ failed.
+Last 13 lines of output:
+  
+  Attaching package: 'acediaR'
+  
+  The following object is masked from 'package:stats':
+  
+      reshape
+  
+  The following object is masked from 'package:utils':
+  
+      stack
+  
+  > 
+  > test_check("acediaR") 
+  
+  === Testing vector size: 1e+05 ===
+* DONE
+Status: 2 ERRORs, 11 WARNINGs, 7 NOTEs

@@ -4,7 +4,21 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <cuda_bf16.h>
+#include <stdio.h>
+#include <vector>
+#include <limits>
+#include "kernel_utils.cuh"
 #include "tensor_ops.cu"
+#include "../gpuTensor.h"
+
+// Simple error checking function
+inline void cudaSafeCall(cudaError_t err, const char* msg) {
+    if (err != cudaSuccess) {
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg), "%s: %s", msg, cudaGetErrorString(err));
+        throw std::runtime_error(error_msg);
+    }
+}
 
 // C-style wrapper functions for each type (for R interface)
 extern "C" {
@@ -222,37 +236,6 @@ long long tensor_sum_int64(const int64_t* input, size_t n) {
     return launch_reduction(input, n, AddOp{}, static_cast<int64_t>(0));
 }
 
-// Unary math operations
-void tensor_exp_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary(result, input, n, ExpOp{});
-    cudaDeviceSynchronize();
-}
-
-void tensor_exp_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary(result, input, n, ExpOp{});
-    cudaDeviceSynchronize();
-}
-
-void tensor_log_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary(result, input, n, LogOp{});
-    cudaDeviceSynchronize();
-}
-
-void tensor_log_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary(result, input, n, LogOp{});
-    cudaDeviceSynchronize();
-}
-
-void tensor_sqrt_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary(result, input, n, SqrtOp{});
-    cudaDeviceSynchronize();
-}
-
-void tensor_sqrt_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary(result, input, n, SqrtOp{});
-    cudaDeviceSynchronize();
-}
-
 // Advanced tensor operations
 
 // Concat operation
@@ -417,6 +400,116 @@ void tensor_strided_copy_float64(double* dest, const double* src, const int* str
     std::vector<int> shape_vec(shape, shape + ndims);
     launch_strided_copy(dest, src, stride_vec, shape_vec, total_elements);
     cudaDeviceSynchronize();
+}
+
+// Unary Math Operations
+void tensor_exp_float32(float* result, const float* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_exp_float32");
+    
+    launch_elementwise_unary(result, input, n, ExpOp());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_exp_float32");
+}
+
+void tensor_exp_float64(double* result, const double* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_exp_float64");
+    
+    launch_elementwise_unary(result, input, n, ExpOp());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_exp_float64");
+}
+
+void tensor_log_float32(float* result, const float* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_log_float32");
+    
+    launch_elementwise_unary(result, input, n, LogOp());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_log_float32");
+}
+
+void tensor_log_float64(double* result, const double* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_log_float64");
+    
+    launch_elementwise_unary(result, input, n, LogOp());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_log_float64");
+}
+
+void tensor_sqrt_float32(float* result, const float* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_sqrt_float32");
+    
+    launch_elementwise_unary(result, input, n, SqrtOp());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_sqrt_float32");
+}
+
+void tensor_sqrt_float64(double* result, const double* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_sqrt_float64");
+    
+    launch_elementwise_unary(result, input, n, SqrtOp());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_sqrt_float64");
+}
+
+// Reduction operations
+float tensor_max_float32(const float* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_max_float32");
+    
+    float result = launch_reduction(input, n, MaxOp(), 
+                                   std::numeric_limits<float>::lowest());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_max_float32");
+    return result;
+}
+
+double tensor_max_float64(const double* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_max_float64");
+    
+    double result = launch_reduction(input, n, MaxOp(), 
+                                    std::numeric_limits<double>::lowest());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_max_float64");
+    return result;
+}
+
+float tensor_min_float32(const float* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_min_float32");
+    
+    float result = launch_reduction(input, n, MinOp(), 
+                                   std::numeric_limits<float>::max());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_min_float32");
+    return result;
+}
+
+double tensor_min_float64(const double* input, size_t n) {
+    cudaError_t err = cudaGetLastError();
+    cudaSafeCall(err, "CUDA error before tensor_min_float64");
+    
+    double result = launch_reduction(input, n, MinOp(), 
+                                    std::numeric_limits<double>::max());
+    
+    err = cudaDeviceSynchronize();
+    cudaSafeCall(err, "cudaDeviceSynchronize failed in tensor_min_float64");
+    return result;
 }
 
 } // extern "C" 

@@ -101,3 +101,27 @@ tensor_permute_unified <- function(tensor_ptr, dims) {
     .Call(`_acediaR_tensor_permute_unified`, tensor_ptr, dims)
 }
 
+tensor_exp_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_exp_unified`, tensor_ptr)
+}
+
+tensor_log_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_log_unified`, tensor_ptr)
+}
+
+tensor_sqrt_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_sqrt_unified`, tensor_ptr)
+}
+
+tensor_mean_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_mean_unified`, tensor_ptr)
+}
+
+tensor_max_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_max_unified`, tensor_ptr)
+}
+
+tensor_min_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_min_unified`, tensor_ptr)
+}
+

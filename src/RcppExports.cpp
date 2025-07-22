@@ -295,6 +295,72 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_exp_unified
+SEXP tensor_exp_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_exp_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_exp_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_log_unified
+SEXP tensor_log_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_log_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_log_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_sqrt_unified
+SEXP tensor_sqrt_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_sqrt_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_sqrt_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_mean_unified
+double tensor_mean_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_mean_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_mean_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_max_unified
+double tensor_max_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_max_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_max_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_min_unified
+double tensor_min_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_min_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_min_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_gpu_available", (DL_FUNC) &_acediaR_gpu_available, 0},
@@ -322,6 +388,12 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_tensor_scalar_add_unified", (DL_FUNC) &_acediaR_tensor_scalar_add_unified, 2},
     {"_acediaR_tensor_transpose_unified", (DL_FUNC) &_acediaR_tensor_transpose_unified, 1},
     {"_acediaR_tensor_permute_unified", (DL_FUNC) &_acediaR_tensor_permute_unified, 2},
+    {"_acediaR_tensor_exp_unified", (DL_FUNC) &_acediaR_tensor_exp_unified, 1},
+    {"_acediaR_tensor_log_unified", (DL_FUNC) &_acediaR_tensor_log_unified, 1},
+    {"_acediaR_tensor_sqrt_unified", (DL_FUNC) &_acediaR_tensor_sqrt_unified, 1},
+    {"_acediaR_tensor_mean_unified", (DL_FUNC) &_acediaR_tensor_mean_unified, 1},
+    {"_acediaR_tensor_max_unified", (DL_FUNC) &_acediaR_tensor_max_unified, 1},
+    {"_acediaR_tensor_min_unified", (DL_FUNC) &_acediaR_tensor_min_unified, 1},
     {NULL, NULL, 0}
 };
 

@@ -10,28 +10,28 @@
 #include "kernel_utils.cuh"
 #include "tensor_kernels.cu"
 
-// Function objects for operations
+// Function objects for operations - with both __host__ and __device__ support
 struct AddOp {
     template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return a + b; }
+    __host__ __device__ T operator()(const T& a, const T& b) const { return a + b; }
 };
 
 struct MulOp {
     template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return a * b; }
+    __host__ __device__ T operator()(const T& a, const T& b) const { return a * b; }
 };
 
 struct SubOp {
     template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return a - b; }
+    __host__ __device__ T operator()(const T& a, const T& b) const { return a - b; }
 };
 
 struct DivOp {
     template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return a / b; }
+    __host__ __device__ T operator()(const T& a, const T& b) const { return a / b; }
 };
 
-// Unary operation functors
+// Unary operation functors - device only since they use CUDA math functions
 struct ExpOp {
     template<typename T>
     __device__ T operator()(const T& a) const { return exp(a); }
@@ -45,6 +45,29 @@ struct LogOp {
 struct SqrtOp {
     template<typename T>
     __device__ T operator()(const T& a) const { return sqrt(a); }
+};
+
+// Reduction operation functors - with both __host__ and __device__ support
+struct MaxOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a, const T& b) const { 
+#ifdef __CUDA_ARCH__
+        return fmax(a, b); // Device version
+#else
+        return (a > b) ? a : b; // Host version
+#endif
+    }
+};
+
+struct MinOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a, const T& b) const { 
+#ifdef __CUDA_ARCH__
+        return fmin(a, b); // Device version
+#else
+        return (a < b) ? a : b; // Host version
+#endif
+    }
 };
 
 // Host interface functions using templates
@@ -90,11 +113,31 @@ void launch_type_conversion(To* output, const From* input, size_t n, cudaStream_
 
 template<typename T, typename AccumType, typename Op>
 AccumType launch_reduction(const T* input, size_t n, Op op, AccumType init_val, cudaStream_t stream = 0) {
+    // Handle edge cases
+    if (n == 0) return init_val;
+    if (n == 1) {
+        // For single element, copy from device to host safely
+        T single_element;
+        cudaError_t cudaStatus = cudaMemcpy(&single_element, input, sizeof(T), cudaMemcpyDeviceToHost);
+        if (cudaStatus != cudaSuccess) {
+            printf("CUDA memcpy failed for single element: %s\n", cudaGetErrorString(cudaStatus));
+            return init_val;
+        }
+        return convert_type<AccumType>(single_element);
+    }
+    
     int threadsPerBlock = 256;
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
     
-    AccumType* d_block_results;
-    cudaMalloc(&d_block_results, blocksPerGrid * sizeof(AccumType));
+    // Limit the number of blocks to prevent excessive memory usage
+    blocksPerGrid = std::min(blocksPerGrid, 65535);
+    
+    AccumType* d_block_results = nullptr;
+    cudaError_t cudaStatus = cudaMalloc(&d_block_results, blocksPerGrid * sizeof(AccumType));
+    if (cudaStatus != cudaSuccess) {
+        printf("CUDA malloc failed: %s\n", cudaGetErrorString(cudaStatus));
+        return init_val;
+    }
     
     size_t sharedMemSize = threadsPerBlock * sizeof(AccumType);
     reduction_kernel<<<blocksPerGrid, threadsPerBlock, sharedMemSize, stream>>>(
@@ -102,9 +145,10 @@ AccumType launch_reduction(const T* input, size_t n, Op op, AccumType init_val, 
     );
     
     // Check for kernel launch errors
-    cudaError_t cudaStatus = cudaGetLastError();
+    cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) {
         printf("CUDA kernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_block_results);
         return init_val;
     }
     
@@ -112,18 +156,33 @@ AccumType launch_reduction(const T* input, size_t n, Op op, AccumType init_val, 
     cudaStatus = cudaDeviceSynchronize();
     if (cudaStatus != cudaSuccess) {
         printf("CUDA synchronize failed: %s\n", cudaGetErrorString(cudaStatus));
+        cudaFree(d_block_results);
         return init_val;
     }
     
-    // Recursively reduce if needed
+    // Copy results back and reduce on host
     AccumType* h_block_results = (AccumType*)malloc(blocksPerGrid * sizeof(AccumType));
-    cudaMemcpy(h_block_results, d_block_results, blocksPerGrid * sizeof(AccumType), cudaMemcpyDeviceToHost);
+    if (!h_block_results) {
+        printf("Host malloc failed\n");
+        cudaFree(d_block_results);
+        return init_val;
+    }
     
-    AccumType final_result = init_val;
-    for (int i = 0; i < blocksPerGrid; i++) {
+    cudaStatus = cudaMemcpy(h_block_results, d_block_results, blocksPerGrid * sizeof(AccumType), cudaMemcpyDeviceToHost);
+    if (cudaStatus != cudaSuccess) {
+        printf("CUDA memcpy failed: %s\n", cudaGetErrorString(cudaStatus));
+        free(h_block_results);
+        cudaFree(d_block_results);
+        return init_val;
+    }
+    
+    // Host-side final reduction - now this will work with __host__ __device__ functors!
+    AccumType final_result = h_block_results[0];
+    for (int i = 1; i < blocksPerGrid; i++) {
         final_result = op(final_result, h_block_results[i]);
     }
     
+    // Cleanup
     free(h_block_results);
     cudaFree(d_block_results);
     

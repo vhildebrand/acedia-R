@@ -621,7 +621,111 @@ tensor_slice_extract <- function(tensor, start_indices, end_indices) {
 #' @export
 dim.gpuTensor <- function(x) {
   return(as.integer(shape(x)))
-} 
+}
+
+#' Exponential Function
+#'
+#' Computes the exponential of each element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with exp(x) computed element-wise
+#' @export
+exp.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_exp_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Natural Logarithm Function
+#'
+#' Computes the natural logarithm of each element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @param base The base of the logarithm (default: exp(1) for natural log)
+#' @return A tensor with log(x) computed element-wise
+#' @export
+log.gpuTensor <- function(x, base = exp(1)) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (base != exp(1)) {
+    stop("Only natural logarithm (base e) is currently supported")
+  }
+  
+  result <- tensor_log_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Square Root Function
+#'
+#' Computes the square root of each element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with sqrt(x) computed element-wise
+#' @export
+sqrt.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_sqrt_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Mean (Average) Function
+#'
+#' Computes the arithmetic mean of all elements in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional arguments (ignored)
+#' @return The mean value of all tensor elements
+#' @export
+mean.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  return(tensor_mean_unified(x))
+}
+
+#' Maximum Function
+#'
+#' Finds the maximum element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional arguments (ignored)
+#' @return The maximum value in the tensor
+#' @export
+max.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  return(tensor_max_unified(x))
+}
+
+#' Minimum Function
+#'
+#' Finds the minimum element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional arguments (ignored)
+#' @return The minimum value in the tensor
+#' @export
+min.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  return(tensor_min_unified(x))
+}
 
 #' Concatenate Tensors
 #'

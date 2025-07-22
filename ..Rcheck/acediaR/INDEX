@@ -1,0 +1,27 @@
+[.gpuTensor             Tensor slicing for gpuTensor
+acediaR                 acediaR: R Interface for CUDA-Accelerated
+                        Linear Algebra
+as.array.gpuTensor      Convert GPU Tensor to R Array
+as_tensor               Create Tensor from Matrix/Array
+benchmark_gpu_multiply
+                        Benchmark GPU vs CPU Performance for
+                        Multiplication Operations
+contiguous              Return a contiguous copy of tensor
+dim.gpuTensor           Get tensor dimensions
+empty_tensor            Create Empty GPU Tensor
+gpu_add                 GPU-accelerated Vector Addition
+gpu_dot                 GPU-accelerated Dot Product
+gpu_multiply            GPU-accelerated Element-wise Vector
+                        Multiplication
+gpu_scale               GPU-accelerated Scalar Multiplication
+gpu_status              Check GPU Availability
+gpu_tensor              Create a GPU Tensor
+is_contiguous           Check if Tensor is Contiguous
+matmul                  Matrix Multiplication
+print.gpuTensor         Print Tensor Information
+requires_grad           Enable Gradient Computation
+shape                   Get Tensor Shape
+size                    Get Tensor Size
+sum.gpuTensor           Tensor Sum
+synchronize             Synchronize Tensor Operations
+view                    Create Tensor View

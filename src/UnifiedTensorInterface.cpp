@@ -50,7 +50,21 @@ extern "C" {
     float tensor_sum_float16(const half* input, size_t n);
     float tensor_sum_float32(const float* input, size_t n);
     double tensor_sum_float64(const double* input, size_t n);
-    long long tensor_sum_int64(const int64_t* input, size_t n);
+    int64_t tensor_sum_int64(const int64_t* input, size_t n);
+    
+    // Unary math operations
+    void tensor_exp_float32(float* result, const float* input, size_t n);
+    void tensor_exp_float64(double* result, const double* input, size_t n);
+    void tensor_log_float32(float* result, const float* input, size_t n);
+    void tensor_log_float64(double* result, const double* input, size_t n);
+    void tensor_sqrt_float32(float* result, const float* input, size_t n);
+    void tensor_sqrt_float64(double* result, const double* input, size_t n);
+    
+    // Reduction operations
+    float tensor_max_float32(const float* input, size_t n);
+    double tensor_max_float64(const double* input, size_t n);
+    float tensor_min_float32(const float* input, size_t n);
+    double tensor_min_float64(const double* input, size_t n);
 
     // Type conversions
     void convert_float32_to_float16(half* output, const float* input, size_t n);
@@ -123,13 +137,26 @@ SEXP tensor_scalar_mul_unified(SEXP tensor_ptr, double scalar); // already prese
 template<typename KernelFunc, typename WrapperType, typename ScalarT>
 std::unique_ptr<TensorBase> binary_elementwise_execute(const TensorBase& a_t, const TensorBase& b_t,
                                                        KernelFunc kernel) {
-    auto a_wrap = dynamic_cast<const WrapperType*>(&a_t);
-    auto b_wrap = dynamic_cast<const WrapperType*>(&b_t);
+    const auto* a_wrap = dynamic_cast<const WrapperType*>(&a_t);
+    const auto* b_wrap = dynamic_cast<const WrapperType*>(&b_t);
     if (!a_wrap || !b_wrap) {
         throw std::runtime_error("Type promotion wrapper mismatch");
     }
-    auto result = std::make_shared<gpuTensor<ScalarT>>(a_wrap->tensor().shape());
-    kernel(result->data(), a_wrap->tensor().data(), b_wrap->tensor().data(), result->size());
+
+    // Get references to the original tensors
+    const gpuTensor<ScalarT>& a_tensor = a_wrap->tensor();
+    const gpuTensor<ScalarT>& b_tensor = b_wrap->tensor();
+
+    // Ensure both tensors are contiguous to guarantee correct element order
+    gpuTensor<ScalarT> a_contiguous = a_tensor.is_contiguous() ? a_tensor : a_tensor.contiguous();
+    gpuTensor<ScalarT> b_contiguous = b_tensor.is_contiguous() ? b_tensor : b_tensor.contiguous();
+
+    // Allocate result tensor
+    auto result = std::make_shared<gpuTensor<ScalarT>>(a_contiguous.shape());
+
+    // Launch CUDA kernel (expects contiguous memory)
+    kernel(result->data(), a_contiguous.data(), b_contiguous.data(), result->size());
+
     return std::make_unique<TensorWrapper<ScalarT>>(result);
 }
 
@@ -1277,5 +1304,283 @@ SEXP tensor_permute_unified(SEXP tensor_ptr, IntegerVector dims) {
         return ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor permute: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_exp_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                
+                // Make tensor contiguous if needed for proper memory layout
+                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                
+                auto result_gpu = gpuTensor<float>(input_tensor.shape(), input_tensor.device());
+                tensor_exp_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                
+                result_tensor = std::make_unique<TensorWrapper<float>>(
+                    std::make_shared<gpuTensor<float>>(std::move(result_gpu))
+                );
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                
+                // Make tensor contiguous if needed for proper memory layout
+                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                
+                auto result_gpu = gpuTensor<double>(input_tensor.shape(), input_tensor.device());
+                tensor_exp_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                
+                result_tensor = std::make_unique<TensorWrapper<double>>(
+                    std::make_shared<gpuTensor<double>>(std::move(result_gpu))
+                );
+                break;
+            }
+            default:
+                stop("Exp not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = tensor_dtype_unified(tensor_ptr);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor exp: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_log_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                
+                // Make tensor contiguous if needed for proper memory layout
+                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                
+                auto result_gpu = gpuTensor<float>(input_tensor.shape(), input_tensor.device());
+                tensor_log_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                
+                result_tensor = std::make_unique<TensorWrapper<float>>(
+                    std::make_shared<gpuTensor<float>>(std::move(result_gpu))
+                );
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                
+                // Make tensor contiguous if needed for proper memory layout
+                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                
+                auto result_gpu = gpuTensor<double>(input_tensor.shape(), input_tensor.device());
+                tensor_log_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                
+                result_tensor = std::make_unique<TensorWrapper<double>>(
+                    std::make_shared<gpuTensor<double>>(std::move(result_gpu))
+                );
+                break;
+            }
+            default:
+                stop("Log not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = tensor_dtype_unified(tensor_ptr);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor log: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_sqrt_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                
+                // Make tensor contiguous if needed for proper memory layout
+                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                
+                auto result_gpu = gpuTensor<float>(input_tensor.shape(), input_tensor.device());
+                tensor_sqrt_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                
+                result_tensor = std::make_unique<TensorWrapper<float>>(
+                    std::make_shared<gpuTensor<float>>(std::move(result_gpu))
+                );
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                
+                // Make tensor contiguous if needed for proper memory layout
+                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                
+                auto result_gpu = gpuTensor<double>(input_tensor.shape(), input_tensor.device());
+                tensor_sqrt_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                
+                result_tensor = std::make_unique<TensorWrapper<double>>(
+                    std::make_shared<gpuTensor<double>>(std::move(result_gpu))
+                );
+                break;
+            }
+            default:
+                stop("Sqrt not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = tensor_dtype_unified(tensor_ptr);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor sqrt: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+double tensor_mean_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        if (tensor->size() == 0) {
+            return 0.0;
+        }
+        
+        // Get sum and divide by size
+        double total_sum = tensor_sum_unified(tensor_ptr);
+        return total_sum / static_cast<double>(tensor->size());
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor mean: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+double tensor_max_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        double result = 0.0;
+        
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                }
+                result = static_cast<double>(tensor_max_float32(tensor_wrapper->tensor().data(), 
+                                                              tensor->size()));
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                }
+                result = tensor_max_float64(tensor_wrapper->tensor().data(), tensor->size());
+                break;
+            }
+            default:
+                stop("Max operation not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        return result;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor max: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+double tensor_min_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        double result = 0.0;
+        
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                }
+                result = static_cast<double>(tensor_min_float32(tensor_wrapper->tensor().data(), 
+                                                              tensor->size()));
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                }
+                result = tensor_min_float64(tensor_wrapper->tensor().data(), tensor->size());
+                break;
+            }
+            default:
+                stop("Min operation not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        return result;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor min: " + std::string(e.what()));
     }
 } 
