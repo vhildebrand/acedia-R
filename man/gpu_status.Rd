@@ -2,21 +2,65 @@
 % Please edit documentation in R/gpu-utils.R
 \name{gpu_status}
 \alias{gpu_status}
-\title{Comprehensive GPU Status}
+\title{Check GPU Availability}
 \usage{
 gpu_status()
 }
 \value{
+Logical indicating if GPU is available for computations
+
+Character string with GPU device information
+
+Numeric value of available GPU memory in bytes (0 if no GPU)
+
 List containing GPU availability, device information, memory status
 }
 \description{
-Returns comprehensive information about GPU availability and status.
+Checks if CUDA-capable GPU is available and accessible.
 }
 \details{
+This function performs runtime detection of CUDA GPU availability.
+It checks for CUDA driver installation, device presence, and basic functionality.
+
+Provides detailed information about detected CUDA devices including
+device names, compute capabilities, and memory information.
+
+Queries the available GPU memory. Useful for determining if large
+operations will fit in GPU memory.
+
 Provides a complete overview of GPU status for diagnostic purposes.
 Useful for troubleshooting and determining optimal usage patterns.
 }
 \examples{
+\dontrun{
+if (gpu_available()) {
+  cat("GPU acceleration enabled\n")
+} else {
+  cat("Using CPU-only mode\n")
+}
+}
+
+Get GPU Information
+
+Returns detailed information about available CUDA GPUs.
+
+\dontrun{
+cat(gpu_info())
+}
+
+Get Available GPU Memory
+
+Returns the amount of free GPU memory in bytes.
+
+\dontrun{
+mem_gb <- gpu_memory_available() / 1e9
+cat("Available GPU memory:", round(mem_gb, 1), "GB\n")
+}
+
+Comprehensive GPU Status
+
+Returns comprehensive information about GPU availability and status.
+
 \dontrun{
 status <- gpu_status()
 print(status)

@@ -21,6 +21,20 @@
 #include <sstream>
 #endif
 
+#include <memory>
+#include <vector>
+#include <iostream>
+#include <cassert>
+#include <type_traits>
+#include <cstring>
+#include "cuda_utils.h"
+
+// Forward declarations for CUDA kernels
+extern "C" {
+    void tensor_strided_copy_float32(float* dest, const float* src, const int* strides, const int* shape, int ndims, size_t total_elements);
+    void tensor_strided_copy_float64(double* dest, const double* src, const int* strides, const int* shape, int ndims, size_t total_elements);
+}
+
 // Forward declarations
 template<typename T> class gpuTensor;
 template<typename T> class TensorView;
@@ -564,11 +578,41 @@ public:
         if (is_contiguous()) {
             return *this;
         }
-        
+
+#ifndef __CUDA_ARCH__
+        // GPU-native strided copy - much faster than host round-trip
         gpuTensor result(shape_, device_);
-        // TODO: Implement strided copy kernel
-        throw std::runtime_error("Non-contiguous tensor copying not yet implemented");
+        
+        // Convert strides from size_t to int for CUDA kernel
+        std::vector<int> strides_int(strides_.begin(), strides_.end());
+        std::vector<int> shape_int(shape_.dims.begin(), shape_.dims.end());
+        
+        // Call appropriate strided copy kernel based on type
+        if constexpr (std::is_same_v<T, float>) {
+            tensor_strided_copy_float32(
+                result.data(), data_, 
+                strides_int.data(), shape_int.data(), 
+                shape_.ndims(), shape_.size()
+            );
+        } else if constexpr (std::is_same_v<T, double>) {
+            tensor_strided_copy_float64(
+                result.data(), data_, 
+                strides_int.data(), shape_int.data(), 
+                shape_.ndims(), shape_.size()
+            );
+        } else {
+            // Fallback to host round-trip for unsupported types
+            std::vector<T> host_buf(shape_.size());
+            copy_to_host(host_buf.data());
+            result.copy_from_host(host_buf.data());
+        }
+        
         return result;
+#else
+        // Device code – cannot allocate device memory, throw for now
+        assert(false && "contiguous() not supported in device code");
+        return *this;
+#endif
     }
     
     // Data transfer methods

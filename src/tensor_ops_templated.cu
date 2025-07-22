@@ -273,8 +273,157 @@ void launch_matmul(T* C, const T* A, const T* B, size_t M, size_t N, size_t K, c
     matmul_tiled_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(C, A, B, M, N, K);
 }
 
+// Generic broadcast kernel for element-wise binary operations
+template<typename T, typename Op>
+__global__ void broadcast_binary_kernel(
+    T* result, 
+    const T* a, const T* b,
+    const int* a_strides, const int* b_strides, const int* result_strides,
+    const int* shape, int ndims, size_t total_elements
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= total_elements) return;
+    
+    // Convert linear index to multidimensional coordinates
+    int coords[8]; // max 8 dimensions
+    int temp_idx = idx;
+    for (int i = ndims - 1; i >= 0; i--) {
+        coords[i] = temp_idx % shape[i];
+        temp_idx /= shape[i];
+    }
+    
+    // Calculate source indices using strides
+    int a_idx = 0, b_idx = 0;
+    for (int i = 0; i < ndims; i++) {
+        a_idx += coords[i] * a_strides[i];
+        b_idx += coords[i] * b_strides[i];
+    }
+    
+    result[idx] = Op{}(a[a_idx], b[b_idx]);
+}
+
+// Launch helper for broadcast operations
+template<typename T, typename Op>
+void launch_broadcast_binary(
+    T* result, const T* a, const T* b,
+    const int* a_strides, const int* b_strides, const int* result_strides,
+    const int* shape, int ndims, size_t total_elements, Op op
+) {
+    // Copy stride and shape data to device
+    int *d_a_strides, *d_b_strides, *d_result_strides, *d_shape;
+    cudaMalloc(&d_a_strides, ndims * sizeof(int));
+    cudaMalloc(&d_b_strides, ndims * sizeof(int));
+    cudaMalloc(&d_result_strides, ndims * sizeof(int));
+    cudaMalloc(&d_shape, ndims * sizeof(int));
+    
+    cudaMemcpy(d_a_strides, a_strides, ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b_strides, b_strides, ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_result_strides, result_strides, ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_shape, shape, ndims * sizeof(int), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    broadcast_binary_kernel<T, Op><<<grid_size, block_size>>>(
+        result, a, b, d_a_strides, d_b_strides, d_result_strides, d_shape, ndims, total_elements
+    );
+    
+    cudaFree(d_a_strides);
+    cudaFree(d_b_strides);
+    cudaFree(d_result_strides);
+    cudaFree(d_shape);
+}
+
+// Strided copy kernel for making tensors contiguous
+template<typename T>
+__global__ void strided_copy_kernel(
+    T* dest, const T* src,
+    const int* src_strides, const int* shape, int ndims, size_t total_elements
+) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= total_elements) return;
+    
+    // Convert linear output index to multidimensional coordinates
+    int coords[8]; // max 8 dimensions
+    int temp_idx = idx;
+    for (int i = ndims - 1; i >= 0; i--) {
+        coords[i] = temp_idx % shape[i];
+        temp_idx /= shape[i];
+    }
+    
+    // Calculate source index using strides
+    int src_idx = 0;
+    for (int i = 0; i < ndims; i++) {
+        src_idx += coords[i] * src_strides[i];
+    }
+    
+    dest[idx] = src[src_idx];
+}
+
+template<typename T>
+void launch_strided_copy(T* dest, const T* src, const std::vector<int>& strides, const std::vector<int>& shape, size_t total_elements) {
+    // Copy stride and shape data to device
+    int* d_strides;
+    int* d_shape;
+    int ndims = shape.size();
+    
+    cudaMalloc(&d_strides, ndims * sizeof(int));
+    cudaMalloc(&d_shape, ndims * sizeof(int));
+    
+    cudaMemcpy(d_strides, strides.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_shape, shape.data(), ndims * sizeof(int), cudaMemcpyHostToDevice);
+    
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_copy_kernel<T><<<grid_size, block_size>>>(
+        dest, src, d_strides, d_shape, ndims, total_elements
+    );
+    
+    cudaFree(d_strides);
+    cudaFree(d_shape);
+}
+
 // C-style wrapper functions for each type (for R interface)
 extern "C" {
+
+// Broadcast addition wrappers
+void tensor_add_broadcast_float32(
+    float* result, const float* a, const float* b,
+    const int* a_strides, const int* b_strides, const int* result_strides,
+    const int* shape, int ndims, size_t total_elements
+) {
+    launch_broadcast_binary(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, AddOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_add_broadcast_float64(
+    double* result, const double* a, const double* b,
+    const int* a_strides, const int* b_strides, const int* result_strides,
+    const int* shape, int ndims, size_t total_elements
+) {
+    launch_broadcast_binary(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, AddOp{});
+    cudaDeviceSynchronize();
+}
+
+// Broadcast multiplication wrappers
+void tensor_mul_broadcast_float32(
+    float* result, const float* a, const float* b,
+    const int* a_strides, const int* b_strides, const int* result_strides,
+    const int* shape, int ndims, size_t total_elements
+) {
+    launch_broadcast_binary(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MulOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_mul_broadcast_float64(
+    double* result, const double* a, const double* b,
+    const int* a_strides, const int* b_strides, const int* result_strides,
+    const int* shape, int ndims, size_t total_elements
+) {
+    launch_broadcast_binary(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MulOp{});
+    cudaDeviceSynchronize();
+}
 
 // Fill operations
 void tensor_fill_float16(half* data, float value, size_t n) {
@@ -354,6 +503,38 @@ void tensor_mul_float64(double* result, const double* a, const double* b, size_t
     cudaDeviceSynchronize();
 }
 
+// Subtraction operations
+void tensor_sub_float16(half* result, const half* a, const half* b, size_t n) {
+    launch_elementwise_binary(result, a, b, n, SubOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_sub_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary(result, a, b, n, SubOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_sub_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary(result, a, b, n, SubOp{});
+    cudaDeviceSynchronize();
+}
+
+// Division operations
+void tensor_div_float16(half* result, const half* a, const half* b, size_t n) {
+    launch_elementwise_binary(result, a, b, n, DivOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_div_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary(result, a, b, n, DivOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_div_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary(result, a, b, n, DivOp{});
+    cudaDeviceSynchronize();
+}
+
 // Scalar multiplication
 void tensor_scalar_mul_float16(half* result, const half* input, float scalar, size_t n) {
     launch_elementwise_scalar(result, input, scalar, n, MulOp{});
@@ -367,6 +548,22 @@ void tensor_scalar_mul_float32(float* result, const float* input, float scalar, 
 
 void tensor_scalar_mul_float64(double* result, const double* input, double scalar, size_t n) {
     launch_elementwise_scalar(result, input, scalar, n, MulOp{});
+    cudaDeviceSynchronize();
+}
+
+// Scalar addition
+void tensor_scalar_add_float16(half* result, const half* input, float scalar, size_t n) {
+    launch_elementwise_scalar(result, input, scalar, n, AddOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_add_float32(float* result, const float* input, float scalar, size_t n) {
+    launch_elementwise_scalar(result, input, scalar, n, AddOp{});
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_add_float64(double* result, const double* input, double scalar, size_t n) {
+    launch_elementwise_scalar(result, input, scalar, n, AddOp{});
     cudaDeviceSynchronize();
 }
 
@@ -446,6 +643,21 @@ void accumulate_gradients_fp16_to_fp32(float* fp32_grads, const half* fp16_grads
     convert_float16_to_float32(temp_fp32, fp16_grads, n);
     launch_elementwise_binary(fp32_grads, fp32_grads, temp_fp32, n, AddOp{});
     cudaFree(temp_fp32);
+    cudaDeviceSynchronize();
+}
+
+// Strided copy operations
+void tensor_strided_copy_float32(float* dest, const float* src, const int* strides, const int* shape, int ndims, size_t total_elements) {
+    std::vector<int> stride_vec(strides, strides + ndims);
+    std::vector<int> shape_vec(shape, shape + ndims);
+    launch_strided_copy(dest, src, stride_vec, shape_vec, total_elements);
+    cudaDeviceSynchronize();
+}
+
+void tensor_strided_copy_float64(double* dest, const double* src, const int* strides, const int* shape, int ndims, size_t total_elements) {
+    std::vector<int> stride_vec(strides, strides + ndims);
+    std::vector<int> shape_vec(shape, shape + ndims);
+    launch_strided_copy(dest, src, stride_vec, shape_vec, total_elements);
     cudaDeviceSynchronize();
 }
 

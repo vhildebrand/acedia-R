@@ -223,13 +223,9 @@ print.gpuTensor <- function(x, ...) {
     result <- tensor_add_unified(a, b)
   } else if (is.numeric(b) && length(b) == 1) {
     # Scalar addition (implemented as a + b = a + (b * ones_like(a)))
-    if (dtype_a == "double") {
-      # For now, we'll use scalar multiplication followed by addition with original tensor
-      # This is inefficient but works as a placeholder
-      ones <- empty_tensor(shape(a), dtype_a)
-      # TODO: Implement fill operation or ones_like function
-      stop("Scalar addition not yet fully implemented")
-    }
+    result <- tensor_scalar_add_unified(a, b)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
   } else {
     stop("Cannot add gpuTensor with object of type: ", class(b))
   }
@@ -336,6 +332,18 @@ is_contiguous <- function(tensor) {
   return(tensor_is_contiguous_unified(tensor))
 }
 
+#' Return a contiguous copy of tensor
+#' @export
+contiguous <- function(tensor) {
+  if (!inherits(tensor, "gpuTensor")) stop("Object is not a gpuTensor")
+  # Currently contiguous() implemented on C++ side by calling method via view
+  # Round-trip through tensor_view_unified of same shape ensures copy, but we added contiguous in C++
+  # To invoke, convert to dtype itself (clone path)
+  result <- tensor_view_unified(tensor, as.integer(shape(tensor)))
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
 #' Synchronize Tensor Operations
 #'
 #' Waits for all asynchronous operations on the tensor to complete.
@@ -367,7 +375,172 @@ requires_grad <- function(tensor, requires_grad = TRUE) {
   stop("Autograd not yet implemented in unified interface")
 }
 
+#' @export
+`-.gpuTensor` <- function(a, b = NULL) {
+  if (is.null(b)) {
+    # Unary negative
+    return(a * (-1))
+  }
+
+  dtype_a <- attr(a, "dtype", exact=TRUE) %||% "double"
+  if (inherits(b, "gpuTensor")) {
+    dtype_b <- attr(b, "dtype", exact=TRUE) %||% "double"
+    if (dtype_a != dtype_b) stop("Cannot subtract tensors with different dtypes")
+    result <- tensor_sub_unified(a, b)
+  } else if (is.numeric(b) && length(b) == 1) {
+    result <- tensor_scalar_add_unified(a, -b)
+  } else {
+    stop("Cannot subtract gpuTensor with object of type: ", class(b))
+  }
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' @export
+`/.gpuTensor` <- function(a, b) {
+  if (missing(b)) stop("Division requires two operands")
+  dtype_a <- attr(a, "dtype", exact=TRUE) %||% "double"
+  if (inherits(b, "gpuTensor")) {
+    dtype_b <- attr(b, "dtype", exact=TRUE) %||% "double"
+    if (dtype_a != dtype_b) stop("Cannot divide tensors with different dtypes")
+    result <- tensor_div_unified(a, b)
+  } else if (is.numeric(b) && length(b) == 1) {
+    inv <- 1.0 / b
+    result <- tensor_scalar_mul_unified(a, inv)
+  } else {
+    stop("Cannot divide gpuTensor with object of type: ", class(b))
+  }
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Tensor slicing for gpuTensor
+#' @export
+`[.gpuTensor` <- function(x, ..., drop = TRUE) {
+  tensor_dims <- shape(x)
+  n_dims <- length(tensor_dims)
+  
+  # Get the actual arguments (including missing ones)
+  args <- substitute(list(...))[-1]  # Remove the 'list' part
+  n_args <- length(args)
+  
+  # Handle empty indices (return full tensor)
+  if (n_args == 0) {
+    return(x)
+  }
+  
+  # Validate number of indices
+  if (n_args > n_dims) {
+    stop("Too many indices for tensor with ", n_dims, " dimensions")
+  }
+  
+  # Process each index position
+  indices <- vector("list", n_dims)
+  for (i in 1:n_dims) {
+    if (i <= n_args) {
+      if (args[[i]] == quote(expr=)) {
+        indices[[i]] <- NULL  # Missing argument like t[2, ]
+      } else {
+        indices[[i]] <- eval(args[[i]], parent.frame())
+      }
+    } else {
+      indices[[i]] <- NULL  # No index provided for this dimension
+    }
+  }
+  
+  # Process each index
+  new_shape <- integer(0)
+  start_indices <- integer(0)
+  end_indices <- integer(0)
+  
+  for (i in 1:n_dims) {
+    idx <- if (i <= length(indices)) indices[[i]] else NULL
+    dim_size <- tensor_dims[i]
+    
+    if (missing(idx) || is.null(idx)) {
+      # Missing index means select all
+      start_indices[i] <- 1L
+      end_indices[i] <- dim_size
+      new_shape <- c(new_shape, dim_size)
+    } else if (is.numeric(idx)) {
+      # Validate positive indices
+      if (any(idx <= 0)) {
+        stop("Only positive indices are supported in this implementation")
+      }
+      if (any(idx > dim_size)) {
+        stop("Index ", max(idx), " is out of bounds for dimension ", i, " with size ", dim_size)
+      }
+      
+      if (length(idx) == 1) {
+        # Single index - this reduces dimensionality
+        start_indices[i] <- as.integer(idx)
+        end_indices[i] <- as.integer(idx)
+        # Don't add to new_shape (dimension is removed)
+      } else {
+        # Multiple indices - for now, only support contiguous ranges
+        if (!all(diff(idx) == 1)) {
+          stop("Only contiguous ranges are supported in this basic implementation")
+        }
+        start_indices[i] <- as.integer(min(idx))
+        end_indices[i] <- as.integer(max(idx))
+        new_shape <- c(new_shape, length(idx))
+      }
+    } else {
+      stop("Unsupported index type: ", class(idx))
+    }
+  }
+
+  # For now, implement basic slicing by copying data
+  # This is not the most efficient but works for the basic interface
+  
+  # Calculate the elements to extract
+  old_dim <- tensor_dims
+  total_elements <- prod(end_indices - start_indices + 1)
+  
+  # Create result tensor
+  if (length(new_shape) == 0) {
+    # Scalar result
+    result_data <- tensor_slice_extract(x, start_indices, end_indices)
+    return(as.numeric(result_data))
+  } else {
+    # Tensor result
+    result_data <- tensor_slice_extract(x, start_indices, end_indices)
+    result <- gpu_tensor(result_data, new_shape)
+    return(result)
+  }
+}
+
+# Helper function to extract sliced data (placeholder implementation)
+tensor_slice_extract <- function(tensor, start_indices, end_indices) {
+  # For basic implementation, convert to R array, slice, and return
+  arr <- as.array(tensor)
+  
+  # Build the slicing expression dynamically
+  slice_args <- list()
+  for (i in seq_along(start_indices)) {
+    if (start_indices[i] == end_indices[i]) {
+      # Single index
+      slice_args[[i]] <- start_indices[i]
+    } else {
+      # Range
+      slice_args[[i]] <- start_indices[i]:end_indices[i]
+    }
+  }
+  
+  # Apply the slice
+  result <- do.call(`[`, c(list(arr), slice_args))
+  
+  # Return as vector for gpu_tensor creation
+  return(as.vector(result))
+}
+
 # Utility function for null coalescing
 `%||%` <- function(lhs, rhs) {
   if (!is.null(lhs)) lhs else rhs
+} 
+
+#' Get tensor dimensions
+#' @export
+dim.gpuTensor <- function(x) {
+  return(as.integer(shape(x)))
 } 

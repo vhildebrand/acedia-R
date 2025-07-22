@@ -13,6 +13,14 @@ gpu_memory_available <- function() {
     .Call(`_acediaR_gpu_memory_available`)
 }
 
+tensor_sub_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_sub_unified`, a_ptr, b_ptr)
+}
+
+tensor_div_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_div_unified`, a_ptr, b_ptr)
+}
+
 create_tensor_unified <- function(data, shape_vec, dtype = "float32") {
     .Call(`_acediaR_create_tensor_unified`, data, shape_vec, dtype)
 }
@@ -75,5 +83,9 @@ tensor_matmul_unified <- function(a_ptr, b_ptr) {
 
 tensor_view_unified <- function(tensor_ptr, new_shape) {
     .Call(`_acediaR_tensor_view_unified`, tensor_ptr, new_shape)
+}
+
+tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
+    .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
 }
 

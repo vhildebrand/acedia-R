@@ -34,27 +34,29 @@ If GPU is not available or GPU operations fail, the function automatically
 falls back to CPU computation with an optional warning.
 
 For chained GPU operations or advanced workflows, consider using \code{gpu_tensor()}
-to create tensor objects:
+to create GPU-resident objects and use the \code{*} operator directly:
 \code{tensor_a * tensor_b} where \code{tensor_a} and \code{tensor_b} are gpuTensor objects.
-
-See \code{\link{gpu_add}}, \code{\link{gpu_dot}}, \code{\link{gpu_scale}} for related operations.
 }
 \examples{
 \dontrun{
-# Basic usage
-a <- c(2, 3, 4)
-b <- c(1, 2, 3)
+# Multiply two large vectors on GPU (with automatic fallback)
+n <- 1e6
+a <- runif(n)
+b <- runif(n)
 result <- gpu_multiply(a, b)
-print(result)  # [1] 2 6 12
 
-# Verify against CPU
-all.equal(result, a * b)  # Should be TRUE
+# Force CPU implementation for testing
+result_cpu <- gpu_multiply(a, b, force_cpu = TRUE)
 
 # For chained operations, use gpuTensor objects:
 tensor_a <- gpu_tensor(a, length(a))
-tensor_b <- gpu_tensor(b, length(b))
+tensor_b <- gpu_tensor(b, length(b)) 
 tensor_result <- tensor_a * tensor_b  # Stays on GPU
-result2 <- as.vector(tensor_result)   # Transfer back when needed
+result2 <- as.vector(tensor_result)  # Transfer back when needed
+
+# Verify correctness against CPU
+all.equal(result, a * b)
+all.equal(result2, a * b)
 }
 
 }

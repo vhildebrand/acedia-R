@@ -40,6 +40,30 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_sub_unified
+SEXP tensor_sub_unified(SEXP a_ptr, SEXP b_ptr);
+RcppExport SEXP _acediaR_tensor_sub_unified(SEXP a_ptrSEXP, SEXP b_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type a_ptr(a_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type b_ptr(b_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_sub_unified(a_ptr, b_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_div_unified
+SEXP tensor_div_unified(SEXP a_ptr, SEXP b_ptr);
+RcppExport SEXP _acediaR_tensor_div_unified(SEXP a_ptrSEXP, SEXP b_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type a_ptr(a_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type b_ptr(b_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_div_unified(a_ptr, b_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
 // create_tensor_unified
 SEXP create_tensor_unified(NumericVector data, IntegerVector shape_vec, std::string dtype);
 RcppExport SEXP _acediaR_create_tensor_unified(SEXP dataSEXP, SEXP shape_vecSEXP, SEXP dtypeSEXP) {
@@ -224,11 +248,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_scalar_add_unified
+SEXP tensor_scalar_add_unified(SEXP tensor_ptr, double scalar);
+RcppExport SEXP _acediaR_tensor_scalar_add_unified(SEXP tensor_ptrSEXP, SEXP scalarSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< double >::type scalar(scalarSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_scalar_add_unified(tensor_ptr, scalar));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_gpu_available", (DL_FUNC) &_acediaR_gpu_available, 0},
     {"_acediaR_gpu_info", (DL_FUNC) &_acediaR_gpu_info, 0},
     {"_acediaR_gpu_memory_available", (DL_FUNC) &_acediaR_gpu_memory_available, 0},
+    {"_acediaR_tensor_sub_unified", (DL_FUNC) &_acediaR_tensor_sub_unified, 2},
+    {"_acediaR_tensor_div_unified", (DL_FUNC) &_acediaR_tensor_div_unified, 2},
     {"_acediaR_create_tensor_unified", (DL_FUNC) &_acediaR_create_tensor_unified, 3},
     {"_acediaR_create_empty_tensor_unified", (DL_FUNC) &_acediaR_create_empty_tensor_unified, 2},
     {"_acediaR_tensor_to_r_unified", (DL_FUNC) &_acediaR_tensor_to_r_unified, 1},
@@ -245,6 +283,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_tensor_mul_unified", (DL_FUNC) &_acediaR_tensor_mul_unified, 2},
     {"_acediaR_tensor_matmul_unified", (DL_FUNC) &_acediaR_tensor_matmul_unified, 2},
     {"_acediaR_tensor_view_unified", (DL_FUNC) &_acediaR_tensor_view_unified, 2},
+    {"_acediaR_tensor_scalar_add_unified", (DL_FUNC) &_acediaR_tensor_scalar_add_unified, 2},
     {NULL, NULL, 0}
 };
 
