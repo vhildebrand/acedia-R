@@ -1,0 +1,716 @@
+#include <Rcpp.h>
+#include "gpuTensor.h"
+#include "TensorRegistry.h"
+#include "cuda_utils.h"
+#include <memory>
+#include <functional>
+
+using namespace Rcpp;
+
+// Forward declarations of templated CUDA functions
+extern "C" {
+    // Addition operations
+    void tensor_add_float16(half* result, const half* a, const half* b, size_t n);
+    void tensor_add_float32(float* result, const float* a, const float* b, size_t n);
+    void tensor_add_float64(double* result, const double* a, const double* b, size_t n);
+    void tensor_add_int8(int8_t* result, const int8_t* a, const int8_t* b, size_t n);
+    void tensor_add_int32(int32_t* result, const int32_t* a, const int32_t* b, size_t n);
+    void tensor_add_int64(int64_t* result, const int64_t* a, const int64_t* b, size_t n);
+
+    // Multiplication operations
+    void tensor_mul_float16(half* result, const half* a, const half* b, size_t n);
+    void tensor_mul_float32(float* result, const float* a, const float* b, size_t n);
+    void tensor_mul_float64(double* result, const double* a, const double* b, size_t n);
+
+    // Subtraction operations
+    void tensor_sub_float16(half* result, const half* a, const half* b, size_t n);
+    void tensor_sub_float32(float* result, const float* a, const float* b, size_t n);
+    void tensor_sub_float64(double* result, const double* a, const double* b, size_t n);
+
+    // Division operations
+    void tensor_div_float16(half* result, const half* a, const half* b, size_t n);
+    void tensor_div_float32(float* result, const float* a, const float* b, size_t n);
+    void tensor_div_float64(double* result, const double* a, const double* b, size_t n);
+
+    // Scalar operations
+    void tensor_scalar_mul_float16(half* result, const half* input, float scalar, size_t n);
+    void tensor_scalar_mul_float32(float* result, const float* input, float scalar, size_t n);
+    void tensor_scalar_mul_float64(double* result, const double* input, double scalar, size_t n);
+    void tensor_scalar_add_float16(half* result, const half* input, float scalar, size_t n);
+    void tensor_scalar_add_float32(float* result, const float* input, float scalar, size_t n);
+    void tensor_scalar_add_float64(double* result, const double* input, double scalar, size_t n);
+
+    // Strided operations for non-contiguous tensors
+    void tensor_add_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_mul_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+
+    // Broadcast operations
+    void tensor_add_broadcast_float32(
+        float* result, const float* a, const float* b,
+        const int* a_strides, const int* b_strides, const int* result_strides,
+        const int* shape, int ndims, size_t total_elements
+    );
+    void tensor_add_broadcast_float64(
+        double* result, const double* a, const double* b,
+        const int* a_strides, const int* b_strides, const int* result_strides,
+        const int* shape, int ndims, size_t total_elements
+    );
+    void tensor_mul_broadcast_float32(
+        float* result, const float* a, const float* b,
+        const int* a_strides, const int* b_strides, const int* result_strides,
+        const int* shape, int ndims, size_t total_elements
+    );
+    void tensor_mul_broadcast_float64(
+        double* result, const double* a, const double* b,
+        const int* a_strides, const int* b_strides, const int* result_strides,
+        const int* shape, int ndims, size_t total_elements
+    );
+}
+
+// Helper to compute broadcast strides
+std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shape& broadcast_shape) {
+    // Output stride vector (one per dimension of the broadcasted result)
+    std::vector<int> strides(broadcast_shape.ndims(), 0);
+
+    // ------------------------------------------------------------------
+    // 1) Compute COLUMN-MAJOR strides for the *original* tensor.
+    // ------------------------------------------------------------------
+    std::vector<int> tensor_strides(tensor_shape.ndims());
+    if (tensor_shape.ndims() > 0) {
+        tensor_strides[0] = 1;                               // first dim
+        for (size_t i = 1; i < tensor_shape.ndims(); ++i) {
+            tensor_strides[i] = tensor_strides[i - 1] * tensor_shape[i - 1];
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 2) Map tensor dimensions onto broadcast dimensions *from the right*.
+    //    (i.e. NumPy/R broadcasting semantics)
+    // ------------------------------------------------------------------
+    int t = static_cast<int>(tensor_shape.ndims()) - 1;      // last dim of tensor
+    for (int b = static_cast<int>(broadcast_shape.ndims()) - 1; b >= 0; --b) {
+        if (t >= 0) {
+            size_t tensor_dim_size = tensor_shape[t];
+            size_t bc_dim_size     = broadcast_shape[b];
+
+            if (tensor_dim_size == bc_dim_size) {
+                // normal dimension ⇒ copy stride
+                strides[b] = tensor_strides[t];
+            } else if (tensor_dim_size == 1) {
+                // broadcast dimension ⇒ stride 0
+                strides[b] = 0;
+            } else {
+                throw std::runtime_error("Invalid broadcast – dimension size mismatch");
+            }
+            --t;  // move to the next (previous) tensor dimension
+        } else {
+            // Extra prepended broadcasted dimension (implicit size-1 in tensor)
+            strides[b] = 0;
+        }
+    }
+
+    return strides;
+}
+
+// Forward declarations for functions defined later (needed for calls inside other functions)
+SEXP tensor_scalar_add_unified(SEXP tensor_ptr, double scalar);
+SEXP tensor_scalar_mul_unified(SEXP tensor_ptr, double scalar);
+
+template<typename KernelFunc, typename WrapperType, typename ScalarT>
+std::unique_ptr<TensorBase> binary_elementwise_execute(const TensorBase& a_t, const TensorBase& b_t,
+                                                       KernelFunc kernel) {
+    const auto* a_wrap = dynamic_cast<const WrapperType*>(&a_t);
+    const auto* b_wrap = dynamic_cast<const WrapperType*>(&b_t);
+    if (!a_wrap || !b_wrap) {
+        throw std::runtime_error("Type promotion wrapper mismatch");
+    }
+
+    // Get references to the original tensors
+    const gpuTensor<ScalarT>& a_tensor = a_wrap->tensor();
+    const gpuTensor<ScalarT>& b_tensor = b_wrap->tensor();
+
+    // Ensure both tensors are contiguous to guarantee correct element order
+    gpuTensor<ScalarT> a_contiguous = a_tensor.is_contiguous() ? a_tensor : a_tensor.contiguous();
+    gpuTensor<ScalarT> b_contiguous = b_tensor.is_contiguous() ? b_tensor : b_tensor.contiguous();
+
+    // Allocate result tensor
+    auto result = std::make_shared<gpuTensor<ScalarT>>(a_contiguous.shape());
+
+    // Launch CUDA kernel (expects contiguous memory)
+    kernel(result->data(), a_contiguous.data(), b_contiguous.data(), result->size());
+
+    return std::make_unique<TensorWrapper<ScalarT>>(result);
+}
+
+// helper macro to reduce duplication
+#define HANDLE_BINARY_OP(dtype_enum, scalar_t, func_name) \
+    case dtype_enum: { \
+        result_tensor = binary_elementwise_execute<decltype(func_name), TensorWrapper<scalar_t>, scalar_t>(*a_promoted, *b_promoted, func_name); \
+        break; }
+
+static SEXP tensor_binary_template(SEXP a_ptr, SEXP b_ptr,
+                                   std::function<void*(void)> dummy, // just for overload resolution
+                                   bool is_sub) {
+    XPtr<TensorBase> a_tensor(a_ptr);
+    XPtr<TensorBase> b_tensor(b_ptr);
+
+    if (!a_tensor || !b_tensor) stop("Invalid tensor pointer(s)");
+
+    if (a_tensor->shape() != b_tensor->shape()) {
+        stop("Shapes must match for this implementation");
+    }
+
+    DType res_type = TypePromotion::get_result_type(*a_tensor, *b_tensor);
+    auto a_promoted = TypePromotion::promote_tensor(*a_tensor, res_type);
+    auto b_promoted = TypePromotion::promote_tensor(*b_tensor, res_type);
+
+    std::unique_ptr<TensorBase> result_tensor;
+
+    switch (res_type) {
+        HANDLE_BINARY_OP(DType::FLOAT16, half, is_sub ? tensor_sub_float16 : tensor_div_float16)
+        HANDLE_BINARY_OP(DType::FLOAT32, float, is_sub ? tensor_sub_float32 : tensor_div_float32)
+        HANDLE_BINARY_OP(DType::FLOAT64, double, is_sub ? tensor_sub_float64 : tensor_div_float64)
+        default:
+            stop("Operation not implemented for dtype: " + dtype_to_string(res_type));
+    }
+
+    auto uniq = std::unique_ptr<TensorBase>(result_tensor.release());
+    XPtr<TensorBase> ptr(uniq.release(), true);
+    ptr.attr("class") = "gpuTensor";
+    ptr.attr("dtype") = dtype_to_string(res_type);
+    return ptr;
+}
+
+// [[Rcpp::export]]
+SEXP tensor_sub_unified(SEXP a_ptr, SEXP b_ptr) {
+    return tensor_binary_template(a_ptr, b_ptr, [](){return nullptr;}, true);
+}
+
+// [[Rcpp::export]]
+SEXP tensor_div_unified(SEXP a_ptr, SEXP b_ptr) {
+    return tensor_binary_template(a_ptr, b_ptr, [](){return nullptr;}, false);
+}
+
+// [[Rcpp::export]]
+SEXP tensor_add_unified(SEXP a_ptr, SEXP b_ptr) {
+    try {
+        XPtr<TensorBase> a_tensor(a_ptr);
+        XPtr<TensorBase> b_tensor(b_ptr);
+
+        if (!a_tensor || !b_tensor) {
+            stop("Invalid tensor pointer(s)");
+        }
+
+        // Check shapes compatibility
+        bool shapes_equal = (a_tensor->shape() == b_tensor->shape());
+        bool scalar_broadcast = (!shapes_equal) && (a_tensor->size() == 1 || b_tensor->size() == 1);
+        bool needs_full_broadcast = !shapes_equal && !scalar_broadcast;
+
+        if (needs_full_broadcast) {
+            // Check if shapes are broadcastable using existing Shape methods
+            if (!a_tensor->shape().broadcastable_with(b_tensor->shape())) {
+                stop("Tensor shapes are not broadcastable");
+            }
+            
+            // Compute broadcast shape and use broadcast kernel
+            Shape broadcast_shape = a_tensor->shape().broadcast_with(b_tensor->shape());
+            
+            // Create result tensor - we need to use the existing pattern for tensor creation
+            DType dtype_a = a_tensor->dtype();
+            DType dtype_b = b_tensor->dtype();
+            
+            if (dtype_a != dtype_b) {
+                stop("Cannot add tensors with different dtypes");
+            }
+            
+            std::unique_ptr<TensorBase> result_tensor;
+            
+            // Compute strides for broadcasting
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            std::vector<int> result_strides(broadcast_shape.ndims());
+            int stride = 1;
+            for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
+                result_strides[i] = stride;
+                stride *= broadcast_shape[i];
+            }
+            
+            // Convert shape dimensions from size_t to int for CUDA kernel
+            std::vector<int> shape_int(broadcast_shape.dims.begin(), broadcast_shape.dims.end());
+            
+            if (dtype_a == DType::FLOAT32) {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
+                }
+                auto result = std::make_shared<gpuTensor<float>>(broadcast_shape);
+                tensor_add_broadcast_float32(
+                    result->data(),
+                    a_wrapper->tensor().data(),
+                    b_wrapper->tensor().data(),
+                    a_strides.data(), b_strides.data(), result_strides.data(),
+                    shape_int.data(), broadcast_shape.ndims(), broadcast_shape.size()
+                );
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+            } else if (dtype_a == DType::FLOAT64) {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
+                }
+                auto result = std::make_shared<gpuTensor<double>>(broadcast_shape);
+                tensor_add_broadcast_float64(
+                    result->data(),
+                    a_wrapper->tensor().data(),
+                    b_wrapper->tensor().data(),
+                    a_strides.data(), b_strides.data(), result_strides.data(),
+                    shape_int.data(), broadcast_shape.ndims(), broadcast_shape.size()
+                );
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+            } else {
+                stop("Broadcast addition only supported for float and double dtypes");
+            }
+            
+            auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+            XPtr<TensorBase> ptr(tensor_unique.release(), true);
+            
+            ptr.attr("class") = "gpuTensor";
+            ptr.attr("dtype") = dtype_to_string(dtype_a);
+            
+            return ptr;
+        }
+
+        // Handle tensor + scalar_tensor case by converting scalar operand to numeric and using scalar kernel
+        if (scalar_broadcast) {
+            const TensorBase* scalar_tensor = (a_tensor->size() == 1) ? a_tensor.get() : b_tensor.get();
+            const TensorBase* other_tensor  = (a_tensor->size() == 1) ? b_tensor.get() : a_tensor.get();
+
+            // Copy scalar to host (as double)
+            double scalar_value = 0.0;
+            scalar_tensor->copy_to_host_generic(&scalar_value);
+
+            // Recurse to scalar addition kernel
+            SEXP other_ptr = (a_tensor->size() == 1) ? b_ptr : a_ptr;
+            return tensor_scalar_add_unified(other_ptr, scalar_value);
+        }
+        
+        // Fast path for equal shapes - use existing type promotion logic
+        DType result_type = TypePromotion::get_result_type(*a_tensor, *b_tensor);
+        
+        // Promote tensors to result type
+        auto a_promoted = TypePromotion::promote_tensor(*a_tensor, result_type);
+        auto b_promoted = TypePromotion::promote_tensor(*b_tensor, result_type);
+        
+        // Perform addition using simple type dispatch
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (result_type) {
+            case DType::FLOAT16: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<half>*>(a_promoted.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<half>*>(b_promoted.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Type promotion failed for FLOAT16");
+                }
+                auto result = std::make_shared<gpuTensor<half>>(a_wrapper->tensor().shape());
+                tensor_add_float16(result->data(), a_wrapper->tensor().data(), 
+                                 b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<half>>(result);
+                break;
+            }
+            case DType::FLOAT32: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_promoted.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_promoted.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Type promotion failed for FLOAT32");
+                }
+                
+                auto result = std::make_shared<gpuTensor<float>>(a_wrapper->tensor().shape());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_add_float32(result->data(), a_wrapper->tensor().data(), 
+                                       b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_add_strided_float32(out_desc, a_desc, b_desc);
+                }
+                
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+                break;
+            }
+            case DType::FLOAT64: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_promoted.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_promoted.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Type promotion failed for FLOAT64");
+                }
+                
+                auto result = std::make_shared<gpuTensor<double>>(a_wrapper->tensor().shape());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_add_float64(result->data(), a_wrapper->tensor().data(), 
+                                       b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_add_strided_float64(out_desc, a_desc, b_desc);
+                }
+                
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+                break;
+            }
+            case DType::INT8: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<int8_t>*>(a_promoted.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<int8_t>*>(b_promoted.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Type promotion failed for INT8");
+                }
+                auto result = std::make_shared<gpuTensor<int8_t>>(a_wrapper->tensor().shape());
+                tensor_add_int8(result->data(), a_wrapper->tensor().data(), 
+                              b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<int8_t>>(result);
+                break;
+            }
+            case DType::INT32: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<int32_t>*>(a_promoted.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<int32_t>*>(b_promoted.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Type promotion failed for INT32");
+                }
+                auto result = std::make_shared<gpuTensor<int32_t>>(a_wrapper->tensor().shape());
+                tensor_add_int32(result->data(), a_wrapper->tensor().data(), 
+                                b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<int32_t>>(result);
+                break;
+            }
+            case DType::INT64: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<int64_t>*>(a_promoted.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<int64_t>*>(b_promoted.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Type promotion failed for INT64");
+                }
+                auto result = std::make_shared<gpuTensor<int64_t>>(a_wrapper->tensor().shape());
+                tensor_add_int64(result->data(), a_wrapper->tensor().data(), 
+                                b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<int64_t>>(result);
+                break;
+            }
+            default:
+                throw std::runtime_error("Addition not supported for dtype: " + dtype_to_string(result_type));
+        }
+        
+        // Wrap result in external pointer
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = dtype_to_string(result_type);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor addition: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_mul_unified(SEXP a_ptr, SEXP b_ptr) {
+    try {
+        XPtr<TensorBase> a_tensor(a_ptr);
+        XPtr<TensorBase> b_tensor(b_ptr);
+
+        if (!a_tensor || !b_tensor) {
+            stop("Invalid tensor pointer(s)");
+        }
+
+        // Check shapes compatibility
+        bool shapes_equal = (a_tensor->shape() == b_tensor->shape());
+        bool scalar_broadcast = (!shapes_equal) && (a_tensor->size() == 1 || b_tensor->size() == 1);
+        bool needs_full_broadcast = !shapes_equal && !scalar_broadcast;
+
+        if (needs_full_broadcast) {
+            // Check if shapes are broadcastable using existing Shape methods
+            if (!a_tensor->shape().broadcastable_with(b_tensor->shape())) {
+                stop("Tensor shapes are not broadcastable");
+            }
+            
+            // Compute broadcast shape and use broadcast kernel
+            Shape broadcast_shape = a_tensor->shape().broadcast_with(b_tensor->shape());
+            
+            // Create result tensor
+            DType dtype_a = a_tensor->dtype();
+            DType dtype_b = b_tensor->dtype();
+            
+            if (dtype_a != dtype_b) {
+                stop("Cannot multiply tensors with different dtypes");
+            }
+            
+            std::unique_ptr<TensorBase> result_tensor;
+            
+            // Compute strides for broadcasting
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            std::vector<int> result_strides(broadcast_shape.ndims());
+            int stride = 1;
+            for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
+                result_strides[i] = stride;
+                stride *= broadcast_shape[i];
+            }
+            
+            // Convert shape dimensions from size_t to int for CUDA kernel
+            std::vector<int> shape_int(broadcast_shape.dims.begin(), broadcast_shape.dims.end());
+            
+            if (dtype_a == DType::FLOAT32) {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
+                }
+                auto result = std::make_shared<gpuTensor<float>>(broadcast_shape);
+                tensor_mul_broadcast_float32(
+                    result->data(),
+                    a_wrapper->tensor().data(),
+                    b_wrapper->tensor().data(),
+                    a_strides.data(), b_strides.data(), result_strides.data(),
+                    shape_int.data(), broadcast_shape.ndims(), broadcast_shape.size()
+                );
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+            } else if (dtype_a == DType::FLOAT64) {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
+                }
+                auto result = std::make_shared<gpuTensor<double>>(broadcast_shape);
+                tensor_mul_broadcast_float64(
+                    result->data(),
+                    a_wrapper->tensor().data(),
+                    b_wrapper->tensor().data(),
+                    a_strides.data(), b_strides.data(), result_strides.data(),
+                    shape_int.data(), broadcast_shape.ndims(), broadcast_shape.size()
+                );
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+            } else {
+                stop("Broadcast multiplication only supported for float and double dtypes");
+            }
+            
+            auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+            XPtr<TensorBase> ptr(tensor_unique.release(), true);
+            
+            ptr.attr("class") = "gpuTensor";
+            ptr.attr("dtype") = dtype_to_string(dtype_a);
+            
+            return ptr;
+        }
+
+        if (scalar_broadcast) {
+            const TensorBase* scalar_tensor = (a_tensor->size() == 1) ? a_tensor.get() : b_tensor.get();
+            const TensorBase* other_tensor  = (a_tensor->size() == 1) ? b_tensor.get() : a_tensor.get();
+
+            double scalar_val = 0.0;
+            scalar_tensor->copy_to_host_generic(&scalar_val);
+
+            SEXP other_ptr = (a_tensor->size() == 1) ? b_ptr : a_ptr;
+            return tensor_scalar_mul_unified(other_ptr, scalar_val);
+        }
+        
+        // Fast path for equal shapes
+        DType dtype_a = a_tensor->dtype();
+        DType dtype_b = b_tensor->dtype();
+        
+        if (dtype_a != dtype_b) {
+            stop("Cannot multiply tensors with different dtypes");
+        }
+        
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype_a) {
+            case DType::FLOAT16: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<half>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<half>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
+                }
+                auto result = std::make_shared<gpuTensor<half>>(a_wrapper->tensor().shape());
+                tensor_mul_float16(result->data(), a_wrapper->tensor().data(), 
+                                 b_wrapper->tensor().data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<half>>(result);
+                break;
+            }
+            case DType::FLOAT32: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
+                }
+                // Ensure both tensors are contiguous
+                auto a_tensor_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
+                auto b_tensor_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
+
+                auto result = std::make_shared<gpuTensor<float>>(a_tensor_contig.shape());
+                tensor_mul_float32(result->data(), a_tensor_contig.data(), 
+                                   b_tensor_contig.data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+                break;
+            }
+            case DType::FLOAT64: {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
+                }
+                // Ensure both tensors are contiguous
+                auto a_tensor_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
+                auto b_tensor_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
+
+                auto result = std::make_shared<gpuTensor<double>>(a_tensor_contig.shape());
+                tensor_mul_float64(result->data(), a_tensor_contig.data(), 
+                                   b_tensor_contig.data(), result->size());
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+                break;
+            }
+            default:
+                stop("Element-wise multiplication not implemented for dtype: " + dtype_to_string(dtype_a));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = dtype_to_string(dtype_a);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor element-wise multiplication: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_scalar_mul_unified(SEXP tensor_ptr, double scalar) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype) {
+            case DType::FLOAT16: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<half>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT16");
+                }
+                auto result = std::make_shared<gpuTensor<half>>(tensor_wrapper->tensor().shape());
+                tensor_scalar_mul_float16(result->data(), tensor_wrapper->tensor().data(), 
+                                        static_cast<float>(scalar), result->size());
+                result_tensor = std::make_unique<TensorWrapper<half>>(result);
+                break;
+            }
+            case DType::FLOAT32: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                }
+                auto result = std::make_shared<gpuTensor<float>>(tensor_wrapper->tensor().shape());
+                tensor_scalar_mul_float32(result->data(), tensor_wrapper->tensor().data(), 
+                                        static_cast<float>(scalar), result->size());
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tensor_wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tensor_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                }
+                auto result = std::make_shared<gpuTensor<double>>(tensor_wrapper->tensor().shape());
+                tensor_scalar_mul_float64(result->data(), tensor_wrapper->tensor().data(), 
+                                        scalar, result->size());
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+                break;
+            }
+            default:
+                stop("Scalar multiplication not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = dtype_to_string(dtype);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor scalar multiplication: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_scalar_add_unified(SEXP tensor_ptr, double scalar) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+
+        DType dtype = tensor->dtype();
+        std::unique_ptr<TensorBase> result_tensor;
+
+        switch (dtype) {
+            case DType::FLOAT16: {
+                auto tw = dynamic_cast<const TensorWrapper<half>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT16");
+                auto result = std::make_shared<gpuTensor<half>>(tw->tensor().shape());
+                tensor_scalar_add_float16(result->data(), tw->tensor().data(), static_cast<float>(scalar), result->size());
+                result_tensor = std::make_unique<TensorWrapper<half>>(result);
+                break;
+            }
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                auto result = std::make_shared<gpuTensor<float>>(tw->tensor().shape());
+                tensor_scalar_add_float32(result->data(), tw->tensor().data(), static_cast<float>(scalar), result->size());
+                result_tensor = std::make_unique<TensorWrapper<float>>(result);
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                auto result = std::make_shared<gpuTensor<double>>(tw->tensor().shape());
+                tensor_scalar_add_float64(result->data(), tw->tensor().data(), scalar, result->size());
+                result_tensor = std::make_unique<TensorWrapper<double>>(result);
+                break;
+            }
+            default:
+                stop("Scalar addition not implemented for dtype: " + dtype_to_string(dtype));
+        }
+
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = dtype_to_string(dtype);
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor scalar addition: " + std::string(e.what()));
+    }
+} 

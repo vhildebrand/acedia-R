@@ -177,8 +177,8 @@ inline std::string dtype_to_string(DType dtype) {
     switch (dtype) {
         case DType::FLOAT16: return "float16";
         case DType::BFLOAT16: return "bfloat16";
-        case DType::FLOAT32: return "float32";
-        case DType::FLOAT64: return "float64";
+        case DType::FLOAT32: return "float";    // R uses 'float' for single-precision
+        case DType::FLOAT64: return "double";   // R uses 'double' for double-precision
         case DType::INT8: return "int8";
         case DType::UINT8: return "uint8";
         case DType::INT16: return "int16";
@@ -579,11 +579,31 @@ public:
             throw std::runtime_error("Transpose currently supports 2D tensors only");
         }
         
-        // Create transposed shape and strides
-        Shape new_shape({shape_[1], shape_[0]});  // Swap dimensions
-        std::vector<size_t> new_strides({strides_[1], strides_[0]});  // Swap strides
+        // For R compatibility, we need to physically transpose the data, not just swap strides
+        // R uses column-major storage, so we need to handle the layout correctly
         
-        return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
+        size_t rows = shape_[0];
+        size_t cols = shape_[1]; 
+        
+        Shape new_shape({cols, rows});  // Swap dimensions
+        gpuTensor result(new_shape, device_);
+        
+        // Copy data from host and transpose it properly
+        std::vector<T> host_data = to_host();
+        std::vector<T> transposed_data(rows * cols);
+        
+        // Transpose the data: result[j][i] = original[i][j]
+        // R stores matrices column-major, so element (i,j) is at index i + j*rows
+        for (size_t i = 0; i < rows; ++i) {
+            for (size_t j = 0; j < cols; ++j) {
+                // Original: (i,j) -> i + j*rows (column-major)
+                // Transposed: (j,i) -> j + i*cols (column-major)
+                transposed_data[j + i * cols] = host_data[i + j * rows];
+            }
+        }
+        
+        result.copy_from_host(transposed_data.data());
+        return result;
     }
     
     // Permute dimensions (general case)
@@ -601,17 +621,53 @@ public:
             used[dims[i]] = true;
         }
         
-        // Create new shape and strides
-        std::vector<size_t> new_shape_dims(ndims());
-        std::vector<size_t> new_strides(ndims());
+        // For R compatibility, we need to physically rearrange the data
+        // R uses column-major storage, so permutation needs proper data layout
         
+        // Calculate new shape
+        std::vector<size_t> new_shape_dims(ndims());
         for (size_t i = 0; i < ndims(); ++i) {
             new_shape_dims[i] = shape_[dims[i]];
-            new_strides[i] = strides_[dims[i]];
+        }
+        Shape new_shape(new_shape_dims);
+        
+        gpuTensor result(new_shape, device_);
+        
+        // Get original data and rearrange it
+        std::vector<T> host_data = to_host();
+        std::vector<T> permuted_data(size());
+        
+        // Calculate strides for indexing
+        std::vector<size_t> old_strides = compute_strides(shape_);
+        std::vector<size_t> new_strides = compute_strides(new_shape);
+        
+        // Permute the data element by element
+        for (size_t linear_idx = 0; linear_idx < size(); ++linear_idx) {
+            // Convert linear index to multi-dimensional coordinates in result tensor (COLUMN-MAJOR)
+            std::vector<size_t> result_coords(ndims());
+            size_t temp_idx = linear_idx;
+            for (size_t d = 0; d < ndims(); ++d) {
+                result_coords[d] = temp_idx % new_shape_dims[d];
+                temp_idx /= new_shape_dims[d];
+            }
+            
+            // Convert result coordinates to original tensor coordinates
+            std::vector<size_t> orig_coords(ndims());
+            for (size_t d = 0; d < ndims(); ++d) {
+                orig_coords[dims[d]] = result_coords[d];
+            }
+            
+            // Calculate original linear index
+            size_t orig_linear_idx = 0;
+            for (size_t d = 0; d < ndims(); ++d) {
+                orig_linear_idx += orig_coords[d] * old_strides[d];
+            }
+            
+            permuted_data[linear_idx] = host_data[orig_linear_idx];
         }
         
-        Shape new_shape(new_shape_dims);
-        return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
+        result.copy_from_host(permuted_data.data());
+        return result;
     }
     
     // Create a contiguous copy
@@ -694,6 +750,29 @@ public:
         copy_to_host(result.data());
         return result;
 #endif
+    }
+    
+    // Create tensor descriptor for strided operations
+    cuda_utils::TensorDescriptor descriptor() const {
+        cuda_utils::TensorDescriptor desc;
+        desc.data = static_cast<void*>(data_);
+        desc.ndims = static_cast<int>(ndims());
+        desc.offset = offset_;
+        desc.total_size = shape_.size();
+        
+        // Copy shape and strides (convert from size_t to int)
+        for (int i = 0; i < desc.ndims; ++i) {
+            desc.shape[i] = static_cast<int>(shape_[i]);
+            desc.strides[i] = static_cast<int>(strides_[i]);
+        }
+        
+        // Zero out unused dimensions
+        for (int i = desc.ndims; i < 8; ++i) {
+            desc.shape[i] = 0;
+            desc.strides[i] = 0;
+        }
+        
+        return desc;
     }
     
     // Print tensor info (always available)

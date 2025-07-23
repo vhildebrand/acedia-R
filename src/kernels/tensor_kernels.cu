@@ -8,6 +8,9 @@
 #include <algorithm>
 #include "kernel_utils.cuh"
 #include "../gpuTensor.h"
+#include "../cuda_utils.h"
+
+using namespace cuda_utils;
 
 // Generic templated kernels
 template<typename T>
@@ -147,10 +150,10 @@ __global__ void broadcast_binary_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_elements) return;
     
-    // Convert linear index to multidimensional coordinates
+    // Convert linear index to multidimensional coordinates (COLUMN-MAJOR for R)
     int coords[8]; // max 8 dimensions
     int temp_idx = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
+    for (int i = 0; i < ndims; i++) {  // Changed from ndims-1 down to 0 up for column-major
         coords[i] = temp_idx % shape[i];
         temp_idx /= shape[i];
     }
@@ -174,10 +177,10 @@ __global__ void strided_copy_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_elements) return;
     
-    // Convert linear output index to multidimensional coordinates
+    // Convert linear output index to multidimensional coordinates (COLUMN-MAJOR for R)
     int coords[8]; // max 8 dimensions
     int temp_idx = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
+    for (int i = 0; i < ndims; i++) {  // Column-major indexing for R
         coords[i] = temp_idx % shape[i];
         temp_idx /= shape[i];
     }
@@ -201,10 +204,10 @@ __global__ void concat_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_elements) return;
     
-    // Convert linear index to multidimensional coordinates
-    int coords[8]; // max 8 dimensions
+    // Convert linear index to result coordinates (COLUMN-MAJOR for R)
+    int coords[8];
     int temp_idx = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
+    for (int i = 0; i < ndims; ++i) {
         coords[i] = temp_idx % shape[i];
         temp_idx /= shape[i];
     }
@@ -245,10 +248,10 @@ __global__ void stack_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_elements) return;
     
-    // Convert linear index to result coordinates
+    // Convert linear index to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
+    for (int i = 0; i < ndims; i++) {  // Column-major indexing for R
         coords[i] = temp_idx % result_shape[i];
         temp_idx /= result_shape[i];
     }
@@ -287,10 +290,10 @@ __global__ void repeat_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_elements) return;
     
-    // Convert linear index to result coordinates
+    // Convert linear index to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
+    for (int i = 0; i < ndims; ++i) {
         coords[i] = temp_idx % result_shape[i];
         temp_idx /= result_shape[i];
     }
@@ -322,10 +325,10 @@ __global__ void pad_kernel(
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_elements) return;
     
-    // Convert to result coordinates
+    // Convert to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
+    for (int i = 0; i < ndims; ++i) {
         coords[i] = temp_idx % result_shape[i];
         temp_idx /= result_shape[i];
     }
@@ -363,3 +366,5 @@ __global__ void pad_kernel(
     
     result[idx] = input[src_idx];
 } 
+
+ 

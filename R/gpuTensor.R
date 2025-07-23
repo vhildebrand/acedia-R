@@ -34,9 +34,15 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
     stop("Data must be numeric")
   }
   
-  # Validate dtype (currently only double/float supported by high-level R interface)
+  # Validate and normalize dtype 
+  if (dtype == "float32") {
+    dtype <- "float"  # Map float32 to float for compatibility
+  } else if (dtype == "float64") {
+    dtype <- "double"  # Map float64 to double for compatibility
+  }
+  
   if (!dtype %in% c("double", "float")) {
-    stop("Unsupported dtype. Supported dtypes are 'double' and 'float'")
+    stop("Unsupported dtype. Supported dtypes are 'double', 'float', 'float32', 'float64'")
   }
 
   if (!is.integer(shape)) {
@@ -80,9 +86,15 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
 #' 
 #' @export
 empty_tensor <- function(shape, dtype = "double", device = "cuda", requires_grad = FALSE) {
-  # Validate dtype for empty tensor as well
+  # Validate and normalize dtype for empty tensor
+  if (dtype == "float32") {
+    dtype <- "float"  # Map float32 to float for compatibility
+  } else if (dtype == "float64") {
+    dtype <- "double"  # Map float64 to double for compatibility
+  }
+  
   if (!dtype %in% c("double", "float")) {
-    stop("Unsupported dtype. Supported dtypes are 'double' and 'float'")
+    stop("Unsupported dtype. Supported dtypes are 'double', 'float', 'float32', 'float64'")
   }
 
   if (!is.integer(shape)) {
@@ -786,7 +798,14 @@ stack <- function(tensors, axis = 1) {
   warning("stack currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
   
   arrays <- lapply(tensors, as.array)
-  result_array <- do.call(abind::abind, c(arrays, along = axis))
+  # Map axis to abind along parameter for stacking (creating new dimension)
+  # axis = 1 means new first dimension -> along = 0
+  # axis = 2 means new second dimension -> along = 1  
+  # etc.
+  abind_along <- axis - 1
+  if (abind_along < 0) abind_along <- 0
+  
+  result_array <- do.call(abind::abind, c(arrays, list(along = abind_along)))
   
   result <- gpu_tensor(as.vector(result_array), dim(result_array))
   return(result)
@@ -805,8 +824,16 @@ repeat_tensor <- function(tensor, repeats) {
     stop("tensor must be a gpuTensor object")
   }
   
-  if (length(repeats) != length(shape(tensor))) {
+  tensor_dims <- length(shape(tensor))
+  
+  # Allow repeats to be shorter than dimensions (pad with 1s)
+  if (length(repeats) > tensor_dims) {
     stop("Length of repeats must match number of tensor dimensions")
+  }
+  
+  # Pad repeats with 1s if shorter than tensor dimensions
+  if (length(repeats) < tensor_dims) {
+    repeats <- c(repeats, rep(1, tensor_dims - length(repeats)))
   }
   
   if (any(repeats <= 0)) {
@@ -818,12 +845,35 @@ repeat_tensor <- function(tensor, repeats) {
   
   array_data <- as.array(tensor)
   
-  # Use base R's rep function with array indexing
+  # Use rep for each dimension
   for (dim in seq_along(repeats)) {
     if (repeats[dim] > 1) {
-      indices <- rep(seq_len(dim(array_data)[dim]), repeats[dim])
-      array_data <- apply(array_data, setdiff(seq_len(length(dim(array_data))), dim), 
-                         function(x) x[indices])
+      # Create indices for repeating along this dimension
+      indices <- rep(seq_len(dim(array_data)[dim]), each = repeats[dim])
+      
+      # Apply the repetition using proper array indexing based on actual dimensions
+      n_dims <- length(dim(array_data))
+      
+      if (n_dims == 1) {
+        if (dim == 1) {
+          array_data <- array_data[indices]
+        }
+      } else if (n_dims == 2) {
+        if (dim == 1) {
+          array_data <- array_data[indices, , drop = FALSE]
+        } else if (dim == 2) {
+          array_data <- array_data[, indices, drop = FALSE]
+        }
+      } else if (n_dims == 3) {
+        if (dim == 1) {
+          array_data <- array_data[indices, , , drop = FALSE]
+        } else if (dim == 2) {
+          array_data <- array_data[, indices, , drop = FALSE]
+        } else if (dim == 3) {
+          array_data <- array_data[, , indices, drop = FALSE]
+        }
+      }
+      # For higher dimensions, would need more complex indexing
     }
   }
   
@@ -882,7 +932,18 @@ pad <- function(tensor, pad_width, mode = "constant", value = 0) {
       (pad_matrix[i, 1] + 1):(pad_matrix[i, 1] + dim(array_data)[i])
     })
     
-    do.call(`[<-`, c(list(result_array), indices, list(array_data)))
+    # Use proper array assignment
+    if (length(dim(array_data)) == 2) {
+      result_array[indices[[1]], indices[[2]]] <- array_data
+    } else if (length(dim(array_data)) == 1) {
+      result_array[indices[[1]]] <- array_data
+    } else if (length(dim(array_data)) == 3) {
+      result_array[indices[[1]], indices[[2]], indices[[3]]] <- array_data
+    } else {
+      # Fallback for higher dimensions
+      result_array <- do.call(`[<-`, c(list(result_array), indices, list(array_data)))
+    }
+    
     result <- gpu_tensor(as.vector(result_array), dim(result_array))
     return(result)
   }

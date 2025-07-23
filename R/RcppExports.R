@@ -21,6 +21,22 @@ tensor_div_unified <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_tensor_div_unified`, a_ptr, b_ptr)
 }
 
+tensor_add_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_add_unified`, a_ptr, b_ptr)
+}
+
+tensor_mul_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_mul_unified`, a_ptr, b_ptr)
+}
+
+tensor_scalar_mul_unified <- function(tensor_ptr, scalar) {
+    .Call(`_acediaR_tensor_scalar_mul_unified`, tensor_ptr, scalar)
+}
+
+tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
+    .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
+}
+
 create_tensor_unified <- function(data, shape_vec, dtype = "float32") {
     .Call(`_acediaR_create_tensor_unified`, data, shape_vec, dtype)
 }
@@ -53,18 +69,6 @@ tensor_to_dtype_unified <- function(tensor_ptr, target_dtype) {
     .Call(`_acediaR_tensor_to_dtype_unified`, tensor_ptr, target_dtype)
 }
 
-tensor_add_unified <- function(a_ptr, b_ptr) {
-    .Call(`_acediaR_tensor_add_unified`, a_ptr, b_ptr)
-}
-
-tensor_scalar_mul_unified <- function(tensor_ptr, scalar) {
-    .Call(`_acediaR_tensor_scalar_mul_unified`, tensor_ptr, scalar)
-}
-
-tensor_sum_unified <- function(tensor_ptr) {
-    .Call(`_acediaR_tensor_sum_unified`, tensor_ptr)
-}
-
 tensor_synchronize_unified <- function(tensor_ptr) {
     invisible(.Call(`_acediaR_tensor_synchronize_unified`, tensor_ptr))
 }
@@ -73,32 +77,8 @@ tensor_is_contiguous_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_is_contiguous_unified`, tensor_ptr)
 }
 
-tensor_mul_unified <- function(a_ptr, b_ptr) {
-    .Call(`_acediaR_tensor_mul_unified`, a_ptr, b_ptr)
-}
-
 tensor_matmul_unified <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_tensor_matmul_unified`, a_ptr, b_ptr)
-}
-
-tensor_view_unified <- function(tensor_ptr, new_shape) {
-    .Call(`_acediaR_tensor_view_unified`, tensor_ptr, new_shape)
-}
-
-tensor_reshape_unified <- function(tensor_ptr, new_shape) {
-    .Call(`_acediaR_tensor_reshape_unified`, tensor_ptr, new_shape)
-}
-
-tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
-    .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
-}
-
-tensor_transpose_unified <- function(tensor_ptr) {
-    .Call(`_acediaR_tensor_transpose_unified`, tensor_ptr)
-}
-
-tensor_permute_unified <- function(tensor_ptr, dims) {
-    .Call(`_acediaR_tensor_permute_unified`, tensor_ptr, dims)
 }
 
 tensor_exp_unified <- function(tensor_ptr) {
@@ -113,6 +93,10 @@ tensor_sqrt_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_sqrt_unified`, tensor_ptr)
 }
 
+tensor_sum_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_sum_unified`, tensor_ptr)
+}
+
 tensor_mean_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_mean_unified`, tensor_ptr)
 }
@@ -123,5 +107,21 @@ tensor_max_unified <- function(tensor_ptr) {
 
 tensor_min_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_min_unified`, tensor_ptr)
+}
+
+tensor_view_unified <- function(tensor_ptr, new_shape) {
+    .Call(`_acediaR_tensor_view_unified`, tensor_ptr, new_shape)
+}
+
+tensor_reshape_unified <- function(tensor_ptr, new_shape) {
+    .Call(`_acediaR_tensor_reshape_unified`, tensor_ptr, new_shape)
+}
+
+tensor_transpose_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_transpose_unified`, tensor_ptr)
+}
+
+tensor_permute_unified <- function(tensor_ptr, dims) {
+    .Call(`_acediaR_tensor_permute_unified`, tensor_ptr, dims)
 }
 

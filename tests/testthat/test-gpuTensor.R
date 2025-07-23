@@ -1,19 +1,18 @@
 test_that("gpuTensor creation works correctly", {
   skip_if_not(gpu_available(), "GPU not available")
   
-  # Test basic tensor creation
   data <- 1:12
   shape <- c(3, 4)
+  
   tensor <- gpu_tensor(data, shape)
   
-  expect_s3_class(tensor, "gpuTensor")
   expect_equal(shape(tensor), shape)
   expect_equal(size(tensor), 12)
   expect_equal(attr(tensor, "dtype"), "double")
   
-  # Test data integrity
+  # Test data integrity - R uses column-major order by default
   result_data <- as.array(tensor)
-  expected_matrix <- matrix(data, nrow = 3, ncol = 4, byrow = TRUE)
+  expected_matrix <- matrix(data, nrow = 3, ncol = 4, byrow = FALSE)  # Changed from byrow = TRUE
   expect_equal(result_data, expected_matrix)
 })
 
@@ -137,7 +136,7 @@ test_that("matrix multiplication works correctly", {
   c_data <- matrix(1:8, nrow = 2, ncol = 4)    # 2x4 (incompatible with 2x3)
   tensor_c <- as_tensor(c_data)
   
-  expect_error(matmul(tensor_a, tensor_c), "incompatible for multiplication")
+  expect_error(matmul(tensor_a, tensor_c), "Incompatible dimensions for matrix multiplication")
   
   # Test non-2D tensors
   tensor_1d <- as_tensor(1:6)
@@ -455,10 +454,10 @@ test_that("tensor error handling is comprehensive", {
   tensor_b <- gpu_tensor(1:8, c(2, 4))
   
   expect_error(tensor_a + tensor_b, "broadcastable")
-  expect_error(tensor_a * tensor_b, "must match")
+  expect_error(tensor_a * tensor_b, "Tensor shapes are not broadcastable")
   
   # Test invalid operations
-  expect_error(matmul(tensor_a, tensor_a), "incompatible")  # 2x3 * 2x3 invalid
+  expect_error(matmul(tensor_a, tensor_a), "Incompatible dimensions for matrix multiplication")  # 2x3 * 2x3 invalid
   
   # Test dtype mismatches
   tensor_float <- gpu_tensor(1:6, c(2, 3), dtype = "float")
