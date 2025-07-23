@@ -1064,23 +1064,23 @@ size.gpuTensor <- function(x) {
 
   # Build start & end indices (similar logic to `[.gpuTensor` reader)
   indices <- vector("list", n_dims)
-  for (i in seq_len(n_dims)) {
+  for (i in 1:n_dims) {
     if (i <= n_args) {
-      if (identical(args[[i]], quote(expr = ))) {
+      if (args[[i]] == quote(expr=)) {
         indices[[i]] <- NULL  # missing like t[ ,]
       } else {
         indices[[i]] <- eval(args[[i]], parent.frame())
       }
     } else {
-      indices[[i]] <- NULL
+      indices[[i]] <- NULL  # No index provided for this dimension
     }
   }
 
   start_indices <- integer(n_dims)
   end_indices   <- integer(n_dims)
 
-  for (i in seq_len(n_dims)) {
-    idx <- indices[[i]]
+  for (i in 1:n_dims) {
+    idx <- if (i <= length(indices)) indices[[i]] else NULL
     dim_size <- tensor_dims[i]
 
     if (is.null(idx)) {

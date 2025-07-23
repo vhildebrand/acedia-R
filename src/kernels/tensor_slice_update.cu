@@ -44,6 +44,29 @@ __global__ void add_scalar_slice_kernel(
 // ----------------------------------------------------------------------------
 extern "C" {
 
+static void launch_slice_add_scalar_float(float* data, double scalar,
+        const int* h_start, const int* h_shape, const int* h_strides,
+        int ndims, size_t total_elements) {
+    int *d_start, *d_shape, *d_strides;
+    size_t bytes = ndims * sizeof(int);
+    cudaMalloc(&d_start, bytes);
+    cudaMalloc(&d_shape, bytes);
+    cudaMalloc(&d_strides, bytes);
+    cudaMemcpy(d_start, h_start, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_shape, h_shape, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_strides, h_strides, bytes, cudaMemcpyHostToDevice);
+
+    int threads = 256;
+    int blocks  = static_cast<int>((total_elements + threads - 1) / threads);
+    add_scalar_slice_kernel<float><<<blocks, threads>>>(
+        data, scalar, d_start, d_shape, d_strides, ndims, total_elements);
+    cudaDeviceSynchronize();
+
+    cudaFree(d_start);
+    cudaFree(d_shape);
+    cudaFree(d_strides);
+}
+
 void tensor_slice_add_scalar_float32(
     float* data,
     double scalar,
@@ -53,10 +76,31 @@ void tensor_slice_add_scalar_float32(
     int ndims,
     size_t total_elements)
 {
+    launch_slice_add_scalar_float(data, scalar, start, slice_shape, strides,
+                                   ndims, total_elements);
+}
+
+static void launch_slice_add_scalar_double(double* data, double scalar,
+        const int* h_start, const int* h_shape, const int* h_strides,
+        int ndims, size_t total_elements) {
+    int *d_start, *d_shape, *d_strides;
+    size_t bytes = ndims * sizeof(int);
+    cudaMalloc(&d_start, bytes);
+    cudaMalloc(&d_shape, bytes);
+    cudaMalloc(&d_strides, bytes);
+    cudaMemcpy(d_start, h_start, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_shape, h_shape, bytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_strides, h_strides, bytes, cudaMemcpyHostToDevice);
+
     int threads = 256;
     int blocks  = static_cast<int>((total_elements + threads - 1) / threads);
-    add_scalar_slice_kernel<float><<<blocks, threads>>>(
-        data, scalar, start, slice_shape, strides, ndims, total_elements);
+    add_scalar_slice_kernel<double><<<blocks, threads>>>(
+        data, scalar, d_start, d_shape, d_strides, ndims, total_elements);
+    cudaDeviceSynchronize();
+
+    cudaFree(d_start);
+    cudaFree(d_shape);
+    cudaFree(d_strides);
 }
 
 void tensor_slice_add_scalar_float64(
@@ -68,10 +112,8 @@ void tensor_slice_add_scalar_float64(
     int ndims,
     size_t total_elements)
 {
-    int threads = 256;
-    int blocks  = static_cast<int>((total_elements + threads - 1) / threads);
-    add_scalar_slice_kernel<double><<<blocks, threads>>>(
-        data, scalar, start, slice_shape, strides, ndims, total_elements);
+    launch_slice_add_scalar_double(data, scalar, start, slice_shape, strides,
+                                   ndims, total_elements);
 }
 
 } // extern "C" 

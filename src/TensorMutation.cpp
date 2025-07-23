@@ -17,13 +17,18 @@ extern "C" {
         const int* strides, int ndims, size_t total_elements);
 }
 
-// Utility: convert Shape (size_t) to std::vector<int> strides (row-major)
+// Utility: convert Shape to std::vector<int> strides (column-major for R compatibility)
 static std::vector<int> shape_to_strides_int(const Shape& shape) {
-    std::vector<size_t> strides_sz = compute_strides(shape);
-    std::vector<int> strides_int(strides_sz.size());
-    for (size_t i = 0; i < strides_sz.size(); ++i) {
-        strides_int[i] = static_cast<int>(strides_sz[i]);
+    if (shape.ndims() == 0) return {};
+    
+    std::vector<int> strides_int(shape.ndims());
+    strides_int[0] = 1;
+    
+    // Column-major: stride[i] = stride[i-1] * dim[i-1]
+    for (size_t i = 1; i < shape.ndims(); ++i) {
+        strides_int[i] = strides_int[i - 1] * static_cast<int>(shape.dims[i - 1]);
     }
+    
     return strides_int;
 }
 

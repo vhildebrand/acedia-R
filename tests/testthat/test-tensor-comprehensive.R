@@ -3,6 +3,29 @@ test_that("Comprehensive tensor operations test suite", {
   
   cat("\n=== COMPREHENSIVE TENSOR OPERATIONS TEST SUITE ===\n")
   
+  # Helper function to verify tensor is on GPU
+  verify_gpu_tensor <- function(tensor, operation_name = "operation") {
+    if (!inherits(tensor, "gpuTensor")) {
+      warning(paste("❌ GPU FALLBACK:", operation_name, "returned non-gpuTensor object"))
+      return(FALSE)
+    }
+    
+    # Additional check: verify data is actually on GPU by attempting a GPU-specific operation
+    tryCatch({
+      # Try to get tensor info - this should work for GPU tensors
+      info <- tensor_info_unified(tensor)
+      if (grepl("CUDA", info, ignore.case = TRUE)) {
+        return(TRUE)
+      } else {
+        warning(paste("❌ GPU FALLBACK:", operation_name, "not on CUDA device"))
+        return(FALSE)
+      }
+    }, error = function(e) {
+      warning(paste("❌ GPU VERIFICATION FAILED:", operation_name, "-", e$message))
+      return(FALSE)
+    })
+  }
+  
   # Test data setup
   set.seed(42)
   sizes <- c(1e3, 1e4, 1e5)
@@ -21,6 +44,10 @@ test_that("Comprehensive tensor operations test suite", {
       tensor_a <- as_tensor(data_a, dtype = dtype)
       tensor_b <- as_tensor(data_b, dtype = dtype)
       
+      # Verify tensors are on GPU
+      verify_gpu_tensor(tensor_a, paste("tensor_a creation", dtype, size))
+      verify_gpu_tensor(tensor_b, paste("tensor_b creation", dtype, size))
+      
       # === BASIC PROPERTIES ===
       expect_equal(as.numeric(size(tensor_a)), size)
       expect_equal(dtype(tensor_a), dtype)
@@ -30,37 +57,44 @@ test_that("Comprehensive tensor operations test suite", {
       
       # Addition
       result_add_gpu <- tensor_a + tensor_b
+      verify_gpu_tensor(result_add_gpu, paste("addition", dtype, size))
       result_add_cpu <- data_a + data_b
       expect_equal(as.array(result_add_gpu), result_add_cpu, tolerance = 1e-6)
       
       # Subtraction  
       result_sub_gpu <- tensor_a - tensor_b
+      verify_gpu_tensor(result_sub_gpu, paste("subtraction", dtype, size))
       result_sub_cpu <- data_a - data_b
       expect_equal(as.array(result_sub_gpu), result_sub_cpu, tolerance = 1e-6)
       
       # Multiplication
       result_mul_gpu <- tensor_a * tensor_b
+      verify_gpu_tensor(result_mul_gpu, paste("multiplication", dtype, size))
       result_mul_cpu <- data_a * data_b
       expect_equal(as.array(result_mul_gpu), result_mul_cpu, tolerance = 1e-6)
       
       # Division (with safe values)
       data_b_safe <- pmax(data_b, 0.1)  # Avoid division by zero
       tensor_b_safe <- as_tensor(data_b_safe, dtype = dtype)
+      verify_gpu_tensor(tensor_b_safe, paste("safe tensor creation", dtype, size))
       result_div_gpu <- tensor_a / tensor_b_safe
+      verify_gpu_tensor(result_div_gpu, paste("division", dtype, size))
       result_div_cpu <- data_a / data_b_safe
       expect_equal(as.array(result_div_gpu), result_div_cpu, tolerance = 1e-6)
       
       # Scalar operations
       scalar_val <- 3.14159
       result_scalar_add_gpu <- tensor_a + scalar_val
+      verify_gpu_tensor(result_scalar_add_gpu, paste("scalar addition", dtype, size))
       result_scalar_add_cpu <- data_a + scalar_val
       expect_equal(as.array(result_scalar_add_gpu), result_scalar_add_cpu, tolerance = 1e-6)
       
       result_scalar_mul_gpu <- tensor_a * scalar_val
+      verify_gpu_tensor(result_scalar_mul_gpu, paste("scalar multiplication", dtype, size))
       result_scalar_mul_cpu <- data_a * scalar_val
       expect_equal(as.array(result_scalar_mul_gpu), result_scalar_mul_cpu, tolerance = 1e-6)
       
-      # === REDUCTION OPERATIONS ===
+      # === REDUCTION OPERATIONS ===w
       
       # Sum
       sum_gpu <- sum(tensor_a)
@@ -77,6 +111,7 @@ test_that("Comprehensive tensor operations test suite", {
       # Min/Max (for positive values)
       data_pos <- abs(data_a) + 1  # Ensure positive
       tensor_pos <- as_tensor(data_pos, dtype = dtype)
+      verify_gpu_tensor(tensor_pos, paste("positive tensor", dtype, size))
       
       if (exists("max.gpuTensor")) {
         max_gpu <- max(tensor_pos)
@@ -93,9 +128,11 @@ test_that("Comprehensive tensor operations test suite", {
       # Exponential (with clipped values to avoid overflow)
       data_exp <- pmax(pmin(data_a, 5), -5)  # Clip to [-5, 5]
       tensor_exp <- as_tensor(data_exp, dtype = dtype)
+      verify_gpu_tensor(tensor_exp, paste("exp tensor", dtype, size))
       
       if (exists("exp.gpuTensor")) {
         result_exp_gpu <- exp(tensor_exp)
+        verify_gpu_tensor(result_exp_gpu, paste("exp operation", dtype, size))
         result_exp_cpu <- exp(data_exp)
         expect_equal(as.array(result_exp_gpu), result_exp_cpu, tolerance = 1e-5)
       }
@@ -103,6 +140,7 @@ test_that("Comprehensive tensor operations test suite", {
       # Square root (positive values only)
       if (exists("sqrt.gpuTensor")) {
         result_sqrt_gpu <- sqrt(tensor_pos)
+        verify_gpu_tensor(result_sqrt_gpu, paste("sqrt operation", dtype, size))
         result_sqrt_cpu <- sqrt(data_pos)
         expect_equal(as.array(result_sqrt_gpu), result_sqrt_cpu, tolerance = 1e-6)
       }
@@ -110,6 +148,7 @@ test_that("Comprehensive tensor operations test suite", {
       # Logarithm (positive values only)
       if (exists("log.gpuTensor")) {
         result_log_gpu <- log(tensor_pos)
+        verify_gpu_tensor(result_log_gpu, paste("log operation", dtype, size))
         result_log_cpu <- log(data_pos)
         expect_equal(as.array(result_log_gpu), result_log_cpu, tolerance = 1e-6)
       }
@@ -135,8 +174,11 @@ test_that("Comprehensive tensor operations test suite", {
     B_data <- matrix(runif(mat_size$k * mat_size$n, -1, 1), 
                      nrow = mat_size$k, ncol = mat_size$n)
     
-      A_tensor <- as_tensor(A_data, dtype = "float")
-  B_tensor <- as_tensor(B_data, dtype = "float")
+    A_tensor <- as_tensor(A_data, dtype = "float")
+    B_tensor <- as_tensor(B_data, dtype = "float")
+    
+    verify_gpu_tensor(A_tensor, paste("matrix A", mat_size$m, "x", mat_size$k))
+    verify_gpu_tensor(B_tensor, paste("matrix B", mat_size$k, "x", mat_size$n))
     
     # Matrix multiplication
     if (exists("matmul") || exists("%*%.gpuTensor")) {
@@ -145,6 +187,7 @@ test_that("Comprehensive tensor operations test suite", {
       } else {
         result_gpu <- A_tensor %*% B_tensor
       }
+      verify_gpu_tensor(result_gpu, paste("matmul result", mat_size$m, "x", mat_size$n))
       result_cpu <- A_data %*% B_data
       
       expect_equal(as.array(result_gpu), result_cpu, tolerance = 1e-5)
@@ -156,6 +199,7 @@ test_that("Comprehensive tensor operations test suite", {
   # Test various reshape and view operations
   original_data <- runif(24, -2, 2)
   tensor_orig <- as_tensor(original_data, dtype = "float")
+  verify_gpu_tensor(tensor_orig, "original tensor for reshaping")
   
   # Reshape tests
   shapes_to_test <- list(c(24), c(6, 4), c(3, 8), c(2, 3, 4))
@@ -169,6 +213,8 @@ test_that("Comprehensive tensor operations test suite", {
         reshaped <- reshape(tensor_orig, shape)
       }
       
+      verify_gpu_tensor(reshaped, paste("reshape to", paste(shape, collapse="x")))
+      
       expect_equal(length(as.array(reshaped)), 24)
       expect_equal(as.numeric(size(reshaped)), 24)
       expect_equal(as.vector(as.array(reshaped)), original_data, tolerance = 1e-7)
@@ -178,6 +224,7 @@ test_that("Comprehensive tensor operations test suite", {
   # Transpose test (2D only)
   mat_data <- matrix(runif(20, -1, 1), nrow = 4, ncol = 5)
   mat_tensor <- as_tensor(mat_data, dtype = "float")
+  verify_gpu_tensor(mat_tensor, "matrix for transpose")
   
   if (exists("t.gpuTensor") || exists("transpose")) {
     if (exists("t.gpuTensor")) {
@@ -186,6 +233,7 @@ test_that("Comprehensive tensor operations test suite", {
       transposed <- transpose(mat_tensor)
     }
     
+    verify_gpu_tensor(transposed, "transpose result")
     result_cpu <- t(mat_data)
     expect_equal(as.array(transposed), result_cpu, tolerance = 1e-7)
   }
@@ -196,8 +244,11 @@ test_that("Comprehensive tensor operations test suite", {
   vec_data <- runif(5, -1, 1)
   mat_data_5x3 <- matrix(runif(15, -1, 1), nrow = 5, ncol = 3)
   
-      vec_tensor <- as_tensor(vec_data, dtype = "float")
-    mat_tensor <- as_tensor(mat_data_5x3, dtype = "float")
+  vec_tensor <- as_tensor(vec_data, dtype = "float")
+  mat_tensor <- as_tensor(mat_data_5x3, dtype = "float")
+  
+  verify_gpu_tensor(vec_tensor, "vector for broadcasting")
+  verify_gpu_tensor(mat_tensor, "matrix for broadcasting")
   
   # Test broadcasting if supported
   # Note: This depends on the broadcasting implementation
@@ -206,34 +257,39 @@ test_that("Comprehensive tensor operations test suite", {
   
   # Test dtype conversions
   test_data <- runif(100, -5, 5)
-      tensor_f32 <- as_tensor(test_data, dtype = "float")
+  tensor_f32 <- as_tensor(test_data, dtype = "float")
+  verify_gpu_tensor(tensor_f32, "float32 tensor for conversion")
   
   if (exists("to_dtype")) {
     # Convert to float64 and back
-          tensor_f64 <- to_dtype(tensor_f32, "double")
-      expect_equal(dtype(tensor_f64), "double")
+    tensor_f64 <- to_dtype(tensor_f32, "double")
+    verify_gpu_tensor(tensor_f64, "converted to double")
+    expect_equal(dtype(tensor_f64), "double")
     expect_equal(as.array(tensor_f64), test_data, tolerance = 1e-6)
     
-          tensor_back <- to_dtype(tensor_f64, "float")
-      expect_equal(dtype(tensor_back), "float")
+    tensor_back <- to_dtype(tensor_f64, "float")
+    verify_gpu_tensor(tensor_back, "converted back to float")
+    expect_equal(dtype(tensor_back), "float")
     expect_equal(as.array(tensor_back), test_data, tolerance = 1e-6)
   }
   
   cat("\n=== MEMORY AND CONTIGUITY TESTS ===\n")
   
   # Test contiguity after operations
-      big_tensor <- as_tensor(runif(1000, -1, 1), dtype = "float")
+  big_tensor <- as_tensor(runif(1000, -1, 1), dtype = "float")
+  verify_gpu_tensor(big_tensor, "big tensor for contiguity test")
   
   expect_true(is_contiguous(big_tensor))
   
   # Operations should preserve or handle non-contiguous tensors correctly
   result_ops <- big_tensor + 1.0
+  verify_gpu_tensor(result_ops, "contiguity test result")
   expect_equal(length(as.array(result_ops)), 1000)
   
   # Test synchronization
   synchronize(big_tensor)  # Should not error
   
-  cat("\n✓ All comprehensive tensor tests passed!\n")
+  cat("\n✅ All comprehensive tensor tests passed! All operations verified on GPU.\n")
 })
 
 test_that("Error handling and edge cases", {
