@@ -491,7 +491,7 @@ permute <- function(tensor, dims) {
 #' @export
 is_contiguous <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) {
-    stop("Object is not a gpuTensor")
+    stop("Object istlan not a gpuTensor")
   }
   return(tensor_is_contiguous_unified(tensor))
 }
@@ -1045,4 +1045,65 @@ size.gpuTensor <- function(x) {
 .onLoad <- function(libname, pkgname) {
   # Force registration of as.numeric method for primitives
   registerS3method("as.numeric", "gpuTensor", as.numeric.gpuTensor)
+}
+
+#' Slice assignment for gpuTensor (in-place update on GPU)
+#'
+#' Currently supports assigning a numeric scalar to a rectangular (contiguous) slice.
+#' More complex assignment (tensor-to-slice) can be added later.
+#' @export
+`[<-.gpuTensor` <- function(x, ..., value) {
+  tensor_dims <- shape(x)
+  n_dims <- length(tensor_dims)
+  args <- substitute(list(...))[-1]  # remove list wrapper
+  n_args <- length(args)
+
+  if (missing(value)) {
+    stop("No value provided for slice assignment")
+  }
+
+  # Build start & end indices (similar logic to `[.gpuTensor` reader)
+  indices <- vector("list", n_dims)
+  for (i in seq_len(n_dims)) {
+    if (i <= n_args) {
+      if (identical(args[[i]], quote(expr = ))) {
+        indices[[i]] <- NULL  # missing like t[ ,]
+      } else {
+        indices[[i]] <- eval(args[[i]], parent.frame())
+      }
+    } else {
+      indices[[i]] <- NULL
+    }
+  }
+
+  start_indices <- integer(n_dims)
+  end_indices   <- integer(n_dims)
+
+  for (i in seq_len(n_dims)) {
+    idx <- indices[[i]]
+    dim_size <- tensor_dims[i]
+
+    if (is.null(idx)) {
+      start_indices[i] <- 1L
+      end_indices[i]   <- dim_size
+    } else if (is.numeric(idx)) {
+      if (any(idx <= 0)) stop("Negative or zero indices not supported in slice assignment")
+      if (any(idx > dim_size)) stop("Index out of bounds in slice assignment")
+      if (!all(diff(idx) == 1)) stop("Only contiguous ranges supported in slice assignment")
+      start_indices[i] <- as.integer(min(idx))
+      end_indices[i]   <- as.integer(max(idx))
+    } else {
+      stop("Unsupported index type in slice assignment: ", class(idx))
+    }
+  }
+
+  slice_shape <- end_indices - start_indices + 1L
+
+  if (is.numeric(value) && length(value) == 1) {
+    # In-place scalar add/assign: for now we implement add-scalar (+=)
+    tensor_slice_add_scalar_unified(x, start_indices, slice_shape, value)
+    return(x)  # modified in-place (external pointer)
+  } else {
+    stop("Currently only scalar numeric assignment to slice is supported")
+  }
 }

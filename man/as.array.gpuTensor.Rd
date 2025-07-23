@@ -4,7 +4,7 @@
 \alias{as.array.gpuTensor}
 \title{Convert GPU Tensor to R Array}
 \usage{
-\method{as.array}{gpuTensor}(tensor)
+\method{as.array}{gpuTensor}(x, ...)
 }
 \arguments{
 \item{tensor}{A gpuTensor object}

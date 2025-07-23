@@ -93,6 +93,10 @@ tensor_sqrt_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_sqrt_unified`, tensor_ptr)
 }
 
+tensor_slice_add_scalar_unified <- function(tensor_ptr, start_indices, slice_shape, scalar) {
+    invisible(.Call(`_acediaR_tensor_slice_add_scalar_unified`, tensor_ptr, start_indices, slice_shape, scalar))
+}
+
 tensor_sum_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_sum_unified`, tensor_ptr)
 }

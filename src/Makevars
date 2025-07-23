@@ -26,8 +26,8 @@ CPP_OBJECTS = $(CPP_SOURCES:.cpp=.o)
 CUDA_SOURCES = $(wildcard *.cu)
 CUDA_OBJECTS = $(CUDA_SOURCES:.cu=.o)
 
-# CUDA sources in kernels directory - we only need to compile the wrappers file since it includes the others
-KERNEL_SOURCES = kernels/tensor_wrappers.cu
+# CUDA sources in kernels directory (compile every .cu so that additional kernels like tensor_slice_update.cu are included)
+KERNEL_SOURCES = $(wildcard kernels/*.cu)
 KERNEL_OBJECTS = $(KERNEL_SOURCES:.cu=.o)
 
 # Automatically include all compiled C++ and CUDA object files
