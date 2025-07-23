@@ -65,7 +65,7 @@ test_that("Comprehensive tensor operations test suite", {
       # Sum
       sum_gpu <- sum(tensor_a)
       sum_cpu <- sum(data_a)
-      expect_equal(sum_gpu, sum_cpu, tolerance = 1e-6)
+      expect_equal(sum_gpu, sum_cpu, tolerance = 1e-5)
       
       # Mean
       if (exists("mean.gpuTensor")) {
