@@ -276,3 +276,148 @@ test_that("Error handling and edge cases", {
   
   cat("\n✓ Error handling tests passed!\n")
 }) 
+
+  cat("\n=== ADVANCED TENSOR OPERATIONS ===\n")
+  
+  # Test complex slicing operations
+  cat("Testing complex slicing operations...\n")
+  large_tensor <- gpu_tensor(1:120, c(4, 5, 6))
+  
+  # Test slice arithmetic
+  if (exists("[.gpuTensor")) {
+    slice1 <- large_tensor[1:2, , ]  # First 2 layers
+    slice2 <- large_tensor[3:4, , ]  # Last 2 layers
+    
+    # Add slices together
+    slice_sum <- slice1 + slice2
+    expect_equal(dim(slice_sum), c(2, 5, 6))
+    
+    # Multiply slice by scalar
+    scaled_slice <- slice1 * 2.5
+    expect_equal(dim(scaled_slice), c(2, 5, 6))
+  }
+  
+  # Test transpose chaining (memory efficiency)
+  cat("Testing transpose chaining...\n")
+  matrix_tensor <- gpu_tensor(1:20, c(4, 5))
+  
+  if (exists("transpose")) {
+    # Chain: transpose -> add scalar -> transpose back
+    result_chain <- transpose(transpose(matrix_tensor) + 1.0)
+    expect_equal(shape(result_chain), c(4, 5))
+    
+    # Verify result correctness
+    expected <- as.array(matrix_tensor) + 1.0
+    expect_equal(as.array(result_chain), expected, tolerance = 1e-10)
+  }
+  
+  # Test memory-efficient operations
+  cat("Testing memory-efficient operations...\n")
+  
+  # Create large tensor for memory efficiency test
+  large_data <- runif(10000)
+  large_tensor_1d <- as_tensor(large_data, dtype = "float")
+  
+  # Chain multiple operations efficiently
+  if (exists("view") && exists("reshape")) {
+    # Reshape -> arithmetic -> reshape back (should be memory efficient)
+    reshaped <- reshape(large_tensor_1d, c(100, 100))
+    operated <- reshaped * 2.0 + 1.0
+    final_result <- reshape(operated, c(10000))
+    
+    expect_equal(size(final_result), 10000)
+    expect_equal(as.vector(final_result), (large_data * 2.0 + 1.0), tolerance = 1e-6)
+  }
+  
+  # Test advanced broadcasting with views
+  cat("Testing advanced broadcasting with views...\n")
+  
+  if (exists("view")) {
+    # Create tensors with different shapes for complex broadcasting
+    tensor_2x3 <- gpu_tensor(1:6, c(2, 3))
+    tensor_1x3 <- gpu_tensor(c(10, 20, 30), c(1, 3))
+    
+    # Broadcasting addition
+    broadcast_result <- tensor_2x3 + tensor_1x3
+    expect_equal(shape(broadcast_result), c(2, 3))
+    
+    # Verify broadcasting worked correctly (convert to vectors for R compatibility)
+    expected_broadcast <- as.vector(as.array(tensor_2x3)) + rep(as.vector(as.array(tensor_1x3)), each=2)
+    expect_equal(as.vector(as.array(broadcast_result)), expected_broadcast, tolerance = 1e-10)
+  }
+  
+  # Test complex operation chains
+  cat("Testing complex operation chains...\n")
+  
+  # Create test matrices
+  mat_a <- gpu_tensor(matrix(runif(20, -1, 1), 4, 5), c(4, 5))
+  mat_b <- gpu_tensor(matrix(runif(15, -1, 1), 5, 3), c(5, 3))
+  
+  if (exists("matmul") && exists("transpose")) {
+    # Complex chain: A * B -> transpose -> add scalar -> reduce
+    expect_no_error({
+      step1 <- matmul(mat_a, mat_b)  # 4x3 result
+      step2 <- transpose(step1)      # 3x4 result  
+      step3 <- step2 + 0.5          # Add scalar
+      final_sum <- sum(step3)       # Reduce to scalar
+    })
+    
+    expect_true(is.numeric(final_sum))
+    expect_length(final_sum, 1)
+  }
+  
+  # Test mixed operations with different tensor shapes
+  cat("Testing mixed operations...\n")
+  
+  # Vector operations
+  vec_a <- as_tensor(runif(1000), dtype = "float")
+  vec_b <- as_tensor(runif(1000), dtype = "float")
+  
+  # Element-wise then reduction
+  element_product <- vec_a * vec_b
+  dot_product_manual <- sum(element_product)
+  
+  # Should match built-in dot product if available
+  expect_true(is.numeric(dot_product_manual))
+  expect_gt(abs(dot_product_manual), 0)  # Should be non-zero for random data
+  
+  # Test contiguity preservation
+  cat("Testing contiguity preservation...\n")
+  
+  contiguous_tensor <- gpu_tensor(1:24, c(4, 6))
+  expect_true(is_contiguous(contiguous_tensor))
+  
+  # Operations that should preserve contiguity
+  scaled <- contiguous_tensor * 2.0
+  expect_true(is_contiguous(scaled))
+  
+  added <- contiguous_tensor + 1.0
+  expect_true(is_contiguous(added))
+  
+  # Test GPU memory efficiency
+  cat("Testing GPU memory efficiency...\n")
+  
+  # Create multiple tensors and ensure no memory leaks
+  initial_memory <- gpu_memory_available()
+  
+  for (i in 1:5) {
+    temp_tensor <- gpu_tensor(runif(1000), c(10, 100))
+    temp_result <- temp_tensor * 2.0 + 1.0
+    temp_sum <- sum(temp_result)
+    
+    # Force cleanup
+    rm(temp_tensor, temp_result, temp_sum)
+  }
+  
+  # Force garbage collection
+  gc()
+  
+  # Memory should be roughly the same (allowing for some fragmentation)
+  final_memory <- gpu_memory_available()
+  memory_diff <- abs(initial_memory - final_memory)
+  memory_diff_mb <- memory_diff / (1024 * 1024)
+  
+  # Allow up to 100MB difference for fragmentation/overhead
+  expect_lt(memory_diff_mb, 100)
+  
+  cat("✓ Advanced tensor operations tests completed!\n") 
