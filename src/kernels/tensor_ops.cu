@@ -631,4 +631,267 @@ int64_t tensor_argmax_float64(const double* input, size_t n) {
     return static_cast<int64_t>(std::distance(host.begin(), it));
 }
 
+// ===================== C Wrappers for TensorMutation.cpp ===================== //
+
+void launch_concat_float32(float* result, const float** inputs, const int* input_sizes, int num_tensors,
+                           const int* result_strides, const int* input_strides_list, 
+                           const int* shape, int ndims, int concat_axis, size_t total_elements) {
+    std::vector<int> result_strides_vec(result_strides, result_strides + ndims);
+    std::vector<std::vector<int>> input_strides_list_vec(num_tensors);
+    for (int i = 0; i < num_tensors; ++i) {
+        input_strides_list_vec[i] = std::vector<int>(input_strides_list + i * ndims, 
+                                                     input_strides_list + (i + 1) * ndims);
+    }
+    std::vector<int> shape_vec(shape, shape + ndims);
+    launch_concat<float>(result, inputs, input_sizes, num_tensors,
+                         result_strides_vec, input_strides_list_vec, shape_vec, concat_axis, total_elements);
+}
+
+void launch_concat_float64(double* result, const double** inputs, const int* input_sizes, int num_tensors,
+                           const int* result_strides, const int* input_strides_list, 
+                           const int* shape, int ndims, int concat_axis, size_t total_elements) {
+    std::vector<int> result_strides_vec(result_strides, result_strides + ndims);
+    std::vector<std::vector<int>> input_strides_list_vec(num_tensors);
+    for (int i = 0; i < num_tensors; ++i) {
+        input_strides_list_vec[i] = std::vector<int>(input_strides_list + i * ndims, 
+                                                     input_strides_list + (i + 1) * ndims);
+    }
+    std::vector<int> shape_vec(shape, shape + ndims);
+    launch_concat<double>(result, inputs, input_sizes, num_tensors,
+                          result_strides_vec, input_strides_list_vec, shape_vec, concat_axis, total_elements);
+}
+
+void launch_stack_float32(float* result, const float** inputs, int num_tensors,
+                          const int* input_strides, const int* result_shape, int ndims,
+                          int stack_axis, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + (ndims - 1));
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    launch_stack<float>(result, inputs, num_tensors, input_strides_vec, result_shape_vec, stack_axis, total_elements);
+}
+
+void launch_stack_float64(double* result, const double** inputs, int num_tensors,
+                          const int* input_strides, const int* result_shape, int ndims,
+                          int stack_axis, size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + (ndims - 1));
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    launch_stack<double>(result, inputs, num_tensors, input_strides_vec, result_shape_vec, stack_axis, total_elements);
+}
+
+void launch_repeat_float32(float* result, const float* input,
+                           const int* input_strides, const int* repeat_counts,
+                           const int* input_shape, const int* result_shape, int ndims,
+                           size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> repeat_counts_vec(repeat_counts, repeat_counts + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    launch_repeat<float>(result, input, input_strides_vec, repeat_counts_vec, input_shape_vec, result_shape_vec, total_elements);
+}
+
+void launch_repeat_float64(double* result, const double* input,
+                           const int* input_strides, const int* repeat_counts,
+                           const int* input_shape, const int* result_shape, int ndims,
+                           size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> repeat_counts_vec(repeat_counts, repeat_counts + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    launch_repeat<double>(result, input, input_strides_vec, repeat_counts_vec, input_shape_vec, result_shape_vec, total_elements);
+}
+
+void launch_pad_float32(float* result, const float* input,
+                        const int* input_strides, const int* input_shape,
+                        const int* pad_before, const int* pad_after,
+                        const int* result_shape, int ndims, float pad_value, int pad_mode,
+                        size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> pad_before_vec(pad_before, pad_before + ndims);
+    std::vector<int> pad_after_vec(pad_after, pad_after + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    launch_pad<float>(result, input, input_strides_vec, input_shape_vec, pad_before_vec, pad_after_vec, 
+                      result_shape_vec, pad_value, pad_mode, total_elements);
+}
+
+void launch_pad_float64(double* result, const double* input,
+                        const int* input_strides, const int* input_shape,
+                        const int* pad_before, const int* pad_after,
+                        const int* result_shape, int ndims, double pad_value, int pad_mode,
+                        size_t total_elements) {
+    std::vector<int> input_strides_vec(input_strides, input_strides + ndims);
+    std::vector<int> input_shape_vec(input_shape, input_shape + ndims);
+    std::vector<int> pad_before_vec(pad_before, pad_before + ndims);
+    std::vector<int> pad_after_vec(pad_after, pad_after + ndims);
+    std::vector<int> result_shape_vec(result_shape, result_shape + ndims);
+    launch_pad<double>(result, input, input_strides_vec, input_shape_vec, pad_before_vec, pad_after_vec, 
+                       result_shape_vec, pad_value, pad_mode, total_elements);
+}
+
+void tensor_div_float16(half* result, const half* a, const half* b, size_t n) {
+    launch_elementwise_binary<half>(result, a, b, n, DivOp());
+}
+
+// ===================== Missing Arithmetic Functions ===================== //
+
+// Multiplication operations
+void tensor_mul_float16(half* result, const half* a, const half* b, size_t n) {
+    launch_elementwise_binary<half>(result, a, b, n, MulOp());
+}
+
+void tensor_mul_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, MulOp());
+}
+
+void tensor_mul_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, MulOp());
+}
+
+// Subtraction operations
+void tensor_sub_float16(half* result, const half* a, const half* b, size_t n) {
+    launch_elementwise_binary<half>(result, a, b, n, SubOp());
+}
+
+void tensor_sub_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, SubOp());
+}
+
+void tensor_sub_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, SubOp());
+}
+
+// Division operations
+void tensor_div_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, DivOp());
+}
+
+void tensor_div_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, DivOp());
+}
+
+// Scalar operations
+void tensor_scalar_mul_float16(half* result, const half* input, float scalar, size_t n) {
+    launch_elementwise_scalar<half, float>(result, input, scalar, n, MulOp());
+}
+
+void tensor_scalar_mul_float32(float* result, const float* input, float scalar, size_t n) {
+    launch_elementwise_scalar<float, float>(result, input, scalar, n, MulOp());
+}
+
+void tensor_scalar_mul_float64(double* result, const double* input, double scalar, size_t n) {
+    launch_elementwise_scalar<double, double>(result, input, scalar, n, MulOp());
+}
+
+void tensor_scalar_add_float16(half* result, const half* input, float scalar, size_t n) {
+    launch_elementwise_scalar<half, float>(result, input, scalar, n, AddOp());
+}
+
+void tensor_scalar_add_float32(float* result, const float* input, float scalar, size_t n) {
+    launch_elementwise_scalar<float, float>(result, input, scalar, n, AddOp());
+}
+
+void tensor_scalar_add_float64(double* result, const double* input, double scalar, size_t n) {
+    launch_elementwise_scalar<double, double>(result, input, scalar, n, AddOp());
+}
+
+// ===================== Additional Missing Functions ===================== //
+
+// Addition operations
+void tensor_add_float16(half* result, const half* a, const half* b, size_t n) {
+    launch_elementwise_binary<half>(result, a, b, n, AddOp());
+}
+
+void tensor_add_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, AddOp());
+}
+
+void tensor_add_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, AddOp());
+}
+
+void tensor_add_int8(int8_t* result, const int8_t* a, const int8_t* b, size_t n) {
+    launch_elementwise_binary<int8_t>(result, a, b, n, AddOp());
+}
+
+void tensor_add_int32(int32_t* result, const int32_t* a, const int32_t* b, size_t n) {
+    launch_elementwise_binary<int32_t>(result, a, b, n, AddOp());
+}
+
+void tensor_add_int64(int64_t* result, const int64_t* a, const int64_t* b, size_t n) {
+    launch_elementwise_binary<int64_t>(result, a, b, n, AddOp());
+}
+
+// Broadcast operations
+void tensor_add_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides, 
+                                  const int* b_strides, const int* result_strides, const int* shape, 
+                                  int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, AddOp());
+}
+
+void tensor_add_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides, 
+                                  const int* b_strides, const int* result_strides, const int* shape, 
+                                  int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, AddOp());
+}
+
+void tensor_mul_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides, 
+                                  const int* b_strides, const int* result_strides, const int* shape, 
+                                  int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MulOp());
+}
+
+void tensor_mul_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides, 
+                                  const int* b_strides, const int* result_strides, const int* shape, 
+                                  int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MulOp());
+}
+
+// Matrix multiplication operations
+void tensor_matmul_float16(half* C, const half* A, const half* B, size_t M, size_t N, size_t K) {
+    launch_matmul<half>(C, A, B, M, N, K);
+}
+
+void tensor_matmul_float32(float* C, const float* A, const float* B, size_t M, size_t N, size_t K) {
+    launch_matmul<float>(C, A, B, M, N, K);
+}
+
+void tensor_matmul_float64(double* C, const double* A, const double* B, size_t M, size_t N, size_t K) {
+    launch_matmul<double>(C, A, B, M, N, K);
+}
+
+// Strided copy operations
+void tensor_strided_copy_float32(float* dest, const float* src, const int* strides, const int* shape, int ndims, size_t total_elements) {
+    std::vector<int> stride_vec(strides, strides + ndims);
+    std::vector<int> shape_vec(shape, shape + ndims);
+    launch_strided_copy<float>(dest, src, stride_vec, shape_vec, total_elements);
+}
+
+void tensor_strided_copy_float64(double* dest, const double* src, const int* strides, const int* shape, int ndims, size_t total_elements) {
+    std::vector<int> stride_vec(strides, strides + ndims);
+    std::vector<int> shape_vec(shape, shape + ndims);
+    launch_strided_copy<double>(dest, src, stride_vec, shape_vec, total_elements);
+}
+
+// Strided operations - placeholder implementations (need strided kernels from tensor_wrappers.cu)
+void tensor_add_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    // TODO: Implement strided operations
+}
+
+void tensor_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    // TODO: Implement strided operations
+}
+
+void tensor_exp_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                const cuda_utils::TensorDescriptor& in_desc) {
+    // TODO: Implement strided operations
+}
+
+void tensor_exp_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                const cuda_utils::TensorDescriptor& in_desc) {
+    // TODO: Implement strided operations
+}
+
 } // extern "C" 

@@ -1043,3 +1043,28 @@ argmax <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) stop("tensor must be gpuTensor")
   tensor_argmax_unified(tensor) + 1  # convert to 1-based index for R
 }
+
+#' Variance (Population)
+#'
+#' Computes population variance of tensor elements.
+#'
+#' @param x A gpuTensor object or other object
+#' @param ... Additional args (ignored for gpuTensor, passed to stats::var for others)
+#' @return Numeric scalar (double)
+#' @export
+var <- function(x, ...) {
+  UseMethod("var")
+}
+
+#' @export
+var.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  tensor_var_unified(x)
+}
+
+#' @export
+var.default <- function(x, ...) {
+  stats::var(x, ...)
+}

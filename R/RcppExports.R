@@ -13,6 +13,14 @@ gpu_memory_available <- function() {
     .Call(`_acediaR_gpu_memory_available`)
 }
 
+tensor_softmax_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_softmax_unified`, tensor_ptr)
+}
+
+tensor_argmax_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_argmax_unified`, tensor_ptr)
+}
+
 tensor_sub_unified <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_tensor_sub_unified`, a_ptr, b_ptr)
 }
@@ -35,6 +43,18 @@ tensor_scalar_mul_unified <- function(tensor_ptr, scalar) {
 
 tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
     .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
+}
+
+tensor_gt_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_gt_unified`, a_ptr, b_ptr)
+}
+
+tensor_lt_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_lt_unified`, a_ptr, b_ptr)
+}
+
+tensor_eq_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_eq_unified`, a_ptr, b_ptr)
 }
 
 create_tensor_unified <- function(data, shape_vec, dtype = "float32") {
@@ -97,6 +117,22 @@ tensor_slice_add_scalar_unified <- function(tensor_ptr, start_indices, slice_sha
     invisible(.Call(`_acediaR_tensor_slice_add_scalar_unified`, tensor_ptr, start_indices, slice_shape, scalar))
 }
 
+tensor_concat_unified <- function(tensor_list, axis = 1L) {
+    .Call(`_acediaR_tensor_concat_unified`, tensor_list, axis)
+}
+
+tensor_stack_unified <- function(tensor_list, axis = 1L) {
+    .Call(`_acediaR_tensor_stack_unified`, tensor_list, axis)
+}
+
+tensor_repeat_unified <- function(tensor_ptr, repeats) {
+    .Call(`_acediaR_tensor_repeat_unified`, tensor_ptr, repeats)
+}
+
+tensor_pad_unified <- function(tensor_ptr, pad_width, mode = "constant", value = 0) {
+    .Call(`_acediaR_tensor_pad_unified`, tensor_ptr, pad_width, mode, value)
+}
+
 tensor_sum_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_sum_unified`, tensor_ptr)
 }
@@ -111,6 +147,14 @@ tensor_max_unified <- function(tensor_ptr) {
 
 tensor_min_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_min_unified`, tensor_ptr)
+}
+
+tensor_prod_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_prod_unified`, tensor_ptr)
+}
+
+tensor_var_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_var_unified`, tensor_ptr)
 }
 
 tensor_view_unified <- function(tensor_ptr, new_shape) {
