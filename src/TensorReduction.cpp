@@ -19,6 +19,14 @@ extern "C" {
     double tensor_max_float64(const double* input, size_t n);
     float tensor_min_float32(const float* input, size_t n);
     double tensor_min_float64(const double* input, size_t n);
+
+    // Product reductions
+    float tensor_prod_float32(const float* input, size_t n);
+    double tensor_prod_float64(const double* input, size_t n);
+
+    // Variance computations (population)
+    double tensor_var_float32(const float* input, size_t n);
+    double tensor_var_float64(const double* input, size_t n);
 }
 
 // Declare the tensor_sum_unified function (needed for mean calculation)
@@ -180,5 +188,64 @@ double tensor_min_unified(SEXP tensor_ptr) {
         return result;
     } catch (const std::exception& e) {
         stop("Error in unified tensor min: " + std::string(e.what()));
+    }
+} 
+
+// [[Rcpp::export]]
+double tensor_prod_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        DType dtype = tensor->dtype();
+        double result = 1.0;
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                result = static_cast<double>(tensor_prod_float32(tw->tensor().data(), tensor->size()));
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                result = tensor_prod_float64(tw->tensor().data(), tensor->size());
+                break;
+            }
+            default:
+                stop("Product operation not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        return result;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor prod: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+double tensor_var_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        if (tensor->size() == 0) return 0.0;
+        DType dtype = tensor->dtype();
+        double result = 0.0;
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                result = tensor_var_float32(tw->tensor().data(), tensor->size());
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                result = tensor_var_float64(tw->tensor().data(), tensor->size());
+                break;
+            }
+            default:
+                stop("Variance operation not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        return result;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor variance: " + std::string(e.what()));
     }
 } 

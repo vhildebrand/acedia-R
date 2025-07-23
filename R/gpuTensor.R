@@ -825,206 +825,50 @@ concat <- function(tensors, axis = 1) {
   if (!is.list(tensors) || length(tensors) < 2) {
     stop("tensors must be a list of at least 2 gpuTensor objects")
   }
-  
   if (!all(sapply(tensors, function(x) inherits(x, "gpuTensor")))) {
     stop("All elements in tensors must be gpuTensor objects")
   }
-  
-  # For now, implement a basic version via R array manipulation
-  # TODO: Implement with CUDA kernels for efficiency
-  warning("concat currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
-  
-  # Convert all tensors to arrays
-  arrays <- lapply(tensors, as.array)
-  
-  # Use base R's abind or implement our own concatenation
-  result_array <- do.call(abind::abind, c(arrays, along = axis))
-  
-  # Convert back to gpu_tensor
-  result <- gpu_tensor(as.vector(result_array), dim(result_array))
+  result <- tensor_concat_unified(tensors, axis)
+  class(result) <- c("gpuTensor", class(result))
   return(result)
 }
 
-#' Stack Tensors
-#'
-#' Stack tensors along a new dimension.
-#'
-#' @param tensors List of gpuTensor objects to stack
-#' @param axis Integer specifying the axis along which to stack (1-indexed)
-#' @return A new tensor with tensors stacked along the specified axis
-#' @export
 stack <- function(tensors, axis = 1) {
   if (!is.list(tensors) || length(tensors) < 2) {
     stop("tensors must be a list of at least 2 gpuTensor objects")
   }
-  
   if (!all(sapply(tensors, function(x) inherits(x, "gpuTensor")))) {
     stop("All elements in tensors must be gpuTensor objects")
   }
-  
-  # Check that all tensors have the same shape
-  first_shape <- shape(tensors[[1]])
-  if (!all(sapply(tensors, function(x) identical(shape(x), first_shape)))) {
-    stop("All tensors must have the same shape for stacking")
-  }
-  
-  # For now, implement via R array manipulation
-  warning("stack currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
-  
-  arrays <- lapply(tensors, as.array)
-  # Map axis to abind along parameter for stacking (creating new dimension)
-  # axis = 1 means new first dimension -> along = 0
-  # axis = 2 means new second dimension -> along = 1  
-  # etc.
-  abind_along <- axis - 1
-  if (abind_along < 0) abind_along <- 0
-  
-  result_array <- do.call(abind::abind, c(arrays, list(along = abind_along)))
-  
-  result <- gpu_tensor(as.vector(result_array), dim(result_array))
+  result <- tensor_stack_unified(tensors, axis)
+  class(result) <- c("gpuTensor", class(result))
   return(result)
 }
 
-#' Repeat Tensor
-#'
-#' Repeat tensor along specified dimensions.
-#'
-#' @param tensor A gpuTensor object
-#' @param repeats Integer vector specifying repeat counts for each dimension
-#' @return A new tensor with the input tensor repeated
-#' @export
 repeat_tensor <- function(tensor, repeats) {
   if (!inherits(tensor, "gpuTensor")) {
     stop("tensor must be a gpuTensor object")
   }
-  
-  tensor_dims <- length(shape(tensor))
-  
-  # Allow repeats to be shorter than dimensions (pad with 1s)
-  if (length(repeats) > tensor_dims) {
-    stop("Length of repeats must match number of tensor dimensions")
-  }
-  
-  # Pad repeats with 1s if shorter than tensor dimensions
-  if (length(repeats) < tensor_dims) {
-    repeats <- c(repeats, rep(1, tensor_dims - length(repeats)))
-  }
-  
-  if (any(repeats <= 0)) {
-    stop("All repeat counts must be positive")
-  }
-  
-  # For now, implement via R array manipulation
-  warning("repeat_tensor currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
-  
-  array_data <- as.array(tensor)
-  
-  # Use rep for each dimension
-  for (dim in seq_along(repeats)) {
-    if (repeats[dim] > 1) {
-      # Create indices for repeating along this dimension
-      indices <- rep(seq_len(dim(array_data)[dim]), each = repeats[dim])
-      
-      # Apply the repetition using proper array indexing based on actual dimensions
-      n_dims <- length(dim(array_data))
-      
-      if (n_dims == 1) {
-        if (dim == 1) {
-          array_data <- array_data[indices]
-        }
-      } else if (n_dims == 2) {
-        if (dim == 1) {
-          array_data <- array_data[indices, , drop = FALSE]
-        } else if (dim == 2) {
-          array_data <- array_data[, indices, drop = FALSE]
-        }
-      } else if (n_dims == 3) {
-        if (dim == 1) {
-          array_data <- array_data[indices, , , drop = FALSE]
-        } else if (dim == 2) {
-          array_data <- array_data[, indices, , drop = FALSE]
-        } else if (dim == 3) {
-          array_data <- array_data[, , indices, drop = FALSE]
-        }
-      }
-      # For higher dimensions, would need more complex indexing
-    }
-  }
-  
-  result <- gpu_tensor(as.vector(array_data), dim(array_data))
+  result <- tensor_repeat_unified(tensor, as.integer(repeats))
+  class(result) <- c("gpuTensor", class(result))
   return(result)
 }
 
-#' Pad Tensor
-#'
-#' Pad tensor with specified values.
-#'
-#' @param tensor A gpuTensor object
-#' @param pad_width List or matrix specifying padding for each dimension
-#' @param mode Padding mode: "constant", "reflect", or "replicate"
-#' @param value Constant value for constant padding (default: 0)
-#' @return A new tensor with padding applied
-#' @export
 pad <- function(tensor, pad_width, mode = "constant", value = 0) {
   if (!inherits(tensor, "gpuTensor")) {
     stop("tensor must be a gpuTensor object")
   }
-  
-  if (!mode %in% c("constant", "reflect", "replicate")) {
-    stop("mode must be one of: 'constant', 'reflect', 'replicate'")
-  }
-  
-  # For now, implement basic constant padding via R array manipulation
-  warning("pad currently uses R array manipulation. CUDA kernel implementation needed for optimal performance.")
-  
-  array_data <- as.array(tensor)
-  
-  # Convert pad_width to standard format
   if (is.list(pad_width)) {
-    if (length(pad_width) != length(shape(tensor))) {
-      stop("pad_width list length must match number of dimensions")
-    }
-    pad_matrix <- do.call(rbind, pad_width)
-  } else if (is.matrix(pad_width)) {
-    if (nrow(pad_width) != length(shape(tensor)) || ncol(pad_width) != 2) {
-      stop("pad_width matrix must be ndims x 2")
-    }
-    pad_matrix <- pad_width
+    pad_mat <- do.call(rbind, pad_width)
   } else {
-    stop("pad_width must be a list or matrix")
+    pad_mat <- as.matrix(pad_width)
   }
-  
-  # Apply padding using base R functionality
-  # This is a simplified implementation - full CUDA implementation would be much faster
-  if (mode == "constant") {
-    # Use basic array padding with constant values
-    padded_dims <- dim(array_data) + pad_matrix[, 1] + pad_matrix[, 2]
-    result_array <- array(value, dim = padded_dims)
-    
-    # Copy original data to center of padded array
-    indices <- lapply(seq_len(length(dim(array_data))), function(i) {
-      (pad_matrix[i, 1] + 1):(pad_matrix[i, 1] + dim(array_data)[i])
-    })
-    
-    # Use proper array assignment
-    if (length(dim(array_data)) == 2) {
-      result_array[indices[[1]], indices[[2]]] <- array_data
-    } else if (length(dim(array_data)) == 1) {
-      result_array[indices[[1]]] <- array_data
-    } else if (length(dim(array_data)) == 3) {
-      result_array[indices[[1]], indices[[2]], indices[[3]]] <- array_data
-    } else {
-      # Fallback for higher dimensions
-      result_array <- do.call(`[<-`, c(list(result_array), indices, list(array_data)))
-    }
-    
-    result <- gpu_tensor(as.vector(result_array), dim(result_array))
-    return(result)
-  }
-  
-  # For reflect and replicate modes, would need more complex implementation
-  stop("Only constant padding mode is currently implemented")
-} 
+  if (ncol(pad_mat) != 2) stop("pad_width must have two columns (before, after)")
+  pad_mat <- matrix(as.integer(pad_mat), nrow = nrow(pad_mat), ncol = 2)
+  result <- tensor_pad_unified(tensor, pad_mat, mode, value)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
 
 #' @export
 shape.gpuTensor <- function(x) {
@@ -1106,4 +950,96 @@ size.gpuTensor <- function(x) {
   } else {
     stop("Currently only scalar numeric assignment to slice is supported")
   }
+}
+
+#' Greater Than Comparison
+#'
+#' Performs element-wise comparison a > b and returns a tensor of 0/1.
+#'
+#' @param a First gpuTensor
+#' @param b Second gpuTensor
+#' @return gpuTensor with numeric 0/1 values
+#' @export
+`>.gpuTensor` <- function(a, b) {
+  if (missing(b) || !inherits(b, "gpuTensor")) {
+    stop("Both operands must be gpuTensor objects")
+  }
+  if (!identical(shape(a), shape(b))) {
+    stop("Comparison currently requires tensors with identical shapes")
+  }
+  result <- tensor_gt_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Less Than Comparison
+#' @rdname greater_than_gpuTensor
+#' @export
+`<.gpuTensor` <- function(a, b) {
+  if (missing(b) || !inherits(b, "gpuTensor")) {
+    stop("Both operands must be gpuTensor objects")
+  }
+  if (!identical(shape(a), shape(b))) {
+    stop("Comparison currently requires tensors with identical shapes")
+  }
+  result <- tensor_lt_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Equality Comparison
+#' @rdname greater_than_gpuTensor
+#' @export
+`==.gpuTensor` <- function(a, b) {
+  if (missing(b) || !inherits(b, "gpuTensor")) {
+    stop("Both operands must be gpuTensor objects")
+  }
+  if (!identical(shape(a), shape(b))) {
+    stop("Comparison currently requires tensors with identical shapes")
+  }
+  result <- tensor_eq_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Product (All elements)
+#'
+#' Computes the product of all tensor elements.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional args (ignored)
+#' @return Numeric scalar
+#' @export
+prod.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  tensor_prod_unified(x)
+}
+
+#' Variance (Population)
+#'
+#' Computes population variance of tensor elements.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional args (ignored)
+#' @return Numeric scalar (double)
+#' @export
+var.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  tensor_var_unified(x)
+}
+
+softmax <- function(tensor) {
+  if (!inherits(tensor, "gpuTensor")) stop("tensor must be gpuTensor")
+  result <- tensor_softmax_unified(tensor)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+argmax <- function(tensor) {
+  if (!inherits(tensor, "gpuTensor")) stop("tensor must be gpuTensor")
+  tensor_argmax_unified(tensor) + 1  # convert to 1-based index for R
 }

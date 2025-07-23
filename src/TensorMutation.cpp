@@ -2,6 +2,8 @@
 #include "gpuTensor.h"
 #include "TensorRegistry.h"
 #include "cuda_utils.h"
+#include <vector>
+#include "tensor_kernels.cu" // for launchers declaration
 
 using namespace Rcpp;
 
@@ -30,6 +32,13 @@ static std::vector<int> shape_to_strides_int(const Shape& shape) {
     }
     
     return strides_int;
+}
+
+// Utility helper: convert size_t vector to int vector
+static std::vector<int> to_int_vec(const std::vector<size_t>& v) {
+    std::vector<int> out(v.size());
+    for (size_t i = 0; i < v.size(); ++i) out[i] = static_cast<int>(v[i]);
+    return out;
 }
 
 // [[Rcpp::export]]
@@ -85,4 +94,234 @@ void tensor_slice_add_scalar_unified(SEXP tensor_ptr,
     } catch (const std::exception& e) {
         stop(std::string("Error in tensor_slice_add_scalar_unified: ") + e.what());
     }
+} 
+
+// ======================= CONCAT ======================= //
+// [[Rcpp::export]]
+SEXP tensor_concat_unified(List tensor_list, int axis = 1) {
+    if (tensor_list.size() < 2) stop("Need at least two tensors to concatenate");
+    axis--; // convert to 0-indexed
+
+    // Validate tensors and gather pointers
+    std::vector<XPtr<TensorBase>> tensors;
+    tensors.reserve(tensor_list.size());
+    for (SEXP t : tensor_list) {
+        tensors.emplace_back(t);
+        if (!tensors.back()) stop("Invalid tensor pointer in list");
+    }
+
+    // Ensure same dtype
+    DType dtype = tensors[0]->dtype();
+    for (auto& tp : tensors) {
+        if (tp->dtype() != dtype) stop("All tensors must have same dtype for concat");
+    }
+
+    // Determine result shape
+    Shape base_shape = tensors[0]->shape();
+    if (axis < 0 || axis >= (int)base_shape.ndims())
+        stop("axis out of range");
+    size_t concat_dim = 0;
+    for (auto& tp : tensors) {
+        Shape s = tp->shape();
+        if (s.ndims() != base_shape.ndims()) stop("All tensors must have same number of dims");
+        for (size_t d = 0; d < s.ndims(); ++d) {
+            if ((int)d == axis) continue;
+            if (s[d] != base_shape[d]) stop("Non-concat dimensions must match");
+        }
+        concat_dim += s[axis];
+    }
+    std::vector<size_t> res_dims(base_shape.dims);
+    res_dims[axis] = concat_dim;
+    Shape result_shape(res_dims);
+
+    // Create result tensor
+    std::unique_ptr<TensorBase> result_tensor;
+
+    size_t total_elements = result_shape.size();
+    int num_tensors = tensors.size();
+
+    // Gather strides and device pointers
+    if (dtype == DType::FLOAT32) {
+        std::vector<const float*> d_ptrs(num_tensors);
+        std::vector<std::vector<int>> input_strides_list;
+        std::vector<int> input_sizes(num_tensors);
+        for (size_t i = 0; i < tensors.size(); ++i) {
+            auto tw = dynamic_cast<const TensorWrapper<float>*>(tensors[i].get());
+            if (!tw) throw std::runtime_error("Wrapper cast failed");
+            d_ptrs[i] = tw->tensor().data();
+            input_strides_list.push_back(to_int_vec(tw->tensor().strides()));
+            input_sizes[i] = static_cast<int>(tw->tensor().shape()[axis]);
+        }
+        auto res_gpu = std::make_shared<gpuTensor<float>>(result_shape);
+        launch_concat<float>(res_gpu->data(), d_ptrs.data(), input_sizes.data(), num_tensors,
+                             to_int_vec(res_gpu->strides()), input_strides_list,
+                             to_int_vec(res_dims), axis, total_elements);
+        result_tensor = std::make_unique<TensorWrapper<float>>(res_gpu);
+    } else if (dtype == DType::FLOAT64) {
+        std::vector<const double*> d_ptrs(num_tensors);
+        std::vector<std::vector<int>> input_strides_list;
+        std::vector<int> input_sizes(num_tensors);
+        for (size_t i = 0; i < tensors.size(); ++i) {
+            auto tw = dynamic_cast<const TensorWrapper<double>*>(tensors[i].get());
+            if (!tw) throw std::runtime_error("Wrapper cast failed");
+            d_ptrs[i] = tw->tensor().data();
+            input_strides_list.push_back(to_int_vec(tw->tensor().strides()));
+            input_sizes[i] = static_cast<int>(tw->tensor().shape()[axis]);
+        }
+        auto res_gpu = std::make_shared<gpuTensor<double>>(result_shape);
+        launch_concat<double>(res_gpu->data(), d_ptrs.data(), input_sizes.data(), num_tensors,
+                             to_int_vec(res_gpu->strides()), input_strides_list,
+                             to_int_vec(res_dims), axis, total_elements);
+        result_tensor = std::make_unique<TensorWrapper<double>>(res_gpu);
+    } else {
+        stop("concat currently supports float & double tensors only");
+    }
+
+    auto uniq = std::unique_ptr<TensorBase>(result_tensor.release());
+    XPtr<TensorBase> ptr(uniq.release(), true);
+    ptr.attr("class") = "gpuTensor";
+    ptr.attr("dtype") = dtype_to_string(dtype);
+    return ptr;
+}
+
+// ======================= STACK ======================= //
+// [[Rcpp::export]]
+SEXP tensor_stack_unified(List tensor_list, int axis = 1) {
+    if (tensor_list.size() < 2) stop("Need at least two tensors to stack");
+    axis--; // new dim index 0-based
+    // Validate tensors
+    std::vector<XPtr<TensorBase>> tensors;
+    for (SEXP t : tensor_list) tensors.emplace_back(t);
+    DType dtype = tensors[0]->dtype();
+    Shape base_shape = tensors[0]->shape();
+    for (auto& tp : tensors) {
+        if (tp->dtype() != dtype) stop("All tensors must have same dtype");
+        if (tp->shape() != base_shape) stop("All tensors must have identical shape for stack");
+    }
+    // Result shape: insert new dim of size num
+    std::vector<size_t> res_dims = base_shape.dims;
+    res_dims.insert(res_dims.begin() + axis, tensors.size());
+    Shape result_shape(res_dims);
+
+    size_t total_elements = result_shape.size();
+    int num_tensors = tensors.size();
+
+    if (dtype == DType::FLOAT32) {
+        std::vector<const float*> d_ptrs(num_tensors);
+        for (int i=0;i<num_tensors;++i) {
+            auto tw = dynamic_cast<const TensorWrapper<float>*>(tensors[i].get());
+            d_ptrs[i]=tw->tensor().data();
+        }
+        // input strides for a single tensor
+        auto one_stride = to_int_vec(dynamic_cast<const TensorWrapper<float>*>(tensors[0].get())->tensor().strides());
+        auto res_gpu = std::make_shared<gpuTensor<float>>(result_shape);
+        launch_stack<float>(res_gpu->data(), d_ptrs.data(), num_tensors,
+                            one_stride, to_int_vec(res_dims), axis, total_elements);
+        auto result_tensor = std::make_unique<TensorWrapper<float>>(res_gpu);
+        XPtr<TensorBase> ptr(result_tensor.release(), true);
+        ptr.attr("class")="gpuTensor"; ptr.attr("dtype")=dtype_to_string(dtype); return ptr;
+    } else if (dtype==DType::FLOAT64) {
+        std::vector<const double*> d_ptrs(num_tensors);
+        for (int i=0;i<num_tensors;++i) {
+            auto tw = dynamic_cast<const TensorWrapper<double>*>(tensors[i].get());
+            d_ptrs[i]=tw->tensor().data();
+        }
+        auto one_stride = to_int_vec(dynamic_cast<const TensorWrapper<double>*>(tensors[0].get())->tensor().strides());
+        auto res_gpu = std::make_shared<gpuTensor<double>>(result_shape);
+        launch_stack<double>(res_gpu->data(), d_ptrs.data(), num_tensors,
+                            one_stride, to_int_vec(res_dims), axis, total_elements);
+        auto result_tensor = std::make_unique<TensorWrapper<double>>(res_gpu);
+        XPtr<TensorBase> ptr(result_tensor.release(), true);
+        ptr.attr("class")="gpuTensor"; ptr.attr("dtype")=dtype_to_string(dtype); return ptr;
+    }
+    stop("stack currently supports float/double only");
+}
+
+// ======================= REPEAT ======================= //
+// [[Rcpp::export]]
+SEXP tensor_repeat_unified(SEXP tensor_ptr, IntegerVector repeats) {
+    XPtr<TensorBase> tensor(tensor_ptr);
+    if (!tensor) stop("Invalid tensor pointer");
+
+    int ndims = tensor->ndims();
+    if (repeats.size() != ndims) stop("repeats length must match tensor dims");
+
+    std::vector<int> repeat_counts(repeats.size());
+    for (int i=0;i<repeats.size();++i) {
+        if (repeats[i]<=0) stop("repeat counts must be positive");
+        repeat_counts[i]=repeats[i];
+    }
+
+    // Result shape
+    std::vector<size_t> res_dims;
+    for (size_t d=0; d<tensor->shape().ndims(); ++d) {
+        res_dims.push_back(tensor->shape()[d]*static_cast<size_t>(repeat_counts[d]));
+    }
+    Shape result_shape(res_dims);
+    size_t total_elements = result_shape.size();
+
+    DType dtype = tensor->dtype();
+    if (dtype==DType::FLOAT32) {
+        auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+        auto res_gpu = std::make_shared<gpuTensor<float>>(result_shape);
+        launch_repeat<float>(res_gpu->data(), tw->tensor().data(),
+                             to_int_vec(tw->tensor().strides()), repeat_counts,
+                             to_int_vec(tw->tensor().shape().dims), to_int_vec(res_dims), total_elements);
+        auto result_tensor = std::make_unique<TensorWrapper<float>>(res_gpu);
+        XPtr<TensorBase> ptr(result_tensor.release(), true);
+        ptr.attr("class")="gpuTensor"; ptr.attr("dtype")="float"; return ptr;
+    } else if (dtype==DType::FLOAT64) {
+        auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+        auto res_gpu = std::make_shared<gpuTensor<double>>(result_shape);
+        launch_repeat<double>(res_gpu->data(), tw->tensor().data(),
+                             to_int_vec(tw->tensor().strides()), repeat_counts,
+                             to_int_vec(tw->tensor().shape().dims), to_int_vec(res_dims), total_elements);
+        auto result_tensor = std::make_unique<TensorWrapper<double>>(res_gpu);
+        XPtr<TensorBase> ptr(result_tensor.release(), true);
+        ptr.attr("class")="gpuTensor"; ptr.attr("dtype")="double"; return ptr;
+    }
+    stop("repeat_tensor currently supports float/double only");
+}
+
+// ======================= PAD (constant only) ======================= //
+// [[Rcpp::export]]
+SEXP tensor_pad_unified(SEXP tensor_ptr, IntegerMatrix pad_width, std::string mode="constant", double value=0) {
+    if (mode!="constant" && mode!="reflect" && mode!="replicate")
+        stop("Unsupported pad mode");
+    XPtr<TensorBase> tensor(tensor_ptr);
+    if(!tensor) stop("Invalid tensor pointer");
+    int ndims=tensor->ndims();
+    if (pad_width.nrow()!=ndims || pad_width.ncol()!=2) stop("pad_width must be matrix of ndims x 2");
+    std::vector<int> pad_before(ndims), pad_after(ndims);
+    std::vector<size_t> res_dims= tensor->shape().dims;
+    for(int i=0;i<ndims;++i){
+        pad_before[i]=pad_width(i,0); pad_after[i]=pad_width(i,1);
+        if (pad_before[i]<0 || pad_after[i]<0) stop("padding must be non-negative");
+        res_dims[i]+= pad_before[i]+pad_after[i];
+    }
+    Shape result_shape(res_dims);
+    size_t total_elements=result_shape.size();
+
+    int pad_mode = (mode=="constant"?0: (mode=="reflect"?1:2));
+    DType dtype=tensor->dtype();
+    if (dtype==DType::FLOAT32){
+        auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+        auto res_gpu=std::make_shared<gpuTensor<float>>(result_shape);
+        launch_pad<float>(res_gpu->data(), tw->tensor().data(),
+                          to_int_vec(tw->tensor().strides()), to_int_vec(tw->tensor().shape().dims),
+                          pad_before, pad_after, to_int_vec(res_dims), static_cast<float>(value), pad_mode, total_elements);
+        auto result_tensor=std::make_unique<TensorWrapper<float>>(res_gpu);
+        XPtr<TensorBase> ptr(result_tensor.release(), true);
+        ptr.attr("class")="gpuTensor"; ptr.attr("dtype")="float"; return ptr;
+    } else if (dtype==DType::FLOAT64){
+        auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+        auto res_gpu=std::make_shared<gpuTensor<double>>(result_shape);
+        launch_pad<double>(res_gpu->data(), tw->tensor().data(),
+                          to_int_vec(tw->tensor().strides()), to_int_vec(tw->tensor().shape().dims),
+                          pad_before, pad_after, to_int_vec(res_dims), value, pad_mode, total_elements);
+        auto result_tensor=std::make_unique<TensorWrapper<double>>(res_gpu);
+        XPtr<TensorBase> ptr(result_tensor.release(), true);
+        ptr.attr("class")="gpuTensor"; ptr.attr("dtype")="double"; return ptr;
+    }
+    stop("pad currently supports float/double only");
 } 

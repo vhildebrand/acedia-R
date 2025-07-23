@@ -70,6 +70,22 @@ struct MinOp {
     }
 };
 
+// ===================== Comparison Functors ===================== //
+struct GreaterOp {
+    template<typename T>
+    __device__ T operator()(const T& a, const T& b) const { return (a > b) ? T(1) : T(0); }
+};
+
+struct LessOp {
+    template<typename T>
+    __device__ T operator()(const T& a, const T& b) const { return (a < b) ? T(1) : T(0); }
+};
+
+struct EqualOp {
+    template<typename T>
+    __device__ T operator()(const T& a, const T& b) const { return (a == b) ? T(1) : T(0); }
+};
+
 // Host interface functions using templates
 template<typename T>
 void launch_fill(T* data, T value, size_t n, cudaStream_t stream = 0) {
@@ -413,3 +429,206 @@ void launch_pad(T* result, const T* input,
     cudaFree(d_pad_after);
     cudaFree(d_result_shape);
 } 
+
+// ===================== Product and Variance Support ===================== //
+struct SquareOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return a * a; }
+};
+
+// ===================== Softmax / Argmax Kernels ===================== //
+
+template<typename T>
+__global__ void shift_exp_kernel(T* out, const T* in, T shift, size_t n) {
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n) {
+        out[tid] = exp(in[tid] - shift);
+    }
+}
+
+template<typename T>
+__global__ void div_scalar_kernel(T* data, T scalar, size_t n) {
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n) {
+        data[tid] /= scalar;
+    }
+}
+
+// BEGIN NEW WRAPPER FUNCTIONS (Sprint 1 enhancements)
+extern "C" {
+
+// ===================== Unary Elementwise Math ===================== //
+
+void tensor_exp_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, ExpOp());
+}
+
+void tensor_exp_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, ExpOp());
+}
+
+void tensor_log_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, LogOp());
+}
+
+void tensor_log_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, LogOp());
+}
+
+void tensor_sqrt_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, SqrtOp());
+}
+
+void tensor_sqrt_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, SqrtOp());
+}
+
+// ===================== Reductions ===================== //
+
+#include <float.h>
+#include <cfloat>
+
+// Sum (FLOAT32 & FLOAT64) - using AddOp from above
+float tensor_sum_float32(const float* input, size_t n) {
+    return launch_reduction<float, float>(input, n, AddOp(), 0.0f);
+}
+
+double tensor_sum_float64(const double* input, size_t n) {
+    return launch_reduction<double, double>(input, n, AddOp(), 0.0);
+}
+
+// Placeholder for half precision & int64 sums (not yet optimized)
+float tensor_sum_float16(const half* /*input*/, size_t /*n*/) {
+    // TODO: Implement half precision reduction
+    return 0.0f;
+}
+
+int64_t tensor_sum_int64(const int64_t* /*input*/, size_t /*n*/) {
+    // TODO: Implement int64 reduction
+    return 0;
+}
+
+// Max
+float tensor_max_float32(const float* input, size_t n) {
+    return launch_reduction<float, float>(input, n, MaxOp(), -FLT_MAX);
+}
+
+double tensor_max_float64(const double* input, size_t n) {
+    return launch_reduction<double, double>(input, n, MaxOp(), -DBL_MAX);
+}
+
+// Min
+float tensor_min_float32(const float* input, size_t n) {
+    return launch_reduction<float, float>(input, n, MinOp(), FLT_MAX);
+}
+
+double tensor_min_float64(const double* input, size_t n) {
+    return launch_reduction<double, double>(input, n, MinOp(), DBL_MAX);
+}
+
+// ===================== Comparison Functors ===================== //
+
+void tensor_gt_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, GreaterOp());
+}
+
+void tensor_gt_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, GreaterOp());
+}
+
+void tensor_lt_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, LessOp());
+}
+
+void tensor_lt_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, LessOp());
+}
+
+void tensor_eq_float32(float* result, const float* a, const float* b, size_t n) {
+    launch_elementwise_binary<float>(result, a, b, n, EqualOp());
+}
+
+void tensor_eq_float64(double* result, const double* a, const double* b, size_t n) {
+    launch_elementwise_binary<double>(result, a, b, n, EqualOp());
+}
+
+// Product reductions
+float tensor_prod_float32(const float* input, size_t n) {
+    return launch_reduction<float, float>(input, n, MulOp(), 1.0f);
+}
+
+double tensor_prod_float64(const double* input, size_t n) {
+    return launch_reduction<double, double>(input, n, MulOp(), 1.0);
+}
+
+// Variance (population) - returns double for precision
+
+double tensor_var_float32(const float* input, size_t n) {
+    if (n == 0) return 0.0;
+    // Allocate temp buffer for squares
+    float* d_squares = nullptr;
+    cudaMalloc(&d_squares, n * sizeof(float));
+    launch_elementwise_unary<float>(d_squares, input, n, SquareOp());
+    float sum = launch_reduction<float, float>(input, n, AddOp(), 0.0f);
+    float sum_sq = launch_reduction<float, float>(d_squares, n, AddOp(), 0.0f);
+    cudaFree(d_squares);
+    double mean = static_cast<double>(sum) / static_cast<double>(n);
+    double mean_sq = static_cast<double>(sum_sq) / static_cast<double>(n);
+    return mean_sq - mean * mean;
+}
+
+double tensor_var_float64(const double* input, size_t n) {
+    if (n == 0) return 0.0;
+    // Allocate temp buffer for squares
+    double* d_squares = nullptr;
+    cudaMalloc(&d_squares, n * sizeof(double));
+    launch_elementwise_unary<double>(d_squares, input, n, SquareOp());
+    double sum = launch_reduction<double, double>(input, n, AddOp(), 0.0);
+    double sum_sq = launch_reduction<double, double>(d_squares, n, AddOp(), 0.0);
+    cudaFree(d_squares);
+    double mean = sum / static_cast<double>(n);
+    double mean_sq = sum_sq / static_cast<double>(n);
+    return mean_sq - mean * mean;
+}
+
+// ----------------- Softmax wrappers -----------------
+
+void tensor_softmax_float32(float* output, const float* input, size_t n) {
+    // 1. max
+    float max_val = launch_reduction<float,float>(input, n, MaxOp(), -FLT_MAX);
+    // 2. exp(x-max)
+    int threads = 256;
+    int blocks = (n + threads - 1) / threads;
+    shift_exp_kernel<float><<<blocks, threads>>>(output, input, max_val, n);
+    // 3. sum
+    float sum_val = launch_reduction<float,float>(output, n, AddOp(), 0.0f);
+    // 4. divide
+    div_scalar_kernel<float><<<blocks, threads>>>(output, sum_val, n);
+}
+
+void tensor_softmax_float64(double* output, const double* input, size_t n) {
+    double max_val = launch_reduction<double,double>(input, n, MaxOp(), -DBL_MAX);
+    int threads = 256;
+    int blocks = (n + threads - 1) / threads;
+    shift_exp_kernel<double><<<blocks, threads>>>(output, input, max_val, n);
+    double sum_val = launch_reduction<double,double>(output, n, AddOp(), 0.0);
+    div_scalar_kernel<double><<<blocks, threads>>>(output, sum_val, n);
+}
+
+// ----------------- Argmax wrappers -----------------
+
+int64_t tensor_argmax_float32(const float* input, size_t n) {
+    std::vector<float> host(n);
+    cudaMemcpy(host.data(), input, n*sizeof(float), cudaMemcpyDeviceToHost);
+    auto it = std::max_element(host.begin(), host.end());
+    return static_cast<int64_t>(std::distance(host.begin(), it));
+}
+
+int64_t tensor_argmax_float64(const double* input, size_t n) {
+    std::vector<double> host(n);
+    cudaMemcpy(host.data(), input, n*sizeof(double), cudaMemcpyDeviceToHost);
+    auto it = std::max_element(host.begin(), host.end());
+    return static_cast<int64_t>(std::distance(host.begin(), it));
+}
+
+} // extern "C" 
