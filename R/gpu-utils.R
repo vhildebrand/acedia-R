@@ -16,7 +16,7 @@
 #'   cat("Using CPU-only mode\n")
 #' }
 #' }
-#' 
+#' @export
 # gpu_available function is auto-generated in RcppExports.R
 # No manual definition needed here
 
@@ -34,7 +34,7 @@
 #' \dontrun{
 #' cat(gpu_info())
 #' }
-#' 
+#' @export
 # gpu_info function is auto-generated in RcppExports.R
 # No manual definition needed here
 
@@ -53,7 +53,7 @@
 #' mem_gb <- gpu_memory_available() / 1e9
 #' cat("Available GPU memory:", round(mem_gb, 1), "GB\n")
 #' }
-#' 
+#' @export
 # gpu_memory_available function is auto-generated in RcppExports.R
 # No manual definition needed here
 

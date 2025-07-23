@@ -272,7 +272,8 @@ SEXP tensor_stack_unified(List tensor_list, int axis = 1) {
             auto tw = dynamic_cast<const TensorWrapper<float>*>(tensors[i].get());
             d_ptrs[i]=tw->tensor().data();
         }
-        // input strides for a single tensor
+        // Use the original input strides (length = base_ndims). The kernel receives
+        // (ndims-1) entries which correspond exactly to the input tensor dimensions.
         auto one_stride = to_int_vec(dynamic_cast<const TensorWrapper<float>*>(tensors[0].get())->tensor().strides());
         auto res_gpu = std::make_shared<gpuTensor<float>>(result_shape);
         auto result_shape_vec = to_int_vec(res_dims);

@@ -47,11 +47,13 @@ test_that("Concat and Stack produce correct results", {
   c_gpu <- concat(list(a,b), axis = 1)
   verify_gpu_tensor(c_gpu, "concat result")
   c_cpu <- abind::abind(as.array(a), as.array(b), along = 1)
+  dimnames(c_cpu) <- NULL  # Remove dimnames to match GPU result
   expect_equal(as.array(c_gpu), c_cpu)
   # Stack along new dim 3
   s_gpu <- stack(list(a,b), axis = 3)
   verify_gpu_tensor(s_gpu, "stack result")
   s_cpu <- abind::abind(as.array(a), as.array(b), along = 3)
+  dimnames(s_cpu) <- NULL  # Remove dimnames to match GPU result
   expect_equal(as.array(s_gpu), s_cpu)
 })
 

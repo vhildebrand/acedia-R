@@ -268,12 +268,10 @@ __global__ void stack_kernel(
         }
     }
     
-    // Calculate source index
+    // Calculate source index using input strides (column-major order)
     int src_idx = 0;
-    int stride = 1;
-    for (int i = ndims - 2; i >= 0; i--) {  // ndims-2 because input has one less dim
-        src_idx += input_coords[i] * stride;
-        stride *= (i == stack_axis ? result_shape[i+1] : result_shape[i]);
+    for (int i = 0; i < ndims - 1; ++i) {
+        src_idx += input_coords[i] * input_strides[i];
     }
     
     result[idx] = inputs[tensor_idx][src_idx];
@@ -298,10 +296,11 @@ __global__ void repeat_kernel(
         temp_idx /= result_shape[i];
     }
     
-    // Map to input coordinates (mod by input shape)
+    // Map to input coordinates based on repeat counts
     int input_coords[8];
     for (int i = 0; i < ndims; i++) {
-        input_coords[i] = coords[i] % input_shape[i];
+        int rep = repeat_counts[i];
+        input_coords[i] = coords[i] / rep;  // integer division to collapse repeats
     }
     
     // Calculate source index
