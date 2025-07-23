@@ -765,6 +765,127 @@ sqrt.gpuTensor <- function(x) {
   return(result)
 }
 
+#' Hyperbolic Tangent Function
+#'
+#' Computes the hyperbolic tangent of each element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with tanh(x) computed element-wise
+#' @export
+tanh.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_tanh_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Sigmoid Activation Function
+#'
+#' Computes the sigmoid (logistic) function 1/(1+exp(-x)) of each element.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with sigmoid(x) computed element-wise
+#' @export
+sigmoid <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_sigmoid_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' ReLU Activation Function
+#'
+#' Computes the Rectified Linear Unit max(0, x) of each element.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with relu(x) computed element-wise
+#' @export
+relu <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_relu_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Sine Function
+#'
+#' Computes the sine of each element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with sin(x) computed element-wise
+#' @export
+sin.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_sin_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Cosine Function
+#'
+#' Computes the cosine of each element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A tensor with cos(x) computed element-wise
+#' @export
+cos.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_cos_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Math Group Generic for GPU Tensors
+#'
+#' Provides support for mathematical functions on GPU tensors
+#' @param x A gpuTensor object
+#' @param ... Additional arguments
+#' @export
+Math.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Get the function name
+  func_name <- .Generic
+  
+  result <- switch(func_name,
+    "tanh" = tensor_tanh_unified(x),
+    "sin" = tensor_sin_unified(x),
+    "cos" = tensor_cos_unified(x),
+    "exp" = tensor_exp_unified(x),
+    "log" = tensor_log_unified(x), 
+    "sqrt" = tensor_sqrt_unified(x),
+    # Fall back to base R for unsupported functions
+    {
+      warning(paste("Math function", func_name, "not implemented for gpuTensor, converting to R"))
+      NextMethod()
+    }
+  )
+  
+  if (!is.null(result)) {
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  } else {
+    return(NextMethod())
+  }
+}
+
 #' Mean (Average) Function
 #'
 #' Computes the arithmetic mean of all elements in the tensor.

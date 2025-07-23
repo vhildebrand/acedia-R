@@ -21,6 +21,26 @@ tensor_argmax_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_argmax_unified`, tensor_ptr)
 }
 
+tensor_tanh_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_tanh_unified`, tensor_ptr)
+}
+
+tensor_sigmoid_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_sigmoid_unified`, tensor_ptr)
+}
+
+tensor_relu_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_relu_unified`, tensor_ptr)
+}
+
+tensor_sin_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_sin_unified`, tensor_ptr)
+}
+
+tensor_cos_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_cos_unified`, tensor_ptr)
+}
+
 tensor_sub_unified <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_tensor_sub_unified`, a_ptr, b_ptr)
 }

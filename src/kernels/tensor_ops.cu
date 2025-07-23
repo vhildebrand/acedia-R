@@ -47,6 +47,39 @@ struct SqrtOp {
     __device__ T operator()(const T& a) const { return sqrt(a); }
 };
 
+// Additional activation function functors
+struct TanhOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return tanh(a); }
+};
+
+struct SigmoidOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return T(1) / (T(1) + exp(-a)); }
+};
+
+struct ReluOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return fmax(a, T(0)); }
+};
+
+struct LeakyReluOp {
+    template<typename T>
+    __device__ T operator()(const T& a, const T& alpha = T(0.01)) const { 
+        return a > T(0) ? a : alpha * a; 
+    }
+};
+
+struct SinOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return sin(a); }
+};
+
+struct CosOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return cos(a); }
+};
+
 // Reduction operation functors - with both __host__ and __device__ support
 struct MaxOp {
     template<typename T>
@@ -458,6 +491,60 @@ __global__ void div_scalar_kernel(T* data, T scalar, size_t n) {
     }
 }
 
+// ===================== Strided Operation Kernels ===================== //
+
+// Strided kernels for non-contiguous tensor operations
+template<typename T, typename Op>
+__global__ void strided_unary_kernel(
+    cuda_utils::TensorDescriptor out_desc,
+    cuda_utils::TensorDescriptor in_desc,
+    size_t total_elements
+) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= total_elements) return;
+    
+    // Convert linear index to coordinates
+    int coords[8];
+    out_desc.linear_to_coords(idx, coords);
+    
+    // Compute offsets using strides
+    size_t in_offset = in_desc.compute_offset(coords);
+    size_t out_offset = out_desc.compute_offset(coords);
+    
+    // Perform operation
+    T* out_ptr = static_cast<T*>(out_desc.data);
+    const T* in_ptr = static_cast<const T*>(in_desc.data);
+    
+    out_ptr[out_offset] = Op{}(in_ptr[in_offset]);
+}
+
+template<typename T, typename Op>
+__global__ void strided_binary_kernel(
+    cuda_utils::TensorDescriptor out_desc,
+    cuda_utils::TensorDescriptor a_desc,
+    cuda_utils::TensorDescriptor b_desc,
+    size_t total_elements
+) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= total_elements) return;
+    
+    // Convert linear index to coordinates
+    int coords[8];
+    out_desc.linear_to_coords(idx, coords);
+    
+    // Compute offsets using strides
+    size_t a_offset = a_desc.compute_offset(coords);
+    size_t b_offset = b_desc.compute_offset(coords);
+    size_t out_offset = out_desc.compute_offset(coords);
+    
+    // Perform operation
+    T* out_ptr = static_cast<T*>(out_desc.data);
+    const T* a_ptr = static_cast<const T*>(a_desc.data);
+    const T* b_ptr = static_cast<const T*>(b_desc.data);
+    
+    out_ptr[out_offset] = Op{}(a_ptr[a_offset], b_ptr[b_offset]);
+}
+
 // BEGIN NEW WRAPPER FUNCTIONS (Sprint 1 enhancements)
 extern "C" {
 
@@ -485,6 +572,47 @@ void tensor_sqrt_float32(float* result, const float* input, size_t n) {
 
 void tensor_sqrt_float64(double* result, const double* input, size_t n) {
     launch_elementwise_unary<double>(result, input, n, SqrtOp());
+}
+
+// New activation functions
+void tensor_tanh_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, TanhOp());
+}
+
+void tensor_tanh_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, TanhOp());
+}
+
+void tensor_sigmoid_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, SigmoidOp());
+}
+
+void tensor_sigmoid_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, SigmoidOp());
+}
+
+void tensor_relu_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, ReluOp());
+}
+
+void tensor_relu_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, ReluOp());
+}
+
+void tensor_sin_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, SinOp());
+}
+
+void tensor_sin_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, SinOp());
+}
+
+void tensor_cos_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, CosOp());
+}
+
+void tensor_cos_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, CosOp());
 }
 
 // ===================== Reductions ===================== //
@@ -876,27 +1004,130 @@ void tensor_strided_copy_float64(double* dest, const double* src, const int* str
     launch_strided_copy<double>(dest, src, stride_vec, shape_vec, total_elements);
 }
 
-// Strided operations - placeholder implementations (need strided kernels from tensor_wrappers.cu)
+// Strided operations - now fully implemented with strided kernels
 void tensor_add_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
                                 const cuda_utils::TensorDescriptor& a_desc,
                                 const cuda_utils::TensorDescriptor& b_desc) {
-    // TODO: Implement strided operations
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, AddOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
 }
 
 void tensor_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
                                 const cuda_utils::TensorDescriptor& a_desc,
                                 const cuda_utils::TensorDescriptor& b_desc) {
-    // TODO: Implement strided operations
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, AddOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
 }
 
 void tensor_exp_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
                                 const cuda_utils::TensorDescriptor& in_desc) {
-    // TODO: Implement strided operations
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, ExpOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
 }
 
 void tensor_exp_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
                                 const cuda_utils::TensorDescriptor& in_desc) {
-    // TODO: Implement strided operations
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, ExpOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+// Additional strided operations for more comprehensive support
+void tensor_mul_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, MulOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, MulOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_log_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, LogOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_log_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, LogOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_sqrt_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                 const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, SqrtOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_sqrt_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                 const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, SqrtOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
 }
 
 } // extern "C" 

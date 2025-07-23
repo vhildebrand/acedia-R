@@ -62,6 +62,61 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_tanh_unified
+SEXP tensor_tanh_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_tanh_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_tanh_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_sigmoid_unified
+SEXP tensor_sigmoid_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_sigmoid_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_sigmoid_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_relu_unified
+SEXP tensor_relu_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_relu_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_relu_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_sin_unified
+SEXP tensor_sin_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_sin_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_sin_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_cos_unified
+SEXP tensor_cos_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_cos_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_cos_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
 // tensor_sub_unified
 SEXP tensor_sub_unified(SEXP a_ptr, SEXP b_ptr);
 RcppExport SEXP _acediaR_tensor_sub_unified(SEXP a_ptrSEXP, SEXP b_ptrSEXP) {
@@ -511,6 +566,11 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_gpu_memory_available", (DL_FUNC) &_acediaR_gpu_memory_available, 0},
     {"_acediaR_tensor_softmax_unified", (DL_FUNC) &_acediaR_tensor_softmax_unified, 1},
     {"_acediaR_tensor_argmax_unified", (DL_FUNC) &_acediaR_tensor_argmax_unified, 1},
+    {"_acediaR_tensor_tanh_unified", (DL_FUNC) &_acediaR_tensor_tanh_unified, 1},
+    {"_acediaR_tensor_sigmoid_unified", (DL_FUNC) &_acediaR_tensor_sigmoid_unified, 1},
+    {"_acediaR_tensor_relu_unified", (DL_FUNC) &_acediaR_tensor_relu_unified, 1},
+    {"_acediaR_tensor_sin_unified", (DL_FUNC) &_acediaR_tensor_sin_unified, 1},
+    {"_acediaR_tensor_cos_unified", (DL_FUNC) &_acediaR_tensor_cos_unified, 1},
     {"_acediaR_tensor_sub_unified", (DL_FUNC) &_acediaR_tensor_sub_unified, 2},
     {"_acediaR_tensor_div_unified", (DL_FUNC) &_acediaR_tensor_div_unified, 2},
     {"_acediaR_tensor_add_unified", (DL_FUNC) &_acediaR_tensor_add_unified, 2},
