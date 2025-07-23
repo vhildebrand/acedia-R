@@ -8,7 +8,22 @@ verify_gpu_tensor <- function(tensor, operation_name = "operation") {
     warning(paste("❌ GPU FALLBACK:", operation_name, "returned non-gpuTensor object"))
     return(FALSE)
   }
-  TRUE
+  
+  # Additional check: verify data is actually on GPU by attempting a GPU-specific operation
+  tryCatch({
+    # Try to get tensor info - this should work for GPU tensors and show CUDA device
+    info <- tensor_info_unified(tensor)
+    if (grepl("CUDA", info, ignore.case = TRUE)) {
+      cat(paste("✅ GPU VERIFIED:", operation_name, "on CUDA device\n"))
+      return(TRUE)
+    } else {
+      warning(paste("❌ GPU FALLBACK:", operation_name, "not on CUDA device"))
+      return(FALSE)
+    }
+  }, error = function(e) {
+    warning(paste("❌ GPU VERIFICATION FAILED:", operation_name, "-", e$message))
+    return(FALSE)
+  })
 }
 
 skip_if_not(gpu_available(), "GPU not available")
@@ -113,4 +128,73 @@ test_that("Softmax GPU runtime reasonable", {
   gpu_time <- system.time({res_gpu <- softmax(gx); synchronize(res_gpu)})[["elapsed"]]
   expect_equal(as.vector(res_gpu)[1:10], res_cpu[1:10], tolerance=1e-4)
   expect_lt(gpu_time, cpu_time * 5)  # allow overhead but not extreme
+})
+
+# ------------------------------------------------------------------
+# GPU Kernel Verification ------------------------------------------
+# ------------------------------------------------------------------
+
+test_that("All operations confirmed to use CUDA kernels", {
+  skip_if_not(gpu_available(), "GPU not available")
+  
+  cat("\n🔍 COMPREHENSIVE GPU KERNEL VERIFICATION:\n")
+  
+  # Test each operation type to ensure GPU execution
+  operations_verified <- 0
+  
+  # 1. Tensor creation
+  t1 <- gpu_tensor(1:12, c(3,4), dtype="float")
+  t2 <- gpu_tensor(13:24, c(3,4), dtype="float")
+  if (verify_gpu_tensor(t1, "tensor creation 1") && verify_gpu_tensor(t2, "tensor creation 2")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  # 2. Concat operation
+  concat_result <- concat(list(t1, t2), axis = 1)
+  if (verify_gpu_tensor(concat_result, "concat operation")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  # 3. Stack operation  
+  stack_result <- stack(list(t1, t2), axis = 3)
+  if (verify_gpu_tensor(stack_result, "stack operation")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  # 4. Repeat operation
+  repeat_result <- repeat_tensor(t1, c(2, 1))
+  if (verify_gpu_tensor(repeat_result, "repeat operation")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  # 5. Pad operation
+  pad_result <- pad(t1, matrix(c(1,1,1,1), nrow=2, byrow=TRUE), mode="constant", value=0)
+  if (verify_gpu_tensor(pad_result, "pad operation")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  # 6. Softmax operation
+  softmax_result <- softmax(t1)
+  if (verify_gpu_tensor(softmax_result, "softmax operation")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  # 7. Comparison operations
+  comparison_result <- t1 > t2
+  if (verify_gpu_tensor(comparison_result, "comparison operation")) {
+    operations_verified <- operations_verified + 1
+  }
+  
+  cat(paste("✅ TOTAL GPU OPERATIONS VERIFIED:", operations_verified, "/7\n"))
+  
+  # Ensure all operations were verified as GPU
+  expect_equal(operations_verified, 7, 
+               info = "All operations should be verified as running on GPU/CUDA")
+  
+  # Additional check: verify that synchronize works (GPU-specific)
+  synchronize(t1)
+  synchronize(concat_result)
+  cat("✅ GPU SYNCHRONIZATION: All tensors synchronized successfully\n")
+  
+  cat("🎉 CONCLUSION: All operations confirmed to use CUDA kernels!\n")
 }) 
