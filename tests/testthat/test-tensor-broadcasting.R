@@ -38,7 +38,7 @@ test_that("3D broadcasting works", {
   result_array <- as.array(result)
   expect_equal(result_array[1,1,1], 1 + 10)  # a[1,1,1] + b[1,1,1]
   expect_equal(result_array[1,2,1], 1 + 20)  # a[1,1,1] + b[1,2,1] 
-  expect_equal(result_array[2,1,2], 5 + 10)  # a[2,1,2] + b[1,1,1]
+  expect_equal(result_array[2,1,2], 4 + 10)  # a[2,1,2] + b[1,1,1] (a[2,1,2] = 4, not 5)
 })
 
 test_that("scalar tensor broadcasting still works", {
@@ -102,5 +102,5 @@ test_that("complex broadcasting patterns work", {
   result_array <- as.array(result)
   expect_equal(result_array[1,1,1], 1 + 1)  # a[1,1,1] + b[1,1,1]
   expect_equal(result_array[1,2,1], 2 + 1)  # a[1,2,1] + b[1,1,1]  
-  expect_equal(result_array[2,1,2], 1 + 6)  # a[1,1,1] + b[2,1,2]
+  expect_equal(result_array[2,1,2], 1 + 4)  # a[1,1,1] + b[2,1,2] (b[2,1,2] = 4, not 6)
 }) 

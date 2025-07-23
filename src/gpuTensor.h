@@ -177,8 +177,8 @@ inline std::string dtype_to_string(DType dtype) {
     switch (dtype) {
         case DType::FLOAT16: return "float16";
         case DType::BFLOAT16: return "bfloat16";
-        case DType::FLOAT32: return "float";    // R uses 'float' for single-precision
-        case DType::FLOAT64: return "double";   // R uses 'double' for double-precision
+        case DType::FLOAT32: return "float";    // R standard name
+        case DType::FLOAT64: return "double";   // R standard name
         case DType::INT8: return "int8";
         case DType::UINT8: return "uint8";
         case DType::INT16: return "int16";
@@ -288,10 +288,10 @@ inline std::vector<size_t> compute_strides(const Shape& shape) {
     if (shape.ndims() == 0) return {};
     
     std::vector<size_t> strides(shape.ndims());
-    strides[shape.ndims() - 1] = 1;
+    strides[0] = 1;
     
-    for (int i = static_cast<int>(shape.ndims()) - 2; i >= 0; --i) {
-        strides[i] = strides[i + 1] * shape[i + 1];
+    for (size_t i = 1; i < shape.ndims(); ++i) {
+        strides[i] = strides[i - 1] * shape[i - 1];
     }
     
     return strides;

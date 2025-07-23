@@ -2,20 +2,27 @@
 % Please edit documentation in R/gpuTensor.R
 \name{as_tensor}
 \alias{as_tensor}
-\title{Create Tensor from Matrix/Array}
+\alias{as_tensor.default}
+\title{Convert R object to GPU Tensor}
 \usage{
-as_tensor(x, dtype = "double", requires_grad = FALSE)
+as_tensor(x, ...)
+
+\method{as_tensor}{default}(x, dtype = "double", requires_grad = FALSE, shape = NULL, ...)
 }
 \arguments{
-\item{x}{An R matrix or array}
+\item{x}{Input R object (vector, matrix, or array)}
 
-\item{dtype}{Data type: "double" or "float" (default: "double")}
+\item{...}{Additional arguments passed to methods}
+
+\item{dtype}{Data type for the tensor (default: "double")}
 
 \item{requires_grad}{Whether to track gradients (default: FALSE)}
+
+\item{shape}{Optional shape to reshape the data (default: NULL, uses input shape)}
 }
 \value{
 A gpuTensor object with the same shape as the input
 }
 \description{
-Creates a gpuTensor from an R matrix or array, preserving dimensions.
+Convert R object to GPU Tensor
 }

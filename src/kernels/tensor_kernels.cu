@@ -153,7 +153,7 @@ __global__ void broadcast_binary_kernel(
     // Convert linear index to multidimensional coordinates (COLUMN-MAJOR for R)
     int coords[8]; // max 8 dimensions
     int temp_idx = idx;
-    for (int i = 0; i < ndims; i++) {  // Changed from ndims-1 down to 0 up for column-major
+    for (int i = 0; i < ndims; i++) {
         coords[i] = temp_idx % shape[i];
         temp_idx /= shape[i];
     }
@@ -180,7 +180,7 @@ __global__ void strided_copy_kernel(
     // Convert linear output index to multidimensional coordinates (COLUMN-MAJOR for R)
     int coords[8]; // max 8 dimensions
     int temp_idx = idx;
-    for (int i = 0; i < ndims; i++) {  // Column-major indexing for R
+    for (int i = 0; i < ndims; i++) {
         coords[i] = temp_idx % shape[i];
         temp_idx /= shape[i];
     }
@@ -207,7 +207,7 @@ __global__ void concat_kernel(
     // Convert linear index to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = 0; i < ndims; ++i) {
+    for (int i = 0; i < ndims; i++) {
         coords[i] = temp_idx % shape[i];
         temp_idx /= shape[i];
     }
@@ -251,7 +251,7 @@ __global__ void stack_kernel(
     // Convert linear index to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = 0; i < ndims; i++) {  // Column-major indexing for R
+    for (int i = 0; i < ndims; i++) {
         coords[i] = temp_idx % result_shape[i];
         temp_idx /= result_shape[i];
     }
@@ -293,7 +293,7 @@ __global__ void repeat_kernel(
     // Convert linear index to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = 0; i < ndims; ++i) {
+    for (int i = 0; i < ndims; i++) {
         coords[i] = temp_idx % result_shape[i];
         temp_idx /= result_shape[i];
     }
@@ -328,7 +328,7 @@ __global__ void pad_kernel(
     // Convert to result coordinates (COLUMN-MAJOR for R)
     int coords[8];
     int temp_idx = idx;
-    for (int i = 0; i < ndims; ++i) {
+    for (int i = 0; i < ndims; i++) {
         coords[i] = temp_idx % result_shape[i];
         temp_idx /= result_shape[i];
     }

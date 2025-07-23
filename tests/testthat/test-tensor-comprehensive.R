@@ -6,7 +6,7 @@ test_that("Comprehensive tensor operations test suite", {
   # Test data setup
   set.seed(42)
   sizes <- c(1e3, 1e4, 1e5)
-  dtypes <- c("float32", "float64") # Add "int32", "int64" when supported
+  dtypes <- c("float", "double") # Add "int32", "int64" when supported
   
   for (size in sizes) {
     for (dtype in dtypes) {
@@ -135,8 +135,8 @@ test_that("Comprehensive tensor operations test suite", {
     B_data <- matrix(runif(mat_size$k * mat_size$n, -1, 1), 
                      nrow = mat_size$k, ncol = mat_size$n)
     
-    A_tensor <- as_tensor(A_data, dtype = "float32")
-    B_tensor <- as_tensor(B_data, dtype = "float32")
+      A_tensor <- as_tensor(A_data, dtype = "float")
+  B_tensor <- as_tensor(B_data, dtype = "float")
     
     # Matrix multiplication
     if (exists("matmul") || exists("%*%.gpuTensor")) {
@@ -155,7 +155,7 @@ test_that("Comprehensive tensor operations test suite", {
   
   # Test various reshape and view operations
   original_data <- runif(24, -2, 2)
-  tensor_orig <- as_tensor(original_data, dtype = "float32")
+  tensor_orig <- as_tensor(original_data, dtype = "float")
   
   # Reshape tests
   shapes_to_test <- list(c(24), c(6, 4), c(3, 8), c(2, 3, 4))
@@ -171,13 +171,13 @@ test_that("Comprehensive tensor operations test suite", {
       
       expect_equal(length(as.array(reshaped)), 24)
       expect_equal(as.numeric(size(reshaped)), 24)
-      expect_equal(as.array(reshaped), original_data, tolerance = 1e-7)
+      expect_equal(as.vector(as.array(reshaped)), original_data, tolerance = 1e-7)
     }
   }
   
   # Transpose test (2D only)
   mat_data <- matrix(runif(20, -1, 1), nrow = 4, ncol = 5)
-  mat_tensor <- as_tensor(mat_data, dtype = "float32")
+  mat_tensor <- as_tensor(mat_data, dtype = "float")
   
   if (exists("t.gpuTensor") || exists("transpose")) {
     if (exists("t.gpuTensor")) {
@@ -196,8 +196,8 @@ test_that("Comprehensive tensor operations test suite", {
   vec_data <- runif(5, -1, 1)
   mat_data_5x3 <- matrix(runif(15, -1, 1), nrow = 5, ncol = 3)
   
-  vec_tensor <- as_tensor(vec_data, dtype = "float32")
-  mat_tensor <- as_tensor(mat_data_5x3, dtype = "float32")
+      vec_tensor <- as_tensor(vec_data, dtype = "float")
+    mat_tensor <- as_tensor(mat_data_5x3, dtype = "float")
   
   # Test broadcasting if supported
   # Note: This depends on the broadcasting implementation
@@ -206,23 +206,23 @@ test_that("Comprehensive tensor operations test suite", {
   
   # Test dtype conversions
   test_data <- runif(100, -5, 5)
-  tensor_f32 <- as_tensor(test_data, dtype = "float32")
+      tensor_f32 <- as_tensor(test_data, dtype = "float")
   
   if (exists("to_dtype")) {
     # Convert to float64 and back
-    tensor_f64 <- to_dtype(tensor_f32, "float64")
-    expect_equal(dtype(tensor_f64), "float64")
+          tensor_f64 <- to_dtype(tensor_f32, "double")
+      expect_equal(dtype(tensor_f64), "double")
     expect_equal(as.array(tensor_f64), test_data, tolerance = 1e-6)
     
-    tensor_back <- to_dtype(tensor_f64, "float32")
-    expect_equal(dtype(tensor_back), "float32")
+          tensor_back <- to_dtype(tensor_f64, "float")
+      expect_equal(dtype(tensor_back), "float")
     expect_equal(as.array(tensor_back), test_data, tolerance = 1e-6)
   }
   
   cat("\n=== MEMORY AND CONTIGUITY TESTS ===\n")
   
   # Test contiguity after operations
-  big_tensor <- as_tensor(runif(1000, -1, 1), dtype = "float32")
+      big_tensor <- as_tensor(runif(1000, -1, 1), dtype = "float")
   
   expect_true(is_contiguous(big_tensor))
   
@@ -252,9 +252,9 @@ test_that("Error handling and edge cases", {
   
   # Test dimension mismatches for matrix operations
   if (exists("matmul")) {
-    A <- as_tensor(matrix(1:6, 2, 3), dtype = "float32")
-    B <- as_tensor(matrix(1:6, 3, 2), dtype = "float32")
-    C <- as_tensor(matrix(1:4, 2, 2), dtype = "float32")
+    A <- as_tensor(matrix(1:6, 2, 3), dtype = "float")
+    B <- as_tensor(matrix(1:6, 3, 2), dtype = "float")
+    C <- as_tensor(matrix(1:4, 2, 2), dtype = "float")
     
     # This should work
     expect_no_error(matmul(A, B))
@@ -265,12 +265,12 @@ test_that("Error handling and edge cases", {
   
   # Test domain errors for math functions
   if (exists("log.gpuTensor")) {
-    negative_tensor <- as_tensor(c(-1, -2, -3), dtype = "float32")
+          negative_tensor <- as_tensor(c(-1, -2, -3), dtype = "float")
     expect_error(log(negative_tensor), "domain error")
   }
   
   if (exists("sqrt.gpuTensor")) {
-    negative_tensor <- as_tensor(c(-1, -4, -9), dtype = "float32")
+          negative_tensor <- as_tensor(c(-1, -4, -9), dtype = "float")
     expect_error(sqrt(negative_tensor), "domain error")
   }
   

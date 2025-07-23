@@ -79,43 +79,26 @@ extern "C" {
 
 // Helper to compute broadcast strides
 std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shape& broadcast_shape) {
-    // Output stride vector (one per dimension of the broadcasted result)
     std::vector<int> strides(broadcast_shape.ndims(), 0);
-
-    // ------------------------------------------------------------------
-    // 1) Compute COLUMN-MAJOR strides for the *original* tensor.
-    // ------------------------------------------------------------------
     std::vector<int> tensor_strides(tensor_shape.ndims());
+
     if (tensor_shape.ndims() > 0) {
-        tensor_strides[0] = 1;                               // first dim
+        tensor_strides[0] = 1;
         for (size_t i = 1; i < tensor_shape.ndims(); ++i) {
             tensor_strides[i] = tensor_strides[i - 1] * tensor_shape[i - 1];
         }
     }
 
-    // ------------------------------------------------------------------
-    // 2) Map tensor dimensions onto broadcast dimensions *from the right*.
-    //    (i.e. NumPy/R broadcasting semantics)
-    // ------------------------------------------------------------------
-    int t = static_cast<int>(tensor_shape.ndims()) - 1;      // last dim of tensor
-    for (int b = static_cast<int>(broadcast_shape.ndims()) - 1; b >= 0; --b) {
-        if (t >= 0) {
-            size_t tensor_dim_size = tensor_shape[t];
-            size_t bc_dim_size     = broadcast_shape[b];
-
-            if (tensor_dim_size == bc_dim_size) {
-                // normal dimension ⇒ copy stride
-                strides[b] = tensor_strides[t];
-            } else if (tensor_dim_size == 1) {
-                // broadcast dimension ⇒ stride 0
-                strides[b] = 0;
-            } else {
-                throw std::runtime_error("Invalid broadcast – dimension size mismatch");
+    int tensor_dim_idx = tensor_shape.ndims() - 1;
+    for (int i = broadcast_shape.ndims() - 1; i >= 0; --i) {
+        if (tensor_dim_idx >= 0) {
+            if (tensor_shape.dims[tensor_dim_idx] == broadcast_shape.dims[i]) {
+                strides[i] = tensor_strides[tensor_dim_idx];
+            } else if (tensor_shape.dims[tensor_dim_idx] != 1) {
+                // This case should be caught by broadcastable_with, but as a safeguard:
+                throw std::runtime_error("Shape mismatch in broadcast stride calculation");
             }
-            --t;  // move to the next (previous) tensor dimension
-        } else {
-            // Extra prepended broadcasted dimension (implicit size-1 in tensor)
-            strides[b] = 0;
+            tensor_dim_idx--;
         }
     }
 

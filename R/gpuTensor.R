@@ -69,7 +69,19 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
     warning("requires_grad is not yet implemented for the unified interface")
   }
   
-  class(tensor) <- c("gpuTensor", class(tensor))
+  # Ensure proper class structure (avoid duplicates)
+  # Fix any class duplication issues from C++ 
+  current_class <- class(tensor)
+  if (length(current_class) > 1 && all(current_class == "gpuTensor")) {
+    class(tensor) <- "gpuTensor"
+  } else if (length(current_class) == 1 && current_class[1] == "gpuTensor") {
+    # Already correct
+  } else if (!"gpuTensor" %in% current_class) {
+    class(tensor) <- c("gpuTensor", current_class)
+  } else {
+    # Remove any duplicates
+    class(tensor) <- unique(current_class)
+  }
   return(tensor)
 }
 
@@ -121,32 +133,46 @@ empty_tensor <- function(shape, dtype = "double", device = "cuda", requires_grad
   return(tensor)
 }
 
-#' Create Tensor from Matrix/Array
+#' Convert R object to GPU Tensor
 #'
-#' Creates a gpuTensor from an R matrix or array, preserving dimensions.
-#'
-#' @param x An R matrix or array
-#' @param dtype Data type: "double" or "float" (default: "double")
-#' @param requires_grad Whether to track gradients (default: FALSE)
-#' 
+#' @param x Input R object (vector, matrix, or array)
+#' @param ... Additional arguments passed to methods
 #' @return A gpuTensor object with the same shape as the input
 #' 
 #' @export
-as_tensor <- function(x, dtype = "double", requires_grad = FALSE) {
-  if (!is.numeric(x)) {
-    stop("Input must be numeric")
+as_tensor <- function(x, ...) {
+  UseMethod("as_tensor")
+}
+
+#' @rdname as_tensor
+#' @param dtype Data type for the tensor (default: "double")
+#' @param requires_grad Whether to track gradients (default: FALSE)
+#' @param shape Optional shape to reshape the data (default: NULL, uses input shape)
+#' @export
+as_tensor.default <- function(x, dtype = "double", requires_grad = FALSE, shape = NULL, ...) {
+  if (is.array(x) || is.matrix(x)) {
+    if (!is.null(shape)) {
+      # Check if size matches
+      if (length(as.vector(x)) != prod(shape)) {
+        stop("Data size (", length(as.vector(x)), ") does not match shape size (", prod(shape), ")")
+      }
+      gpu_tensor(data = as.vector(x), shape = shape, dtype = dtype, requires_grad = requires_grad)
+    } else {
+      gpu_tensor(data = as.vector(x), shape = dim(x), dtype = dtype, requires_grad = requires_grad)
+    }
+  } else if (is.vector(x)) {
+    if (!is.null(shape)) {
+      # Check if size matches
+      if (length(x) != prod(shape)) {
+        stop("Data size (", length(x), ") does not match shape size (", prod(shape), ")")
+      }
+      gpu_tensor(data = x, shape = shape, dtype = dtype, requires_grad = requires_grad)
+    } else {
+      gpu_tensor(data = x, shape = length(x), dtype = dtype, requires_grad = requires_grad)
+    }
+  } else {
+    stop("Cannot convert object of class '", class(x)[1], "' to tensor")
   }
-  
-  # Get dimensions (handle vectors, matrices, and arrays)
-  shape <- dim(x)
-  if (is.null(shape)) {
-    shape <- length(x)  # Vector case
-  }
-  
-  # Convert to vector for data transfer
-  data <- as.vector(x)
-  
-  return(gpu_tensor(data, shape, dtype, "cuda", requires_grad))
 }
 
 #' Convert GPU Tensor to R Array
@@ -158,14 +184,36 @@ as_tensor <- function(x, dtype = "double", requires_grad = FALSE) {
 #' @return An R array with the same shape as the tensor
 #' 
 #' @export
-as.array.gpuTensor <- function(tensor) {
-  return(tensor_to_r_unified(tensor))
+as.array.gpuTensor <- function(x, ...) {
+  result <- tensor_to_r_unified(x)
+  # For 1D tensors, return a vector instead of 1D array for better compatibility
+  if (length(dim(result)) == 1) {
+    return(as.vector(result))
+  }
+  return(result)
 }
 
 #' @export
 as.vector.gpuTensor <- function(x, mode = "any") {
   result <- as.array(x)
   return(as.vector(result))
+}
+
+#' @export
+as.numeric.gpuTensor <- function(x, ...) {
+  # Convert to array first, then to numeric
+  arr <- as.array(x)
+  return(as.numeric(arr))
+}
+
+# Also add a direct conversion function as backup
+#' @export  
+to_numeric <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    return(as.numeric(as.array(x)))
+  } else {
+    return(as.numeric(x))
+  }
 }
 
 #' Get Tensor Shape
@@ -192,6 +240,15 @@ size <- function(tensor) {
   return(tensor_size_unified(tensor))
 }
 
+#' Get Tensor Data Type
+#'
+#' @param tensor A gpuTensor object
+#' @return Character string indicating the data type
+#' @export
+dtype <- function(tensor) {
+  UseMethod("dtype")
+}
+
 #' Print Tensor Information
 #'
 #' @param x A gpuTensor object
@@ -213,6 +270,23 @@ print.gpuTensor <- function(x, ...) {
   }
   
   invisible(x)
+}
+
+# Helper function to ensure proper gpuTensor class (no duplicates)
+.fix_gpuTensor_class <- function(x) {
+  if (!is.null(x) && inherits(x, "gpuTensor")) {
+    current_class <- class(x)
+    if (length(current_class) > 1) {
+      if (all(current_class == "gpuTensor")) {
+        # All duplicates, fix to single
+        class(x) <- "gpuTensor"
+      } else {
+        # Mixed classes, keep unique ones
+        class(x) <- unique(current_class)
+      }
+    }
+  }
+  return(x)
 }
 
 #' @export
@@ -951,3 +1025,24 @@ pad <- function(tensor, pad_width, mode = "constant", value = 0) {
   # For reflect and replicate modes, would need more complex implementation
   stop("Only constant padding mode is currently implemented")
 } 
+
+#' @export
+shape.gpuTensor <- function(x) {
+  .Call(`_acediaR_tensor_shape_unified`, x)
+}
+
+#' @export
+dtype.gpuTensor <- function(x) {
+  .Call(`_acediaR_tensor_dtype_unified`, x)
+}
+
+#' @export
+size.gpuTensor <- function(x) {
+  .Call(`_acediaR_tensor_size_unified`, x)
+}
+
+# Package load hook to ensure proper method registration
+.onLoad <- function(libname, pkgname) {
+  # Force registration of as.numeric method for primitives
+  registerS3method("as.numeric", "gpuTensor", as.numeric.gpuTensor)
+}
