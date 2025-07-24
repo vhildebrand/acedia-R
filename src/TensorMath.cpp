@@ -124,8 +124,7 @@ SEXP tensor_log_unified(SEXP tensor_ptr) {
                 auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
                 if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
                 
-                // Make tensor contiguous if needed for proper memory layout
-                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                const gpuTensor<float>& input_tensor = tw->tensor();
 
                 // Input validation: log undefined for non-positive values
                 std::vector<float> host_data(input_tensor.size());
@@ -137,7 +136,14 @@ SEXP tensor_log_unified(SEXP tensor_ptr) {
                 }
                 
                 auto result_gpu = gpuTensor<float>(input_tensor.shape(), input_tensor.device());
-                tensor_log_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+
+                if (input_tensor.is_contiguous()) {
+                    tensor_log_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                } else {
+                    auto out_desc = result_gpu.descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_log_strided_float32(out_desc, in_desc);
+                }
                 
                 result_tensor = std::make_unique<TensorWrapper<float>>(
                     std::make_shared<gpuTensor<float>>(std::move(result_gpu))
@@ -148,8 +154,7 @@ SEXP tensor_log_unified(SEXP tensor_ptr) {
                 auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
                 if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
                 
-                // Make tensor contiguous if needed for proper memory layout
-                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                const gpuTensor<double>& input_tensor = tw->tensor();
 
                 // Input validation: log undefined for non-positive values
                 std::vector<double> host_data(input_tensor.size());
@@ -161,7 +166,14 @@ SEXP tensor_log_unified(SEXP tensor_ptr) {
                 }
                 
                 auto result_gpu = gpuTensor<double>(input_tensor.shape(), input_tensor.device());
-                tensor_log_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+
+                if (input_tensor.is_contiguous()) {
+                    tensor_log_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                } else {
+                    auto out_desc = result_gpu.descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_log_strided_float64(out_desc, in_desc);
+                }
                 
                 result_tensor = std::make_unique<TensorWrapper<double>>(
                     std::make_shared<gpuTensor<double>>(std::move(result_gpu))
@@ -201,8 +213,7 @@ SEXP tensor_sqrt_unified(SEXP tensor_ptr) {
                 auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
                 if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
                 
-                // Make tensor contiguous if needed for proper memory layout
-                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                const gpuTensor<float>& input_tensor = tw->tensor();
 
                 // Input validation: sqrt undefined for negative values
                 std::vector<float> host_data(input_tensor.size());
@@ -214,7 +225,14 @@ SEXP tensor_sqrt_unified(SEXP tensor_ptr) {
                 }
                 
                 auto result_gpu = gpuTensor<float>(input_tensor.shape(), input_tensor.device());
-                tensor_sqrt_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+
+                if (input_tensor.is_contiguous()) {
+                    tensor_sqrt_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                } else {
+                    auto out_desc = result_gpu.descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_sqrt_strided_float32(out_desc, in_desc);
+                }
                 
                 result_tensor = std::make_unique<TensorWrapper<float>>(
                     std::make_shared<gpuTensor<float>>(std::move(result_gpu))
@@ -225,8 +243,7 @@ SEXP tensor_sqrt_unified(SEXP tensor_ptr) {
                 auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
                 if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
                 
-                // Make tensor contiguous if needed for proper memory layout
-                auto input_tensor = tw->tensor().is_contiguous() ? tw->tensor() : tw->tensor().contiguous();
+                const gpuTensor<double>& input_tensor = tw->tensor();
 
                 // Input validation: sqrt undefined for negative values
                 std::vector<double> host_data(input_tensor.size());
@@ -238,7 +255,13 @@ SEXP tensor_sqrt_unified(SEXP tensor_ptr) {
                 }
                 
                 auto result_gpu = gpuTensor<double>(input_tensor.shape(), input_tensor.device());
-                tensor_sqrt_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                if (input_tensor.is_contiguous()) {
+                    tensor_sqrt_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                } else {
+                    auto out_desc = result_gpu.descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_sqrt_strided_float64(out_desc, in_desc);
+                }
                 
                 result_tensor = std::make_unique<TensorWrapper<double>>(
                     std::make_shared<gpuTensor<double>>(std::move(result_gpu))

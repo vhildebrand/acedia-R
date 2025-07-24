@@ -12,7 +12,7 @@ CUDA_LIB_PATH = $(CUDA_HOME)/lib64
 PKG_CPPFLAGS = -I$(R_HOME)/include -I$(CUDA_HOME)/include -Ikernels $(shell $(R_HOME)/bin/Rscript -e "Rcpp:::CxxFlags()") -D_FORTIFY_SOURCE=2 -fPIC
 
 # Linker flags  
-PKG_LIBS = -L$(R_HOME)/lib -lR -L$(CUDA_LIB_PATH) -lcudart $(shell $(R_HOME)/bin/Rscript -e "Rcpp:::LdFlags()")
+PKG_LIBS = -L$(R_HOME)/lib -lR -L$(CUDA_LIB_PATH) -lcudart -lcublas $(shell $(R_HOME)/bin/Rscript -e "Rcpp:::LdFlags()")
 
 # CUDA compiler and flags  
 NVCC = $(CUDA_HOME)/bin/nvcc

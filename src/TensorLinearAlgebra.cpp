@@ -2,6 +2,7 @@
 #include "gpuTensor.h"
 #include "TensorRegistry.h"
 #include "cuda_utils.h"
+#include <cublas_v2.h>
 #include <memory>
 
 using namespace Rcpp;
@@ -73,10 +74,37 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
                 }
+
+                // Ensure contiguity
+                auto a_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor()
+                                   : a_wrapper->tensor().contiguous();
+                auto b_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor()
+                                   : b_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<half>>(result_shape);
-                // Note: CUDA kernel expects row-major, but R uses column-major
-                tensor_matmul_float16(result->data(), b_wrapper->tensor().data(), 
-                                    a_wrapper->tensor().data(), N, M, K);
+
+                const float alpha_f = 1.0f;
+                const float beta_f  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasGemmEx(
+                    handle,
+                    CUBLAS_OP_N, CUBLAS_OP_N,                 // A * B directly
+                    static_cast<int>(M),                       // rows of C
+                    static_cast<int>(N),                       // cols of C
+                    static_cast<int>(K),                       // shared dim
+                    &alpha_f,
+                    a_contig.data(), CUDA_R_16F, static_cast<int>(M),
+                    b_contig.data(), CUDA_R_16F, static_cast<int>(K),
+                    &beta_f,
+                    result->data(), CUDA_R_16F, static_cast<int>(M),
+                    CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasGemmEx (float16) failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<half>>(result);
                 break;
             }
@@ -86,11 +114,35 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
                 }
+                // Ensure inputs are contiguous (safety)
+                auto a_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor()
+                                   : a_wrapper->tensor().contiguous();
+                auto b_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor()
+                                   : b_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<float>>(result_shape);
-                // Note: CUDA kernel expects row-major, but R uses column-major
-                // So we compute B^T * A^T = (A * B)^T, then the result is already transposed to R's column-major  
-                tensor_matmul_float32(result->data(), b_wrapper->tensor().data(), 
-                                    a_wrapper->tensor().data(), N, M, K);
+
+                // cuBLAS GEMM: use trick (B^T * A^T) to treat our row-major data
+                const float alpha = 1.0f;
+                const float beta  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasSgemm(
+                    handle,
+                    CUBLAS_OP_N, CUBLAS_OP_N,                 // A * B directly
+                    static_cast<int>(M),                       // rows of C (M x N result)
+                    static_cast<int>(N),                       // cols of C
+                    static_cast<int>(K),                       // shared dim
+                    &alpha,
+                    a_contig.data(), static_cast<int>(M),      // A pointer & leading dim (rows of A)
+                    b_contig.data(), static_cast<int>(K),      // B pointer & leading dim (rows of B)
+                    &beta,
+                    result->data(), static_cast<int>(M));      // C pointer & leading dim
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasSgemm failed");
+                }
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
@@ -100,10 +152,34 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
                 }
+                // Ensure inputs are contiguous (safety)
+                auto a_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor()
+                                   : a_wrapper->tensor().contiguous();
+                auto b_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor()
+                                   : b_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<double>>(result_shape);
-                // Note: CUDA kernel expects row-major, but R uses column-major
-                tensor_matmul_float64(result->data(), b_wrapper->tensor().data(), 
-                                    a_wrapper->tensor().data(), N, M, K);
+
+                const double alpha = 1.0;
+                const double beta  = 0.0;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasDgemm(
+                    handle,
+                    CUBLAS_OP_N, CUBLAS_OP_N,
+                    static_cast<int>(M),
+                    static_cast<int>(N),
+                    static_cast<int>(K),
+                    &alpha,
+                    a_contig.data(), static_cast<int>(M),
+                    b_contig.data(), static_cast<int>(K),
+                    &beta,
+                    result->data(), static_cast<int>(M));
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasDgemm failed");
+                }
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }
@@ -162,13 +238,34 @@ SEXP tensor_outer_product_unified(SEXP a_ptr, SEXP b_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto a_contiguous = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
-                auto b_contiguous = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
-                
+                auto a_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
+                auto b_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<half>>(result_shape);
-                tensor_outer_product_float16(result->data(), a_contiguous.data(), 
-                                           b_contiguous.data(), M, N);
+
+                const float alpha_f = 1.0f;
+                const float beta_f  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                // Use GEMMEx with K=1 (rank-1 outer product)
+                cublasStatus_t stat = cublasGemmEx(
+                    handle,
+                    CUBLAS_OP_N, CUBLAS_OP_T,             // a (M x 1) * b^T (1 x N)
+                    static_cast<int>(M),
+                    static_cast<int>(N),
+                    1,
+                    &alpha_f,
+                    a_contig.data(), CUDA_R_16F, static_cast<int>(M),
+                    b_contig.data(), CUDA_R_16F, static_cast<int>(N),
+                    &beta_f,
+                    result->data(), CUDA_R_16F, static_cast<int>(M),
+                    CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasGemmEx (outer product float16) failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<half>>(result);
                 break;
             }
@@ -179,13 +276,31 @@ SEXP tensor_outer_product_unified(SEXP a_ptr, SEXP b_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto a_contiguous = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
-                auto b_contiguous = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
-                
+                // Ensure contiguity
+                auto a_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
+                auto b_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<float>>(result_shape);
-                tensor_outer_product_float32(result->data(), a_contiguous.data(), 
-                                            b_contiguous.data(), M, N);
+
+                // Initialize result to zero
+                cudaMemset(result->data(), 0, sizeof(float)*M*N);
+
+                const float alpha = 1.0f;
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasSger(
+                    handle,
+                    static_cast<int>(M),   // rows
+                    static_cast<int>(N),   // cols
+                    &alpha,
+                    a_contig.data(), 1,    // x
+                    b_contig.data(), 1,    // y
+                    result->data(), static_cast<int>(M)); // A
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasSger failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
@@ -196,13 +311,28 @@ SEXP tensor_outer_product_unified(SEXP a_ptr, SEXP b_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto a_contiguous = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
-                auto b_contiguous = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
-                
+                auto a_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
+                auto b_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<double>>(result_shape);
-                tensor_outer_product_float64(result->data(), a_contiguous.data(), 
-                                           b_contiguous.data(), M, N);
+                cudaMemset(result->data(), 0, sizeof(double)*M*N);
+
+                const double alpha = 1.0;
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasDger(
+                    handle,
+                    static_cast<int>(M),
+                    static_cast<int>(N),
+                    &alpha,
+                    a_contig.data(), 1,
+                    b_contig.data(), 1,
+                    result->data(), static_cast<int>(M));
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasDger failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }
@@ -260,7 +390,7 @@ SEXP tensor_matvec_unified(SEXP A_ptr, SEXP v_ptr) {
             stop("Cannot multiply matrix and vector with different dtypes");
         }
         
-        Shape result_shape({M});  // Result is M-length vector
+        Shape result_shape({M, 1});  // Result is M×1 matrix (like R)
         std::unique_ptr<TensorBase> result_tensor;
         
         switch (dtype_A) {
@@ -271,13 +401,32 @@ SEXP tensor_matvec_unified(SEXP A_ptr, SEXP v_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto A_contiguous = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
-                auto v_contiguous = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
-                
+                auto A_contig = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
+                auto v_contig = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<half>>(result_shape);
-                tensor_matvec_float16(result->data(), A_contiguous.data(), 
-                                    v_contiguous.data(), M, N);
+
+                const float alpha_f = 1.0f;
+                const float beta_f  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                // Use GEMMEx with vector as 1xN matrix (transpose trick)
+                cublasStatus_t stat = cublasGemmEx(
+                    handle,
+                    CUBLAS_OP_T, CUBLAS_OP_T,
+                    1, static_cast<int>(M), static_cast<int>(N),
+                    &alpha_f,
+                    v_contig.data(), CUDA_R_16F, 1,
+                    A_contig.data(), CUDA_R_16F, static_cast<int>(M),
+                    &beta_f,
+                    result->data(), CUDA_R_16F, 1,
+                    CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasGemmEx (matvec float16) failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<half>>(result);
                 break;
             }
@@ -288,13 +437,32 @@ SEXP tensor_matvec_unified(SEXP A_ptr, SEXP v_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto A_contiguous = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
-                auto v_contiguous = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
-                
+                auto A_contig = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
+                auto v_contig = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<float>>(result_shape);
-                tensor_matvec_float32(result->data(), A_contiguous.data(), 
-                                    v_contiguous.data(), M, N);
+
+                const float alpha = 1.0f;
+                const float beta  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                // Use GEMV with transpose trick
+                cublasStatus_t stat = cublasSgemv(
+                    handle,
+                    CUBLAS_OP_N,                              // no transpose for column-major
+                    static_cast<int>(M),                       // rows of A (M)
+                    static_cast<int>(N),                       // cols of A (N)
+                    &alpha,
+                    A_contig.data(), static_cast<int>(M),      // lda (leading dimension = rows)
+                    v_contig.data(), 1,
+                    &beta,
+                    result->data(), 1);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasSgemv failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
@@ -305,13 +473,31 @@ SEXP tensor_matvec_unified(SEXP A_ptr, SEXP v_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto A_contiguous = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
-                auto v_contiguous = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
-                
+                auto A_contig = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
+                auto v_contig = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<double>>(result_shape);
-                tensor_matvec_float64(result->data(), A_contiguous.data(), 
-                                    v_contiguous.data(), M, N);
+
+                const double alpha = 1.0;
+                const double beta  = 0.0;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasDgemv(
+                    handle,
+                    CUBLAS_OP_N,
+                    static_cast<int>(M),
+                    static_cast<int>(N),
+                    &alpha,
+                    A_contig.data(), static_cast<int>(M),
+                    v_contig.data(), 1,
+                    &beta,
+                    result->data(), 1);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasDgemv failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }
@@ -369,7 +555,7 @@ SEXP tensor_vecmat_unified(SEXP v_ptr, SEXP A_ptr) {
             stop("Cannot multiply vector and matrix with different dtypes");
         }
         
-        Shape result_shape({N});  // Result is N-length vector
+        Shape result_shape({1, N});  // Result is 1×N matrix (like R)
         std::unique_ptr<TensorBase> result_tensor;
         
         switch (dtype_v) {
@@ -380,13 +566,32 @@ SEXP tensor_vecmat_unified(SEXP v_ptr, SEXP A_ptr) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
                 }
                 
-                // Ensure both tensors are contiguous before kernel launch
-                auto v_contiguous = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
-                auto A_contiguous = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
-                
+                auto v_contig = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
+                auto A_contig = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<half>>(result_shape);
-                tensor_vecmat_float16(result->data(), v_contiguous.data(), 
-                                    A_contiguous.data(), M, N);
+
+                const float alpha_f = 1.0f;
+                const float beta_f  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                // Treat v as 1xM, A as MxN: use GEMMEx
+                cublasStatus_t stat = cublasGemmEx(
+                    handle,
+                    CUBLAS_OP_N, CUBLAS_OP_N,
+                    static_cast<int>(N), 1, static_cast<int>(M),
+                    &alpha_f,
+                    A_contig.data(), CUDA_R_16F, static_cast<int>(N), // row-major mem but OP_N, dims N x M? but we follow pattern
+                    v_contig.data(), CUDA_R_16F, static_cast<int>(M),
+                    &beta_f,
+                    result->data(), CUDA_R_16F, static_cast<int>(N),
+                    CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasGemmEx (vecmat float16) failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<half>>(result);
                 break;
             }
@@ -396,14 +601,32 @@ SEXP tensor_vecmat_unified(SEXP v_ptr, SEXP A_ptr) {
                 if (!v_wrapper || !A_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
                 }
-                
-                // Ensure both tensors are contiguous before kernel launch
-                auto v_contiguous = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
-                auto A_contiguous = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
-                
+
+                auto v_contig = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
+                auto A_contig = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<float>>(result_shape);
-                tensor_vecmat_float32(result->data(), v_contiguous.data(), 
-                                    A_contiguous.data(), M, N);
+
+                const float alpha = 1.0f;
+                const float beta  = 0.0f;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasSgemv(
+                    handle,
+                    CUBLAS_OP_T,
+                    static_cast<int>(M),
+                    static_cast<int>(N),
+                    &alpha,
+                    A_contig.data(), static_cast<int>(M),
+                    v_contig.data(), 1,
+                    &beta,
+                    result->data(), 1);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasSgemv (vecmat) failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
@@ -413,14 +636,32 @@ SEXP tensor_vecmat_unified(SEXP v_ptr, SEXP A_ptr) {
                 if (!v_wrapper || !A_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
                 }
-                
-                // Ensure both tensors are contiguous before kernel launch
-                auto v_contiguous = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
-                auto A_contiguous = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
-                
+
+                auto v_contig = v_wrapper->tensor().is_contiguous() ? v_wrapper->tensor() : v_wrapper->tensor().contiguous();
+                auto A_contig = A_wrapper->tensor().is_contiguous() ? A_wrapper->tensor() : A_wrapper->tensor().contiguous();
+
                 auto result = std::make_shared<gpuTensor<double>>(result_shape);
-                tensor_vecmat_float64(result->data(), v_contiguous.data(), 
-                                    A_contiguous.data(), M, N);
+
+                const double alpha = 1.0;
+                const double beta  = 0.0;
+
+                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+
+                cublasStatus_t stat = cublasDgemv(
+                    handle,
+                    CUBLAS_OP_T,
+                    static_cast<int>(M),
+                    static_cast<int>(N),
+                    &alpha,
+                    A_contig.data(), static_cast<int>(M),
+                    v_contig.data(), 1,
+                    &beta,
+                    result->data(), 1);
+
+                if (stat != CUBLAS_STATUS_SUCCESS) {
+                    throw std::runtime_error("cublasDgemv (vecmat) failed");
+                }
+
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }

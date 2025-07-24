@@ -155,6 +155,33 @@ struct TensorDescriptor {
     }
 };
 
+// --------------------------------------------------------------
+// Lazy global cuBLAS handle (thread-safe since C++11 static init)
+// --------------------------------------------------------------
+
+inline cublasHandle_t get_cublas_handle() {
+    static cublasHandle_t handle = nullptr;
+    static bool initialised = false;
+    if (!initialised) {
+        cublasStatus_t stat = cublasCreate(&handle);
+        if (stat != CUBLAS_STATUS_SUCCESS) {
+            throw std::runtime_error("Failed to create cuBLAS handle");
+        }
+        initialised = true;
+    }
+    return handle;
+}
+
+// Convenience: set stream for the global handle and return it
+inline cublasHandle_t get_cublas_handle(cudaStream_t stream) {
+    auto handle = get_cublas_handle();
+    cublasStatus_t stat = cublasSetStream(handle, stream);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("Failed to set cuBLAS stream");
+    }
+    return handle;
+}
+
 } // namespace cuda_utils
 
 #endif // CUDA_UTILS_H 
