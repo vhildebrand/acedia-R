@@ -6,7 +6,7 @@
     GNU Fortran (Ubuntu 13.2.0-23ubuntu3) 13.2.0
 * running under: Ubuntu 24.04.2 LTS
 * using session charset: UTF-8
-* using options ‘--no-manual --no-build-vignettes’
+* using option ‘--no-manual’
 * checking for file ‘./DESCRIPTION’ ... OK
 * checking extension type ... Package
 * this is package ‘acediaR’ version ‘0.0.0.9000’
@@ -15,14 +15,18 @@
 * checking package dependencies ... OK
 * checking if this is a source package ... WARNING
 Subdirectory ‘acediaR/src’ contains apparent object files/libraries
-  RcppExports.o RcppInterface.o UnifiedTensorInterface.o acediaR.so
-  tensor_ops_templated.o tensor_ops_templated_DEPRECATED.o
+  RcppExports.o RcppInterface.o TensorActivation.o TensorArithmetic.o
+  TensorComparison.o TensorCreation.o TensorDataAccess.o
+  TensorLinearAlgebra.o TensorMath.o TensorMutation.o TensorReduction.o
+  TensorShape.o UnifiedTensorInterface.o acediaR.so
+  tensor_ops_templated_DEPRECATED.o
 Object files/libraries should not be included in a source package.
 
 In addition to the above warning(s), found the following notes:
 
 Found the following apparent object files/libraries:
-  src/kernels/tensor_wrappers.o
+  src/kernels/tensor_kernels.o src/kernels/tensor_ops.o
+  src/kernels/tensor_slice_update.o src/kernels/tensor_wrappers.o
 Object files/libraries should not be included in a source package.
 * checking if there is a namespace ... OK
 * checking for executable files ... OK
@@ -44,9 +48,9 @@ Found the following significant warnings:
 See ‘/home/alekseim/Documents/gauntlet/acediaR/..Rcheck/00install.out’ for details.
 * used C++ compiler: ‘g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0’
 * checking installed package size ... NOTE
-  installed size is  5.5Mb
+  installed size is 21.0Mb
   sub-directories of 1Mb or more:
-    libs   5.3Mb
+    libs  20.7Mb
 * checking package directory ... OK
 * checking DESCRIPTION meta-information ... NOTE
 Checking should be performed on sources prepared by ‘R CMD build’.
@@ -66,13 +70,12 @@ Most likely, these were included erroneously.
 * checking whether the namespace can be unloaded cleanly ... OK
 * checking loading without being on the library search path ... OK
 * checking startup messages can be suppressed ... OK
-* checking dependencies in R code ... WARNING
-'::' or ':::' import not declared from: ‘abind’
+* checking dependencies in R code ... OK
 * checking S3 generic/method consistency ... WARNING
-as.array:
-  function(x, ...)
-as.array.gpuTensor:
+dtype:
   function(tensor)
+dtype.gpuTensor:
+  function(x)
 See section ‘Generic functions and methods’ in the ‘Writing R
 Extensions’ manual.
 * checking replacement functions ... OK
@@ -96,36 +99,31 @@ prepare_Rd: acediaR.Rd:17: unknown macro '\item'
 * checking Rd cross-references ... OK
 * checking for missing documentation entries ... WARNING
 Undocumented code objects:
-  ‘*.gpuTensor’ ‘+.gpuTensor’ ‘-.gpuTensor’ ‘/.gpuTensor’
-  ‘as.vector.gpuTensor’ ‘concat’ ‘create_empty_tensor_unified’
-  ‘create_tensor_unified’ ‘exp.gpuTensor’ ‘gpu_available’ ‘gpu_info’
-  ‘gpu_memory_available’ ‘log.gpuTensor’ ‘max.gpuTensor’
-  ‘mean.gpuTensor’ ‘min.gpuTensor’ ‘pad’ ‘permute’ ‘repeat_tensor’
-  ‘reshape’ ‘sqrt.gpuTensor’ ‘stack’ ‘tensor_add_unified’
-  ‘tensor_div_unified’ ‘tensor_dtype_unified’ ‘tensor_exp_unified’
-  ‘tensor_info_unified’ ‘tensor_is_contiguous_unified’
-  ‘tensor_log_unified’ ‘tensor_matmul_unified’ ‘tensor_max_unified’
-  ‘tensor_mean_unified’ ‘tensor_min_unified’ ‘tensor_mul_unified’
-  ‘tensor_permute_unified’ ‘tensor_reshape_unified’
-  ‘tensor_scalar_add_unified’ ‘tensor_scalar_mul_unified’
-  ‘tensor_shape_unified’ ‘tensor_size_unified’ ‘tensor_slice_extract’
-  ‘tensor_sqrt_unified’ ‘tensor_sub_unified’ ‘tensor_sum_unified’
-  ‘tensor_synchronize_unified’ ‘tensor_to_dtype_unified’
-  ‘tensor_to_r_unified’ ‘tensor_transpose_unified’
-  ‘tensor_view_unified’ ‘transpose’
+  ‘shape.gpuTensor’ ‘size.gpuTensor’ ‘to_numeric’
 All user-level objects in a package should have documentation entries.
 See chapter ‘Writing R documentation files’ in the ‘Writing R
 Extensions’ manual.
 * checking for code/documentation mismatches ... OK
 * checking Rd \usage sections ... WARNING
+Undocumented arguments in documentation object 'as.array.gpuTensor'
+  ‘x’ ‘...’
+Documented arguments not in \usage in documentation object 'as.array.gpuTensor':
+  ‘tensor’
+
 Undocumented arguments in documentation object 'contiguous'
   ‘tensor’
 
 Undocumented arguments in documentation object 'dim.gpuTensor'
   ‘x’
 
+Undocumented arguments in documentation object '<.gpuTensor'
+  ‘a’ ‘b’
+
 Undocumented arguments in documentation object '[.gpuTensor'
   ‘x’ ‘...’ ‘drop’
+
+Undocumented arguments in documentation object '[<-.gpuTensor'
+  ‘x’ ‘...’ ‘value’
 
 Undocumented arguments in documentation object 'sum.gpuTensor'
   ‘...’
@@ -136,13 +134,7 @@ The \usage entries must correspond to syntactically valid R code.
 See chapter ‘Writing R documentation files’ in the ‘Writing R
 Extensions’ manual.
 * checking Rd contents ... OK
-* checking for unstated dependencies in examples ... ERROR
-Warning: parse error in file 'lines':
-5: unexpected symbol
-186: 
-187: Get GPU
-         ^
-** will not attempt to run examples
+* checking for unstated dependencies in examples ... OK
 * checking LazyData ... NOTE
   'LazyData' is specified without a 'data' directory
 * checking line endings in C/C++/Fortran sources/headers ... NOTE
@@ -151,8 +143,17 @@ Found the following sources/headers not terminated with a newline:
   src/ComputationGraph.h
   src/GraphCompiler.h
   src/RcppInterface.cpp
+  src/TensorActivation.cpp
+  src/TensorArithmetic.cpp
+  src/TensorComparison.cpp
+  src/TensorCreation.cpp
+  src/TensorDataAccess.cpp
+  src/TensorLinearAlgebra.cpp
+  src/TensorMath.cpp
+  src/TensorMutation.cpp
+  src/TensorReduction.cpp
   src/TensorRegistry.h
-  src/UnifiedTensorInterface.cpp
+  src/TensorShape.cpp
   src/cuda_utils.h
   src/gpuTensor.h
 Some compilers warn on such files.
@@ -171,38 +172,38 @@ $(wildcard), ifeq ... endif, .NOTPARALLEL See section ‘Writing portable
 packages’ in the ‘Writing R Extensions’ manual.
 * checking for portable use of $(BLAS_LIBS) and $(LAPACK_LIBS) ... OK
 * checking use of PKG_*FLAGS in Makefiles ... OK
-* checking compiled code ... WARNING
+* checking compiled code ... NOTE
 File ‘acediaR/libs/acediaR.so’:
   Found ‘__printf_chk’, possibly from ‘printf’ (C)
-    Object: ‘kernels/tensor_wrappers.o’
-  Found ‘exit’, possibly from ‘exit’ (C)
-    Object: ‘kernels/tensor_wrappers.o’
+    Object: ‘kernels/tensor_ops.o’
+  Found ‘puts’, possibly from ‘printf’ (C), ‘puts’ (C)
+    Object: ‘kernels/tensor_ops.o’
 
 Compiled code should not call entry points which might terminate R nor
 write to stdout/stderr instead of to the console, nor use Fortran I/O
 nor system RNGs nor [v]sprintf.
 
 See ‘Writing portable packages’ in the ‘Writing R Extensions’ manual.
-* checking examples ... SKIPPED
+* checking examples ... OK
 * checking for unstated dependencies in ‘tests’ ... OK
 * checking tests ... ERROR
   Running ‘testthat.R’
 Running the tests in ‘tests/testthat.R’ failed.
 Last 13 lines of output:
+  22/24 mismatches (average diff: 13.5)
+  [2]   4 - 14 == -10
+  [3]   6 - 26 == -20
+  [4]   8 - 38 == -30
+  [5]  10 -  4 ==   6
+  [6]  12 - 16 ==  -4
+  [7]  14 - 28 == -14
+  [8]  16 - 40 == -24
+  [9]  18 -  6 ==  12
+  [10] 20 - 18 ==   2
+  ...
   
-  Attaching package: 'acediaR'
-  
-  The following object is masked from 'package:stats':
-  
-      reshape
-  
-  The following object is masked from 'package:utils':
-  
-      stack
-  
-  > 
-  > test_check("acediaR") 
-  
-  === Testing vector size: 1e+05 ===
+  [ FAIL 3 | WARN 0 | SKIP 0 | PASS 355 ]
+  Error: Test failures
+  Execution halted
 * DONE
-Status: 2 ERRORs, 11 WARNINGs, 7 NOTEs
+Status: 1 ERROR, 9 WARNINGs, 8 NOTEs

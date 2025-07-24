@@ -8,3 +8,5 @@
 *.so
 *.tar.gz
 *.rds
+*.rdx
+*.rdb

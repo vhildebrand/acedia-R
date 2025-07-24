@@ -7,6 +7,45 @@
 #include <unordered_map>
 #include <functional>
 
+// Forward declarations of CUDA kernels (see tensor_ops.cu)
+extern "C" {
+    // Element-wise add
+    void tensor_add_float16(half* result, const half* a, const half* b, size_t n);
+    void tensor_add_float32(float* result, const float* a, const float* b, size_t n);
+    void tensor_add_float64(double* result, const double* a, const double* b, size_t n);
+    void tensor_add_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    // Element-wise multiply
+    void tensor_mul_float16(half* result, const half* a, const half* b, size_t n);
+    void tensor_mul_float32(float* result, const float* a, const float* b, size_t n);
+    void tensor_mul_float64(double* result, const double* a, const double* b, size_t n);
+    void tensor_mul_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    // Scalar multiply
+    void tensor_scalar_mul_float16(half* result, const half* input, float scalar, size_t n);
+    void tensor_scalar_mul_float32(float* result, const float* input, float scalar, size_t n);
+    void tensor_scalar_mul_float64(double* result, const double* input, double scalar, size_t n);
+    // Matrix multiply
+    void tensor_matmul_float16(half* C, const half* A, const half* B, size_t M, size_t N, size_t K);
+    void tensor_matmul_float32(float* C, const float* A, const float* B, size_t M, size_t N, size_t K);
+    void tensor_matmul_float64(double* C, const double* A, const double* B, size_t M, size_t N, size_t K);
+    // Reductions
+    float  tensor_sum_float16(const half* input, size_t n);
+    float  tensor_sum_float32(const float* input, size_t n);
+    double tensor_sum_float64(const double* input, size_t n);
+}
+
+// Helper for static_assert false in templated context
+template<typename> struct always_false : std::false_type {};
+
 /**
  * @brief Type-erased base class for tensors
  */
@@ -140,39 +179,147 @@ public:
         tensor_->copy_from_host(static_cast<const T*>(host_ptr));
     }
     
-    // Operations (to be implemented with templated kernels)
+    // Operations (previously TODO) – now implemented with CUDA kernels
     std::unique_ptr<TensorBase> add(const TensorBase& other) const override {
-        // Check if other is the same type
-        if (other.dtype() == tensor_->dtype()) {
-            const TensorWrapper<T>* other_wrapper = dynamic_cast<const TensorWrapper<T>*>(&other);
-            if (other_wrapper) {
-                // TODO: Implement templated addition
-                throw std::runtime_error("Templated tensor addition not yet implemented");
-            }
+        // Ensure same dtype for now (type-promotion handled elsewhere)
+        if (other.dtype() != tensor_->dtype()) {
+            throw std::runtime_error("add: dtype mismatch – promotion not yet implemented");
         }
-        
-        // Type promotion case
-        throw std::runtime_error("Mixed-type tensor operations not yet implemented");
+        const auto* other_wrap = dynamic_cast<const TensorWrapper<T>*>(&other);
+        if (!other_wrap) {
+            throw std::runtime_error("add: dynamic_cast failed");
+        }
+        if (tensor_->shape() != other_wrap->tensor().shape()) {
+            throw std::runtime_error("add: shape mismatch");
+        }
+        // Ensure contiguous fast path or strided for non-contiguous (float32/64)
+        bool a_contig_flag = tensor_->is_contiguous();
+        bool b_contig_flag = other_wrap->tensor().is_contiguous();
+
+        auto result = std::make_shared<gpuTensor<T>>(tensor_->shape());
+
+        if constexpr (std::is_same_v<T, float>) {
+            if (a_contig_flag && b_contig_flag) {
+                tensor_add_float32(result->data(), tensor_->data(), other_wrap->tensor().data(), result->size());
+            } else {
+                tensor_add_strided_float32(result->descriptor(), tensor_->descriptor(), other_wrap->tensor().descriptor());
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (a_contig_flag && b_contig_flag) {
+                tensor_add_float64(result->data(), tensor_->data(), other_wrap->tensor().data(), result->size());
+            } else {
+                tensor_add_strided_float64(result->descriptor(), tensor_->descriptor(), other_wrap->tensor().descriptor());
+            }
+        } else if constexpr (std::is_same_v<T, half>) {
+            // No strided kernel yet – fall back to contiguous copy path
+            gpuTensor<T> a_contig = a_contig_flag ? *tensor_ : tensor_->contiguous();
+            gpuTensor<T> b_contig = b_contig_flag ? other_wrap->tensor() : other_wrap->tensor().contiguous();
+            tensor_add_float16(result->data(), a_contig.data(), b_contig.data(), result->size());
+        } else {
+            throw std::runtime_error("add not implemented for this type");
+        }
+        return std::make_unique<TensorWrapper<T>>(result);
     }
-    
+
     std::unique_ptr<TensorBase> mul(const TensorBase& other) const override {
-        // Similar to add, but for multiplication
-        throw std::runtime_error("Templated tensor multiplication not yet implemented");
+        if (other.dtype() != tensor_->dtype()) {
+            throw std::runtime_error("mul: dtype mismatch – promotion not yet implemented");
+        }
+        const auto* other_wrap = dynamic_cast<const TensorWrapper<T>*>(&other);
+        if (!other_wrap) {
+            throw std::runtime_error("mul: dynamic_cast failed");
+        }
+        if (tensor_->shape() != other_wrap->tensor().shape()) {
+            throw std::runtime_error("mul: shape mismatch");
+        }
+        bool a_contig_flag = tensor_->is_contiguous();
+        bool b_contig_flag = other_wrap->tensor().is_contiguous();
+
+        auto result = std::make_shared<gpuTensor<T>>(tensor_->shape());
+
+        if constexpr (std::is_same_v<T, float>) {
+            if (a_contig_flag && b_contig_flag) {
+                tensor_mul_float32(result->data(), tensor_->data(), other_wrap->tensor().data(), result->size());
+            } else {
+                tensor_mul_strided_float32(result->descriptor(), tensor_->descriptor(), other_wrap->tensor().descriptor());
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (a_contig_flag && b_contig_flag) {
+                tensor_mul_float64(result->data(), tensor_->data(), other_wrap->tensor().data(), result->size());
+            } else {
+                tensor_mul_strided_float64(result->descriptor(), tensor_->descriptor(), other_wrap->tensor().descriptor());
+            }
+        } else if constexpr (std::is_same_v<T, half>) {
+            gpuTensor<T> a_contig = a_contig_flag ? *tensor_ : tensor_->contiguous();
+            gpuTensor<T> b_contig = b_contig_flag ? other_wrap->tensor() : other_wrap->tensor().contiguous();
+            tensor_mul_float16(result->data(), a_contig.data(), b_contig.data(), result->size());
+        } else {
+            throw std::runtime_error("mul not implemented for this type");
+        }
+        return std::make_unique<TensorWrapper<T>>(result);
     }
-    
+
     std::unique_ptr<TensorBase> scalar_mul(double scalar) const override {
-        // TODO: Implement templated scalar multiplication
-        throw std::runtime_error("Templated scalar multiplication not yet implemented");
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        auto result = std::make_shared<gpuTensor<T>>(tensor_->shape());
+        if constexpr (std::is_same_v<T, float>) {
+            tensor_scalar_mul_float32(result->data(), a_contig.data(), static_cast<float>(scalar), result->size());
+        } else if constexpr (std::is_same_v<T, double>) {
+            tensor_scalar_mul_float64(result->data(), a_contig.data(), scalar, result->size());
+        } else if constexpr (std::is_same_v<T, half>) {
+            tensor_scalar_mul_float16(result->data(), a_contig.data(), static_cast<float>(scalar), result->size());
+        } else {
+            throw std::runtime_error("scalar_mul not implemented for this type");
+        }
+        return std::make_unique<TensorWrapper<T>>(result);
     }
-    
+
     std::unique_ptr<TensorBase> matmul(const TensorBase& other) const override {
-        // TODO: Implement templated matrix multiplication
-        throw std::runtime_error("Templated matrix multiplication not yet implemented");
+        if (other.dtype() != tensor_->dtype()) {
+            throw std::runtime_error("matmul: dtype mismatch – promotion not yet implemented");
+        }
+        const auto* other_wrap = dynamic_cast<const TensorWrapper<T>*>(&other);
+        if (!other_wrap) {
+            throw std::runtime_error("matmul: dynamic_cast failed");
+        }
+        // Expect 2-D matrices with matching inner dim
+        if (tensor_->ndims() != 2 || other_wrap->tensor().ndims() != 2) {
+            throw std::runtime_error("matmul: requires 2-D tensors");
+        }
+        size_t M = tensor_->shape()[0];
+        size_t K = tensor_->shape()[1];
+        size_t K2 = other_wrap->tensor().shape()[0];
+        size_t N = other_wrap->tensor().shape()[1];
+        if (K != K2) {
+            throw std::runtime_error("matmul: inner dimensions do not match");
+        }
+        gpuTensor<T> A = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        gpuTensor<T> B = other_wrap->tensor().is_contiguous() ? other_wrap->tensor() : other_wrap->tensor().contiguous();
+        Shape result_shape({M, N});
+        auto result = std::make_shared<gpuTensor<T>>(result_shape);
+        if constexpr (std::is_same_v<T, float>) {
+            tensor_matmul_float32(result->data(), A.data(), B.data(), M, N, K);
+        } else if constexpr (std::is_same_v<T, double>) {
+            tensor_matmul_float64(result->data(), A.data(), B.data(), M, N, K);
+        } else if constexpr (std::is_same_v<T, half>) {
+            tensor_matmul_float16(result->data(), A.data(), B.data(), M, N, K);
+        } else {
+            throw std::runtime_error("matmul not implemented for this type");
+        }
+        return std::make_unique<TensorWrapper<T>>(result);
     }
-    
+
     double sum() const override {
-        // TODO: Implement templated sum reduction
-        throw std::runtime_error("Templated sum reduction not yet implemented");
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        if constexpr (std::is_same_v<T, float>) {
+            return static_cast<double>(tensor_sum_float32(a_contig.data(), a_contig.size()));
+        } else if constexpr (std::is_same_v<T, double>) {
+            return tensor_sum_float64(a_contig.data(), a_contig.size());
+        } else if constexpr (std::is_same_v<T, half>) {
+            return static_cast<double>(tensor_sum_float16(a_contig.data(), a_contig.size()));
+        } else {
+            throw std::runtime_error("sum not implemented for this type");
+        }
     }
     
     std::unique_ptr<TensorBase> clone() const override {

@@ -1,0 +1,63 @@
+      2   test_data <- create_noncontiguous_test()
+      1   # Transpose test (2D only)
+      1 test_with_artificial_noncontiguous <- function() {
+      1 test_with_artificial_noncontiguous()
+      1 test_view_operations <- function() {
+      1 test_view_operations()
+      1 test_vecmat_noncontiguous <- function() {
+      1 test_vecmat_noncontiguous()
+      1 test_that("unsupported dtype errors are raised", {
+      1 test_that("Transpose view operations work on GPU", {
+      1 test_that("Softmax GPU runtime reasonable", {
+      1 test_that("Softmax and Argmax work correctly on GPU", {
+      1 test_that("Slice mutation with different slice patterns (GPU verified)", {
+      1 test_that("Slice mutation updates parent tensor in-place (GPU verified)", {
+      1 test_that("repeat_tensor and pad work", {
+      1 test_that("prod and var reductions correct", {
+      1 test_that("Permute view operations work on GPU", {
+      1 test_that("Mixed operations maintain precision and performance", {
+      1 test_that("Memory usage and scaling verification", {
+      1 test_that("Memory bandwidth utilization indicates parallel execution", {
+      1 test_that("Matrix operations maintain GPU execution", {
+      1 test_that("High-rank broadcasting works on GPU", {
+      1 test_that("GPU tensor operations use parallel CUDA kernels", {
+      1 test_that("GPU tensor operations scale with parallel execution", {
+      1 test_that("GPU operations actually run on GPU with parallel execution", {
+      1 test_that("GPU memory operations are efficient", {
+      1 test_that("GPU implementation is appreciably faster than CPU for large vectors", {
+      1 test_that("GPU error handling and fallback work correctly", {
+      1 test_that("Error handling and edge cases", {
+      1 test_that("Enhanced GPU performance benchmarks with verification", {
+      1 test_that("CUDA kernel launches are actually parallel", {
+      1 test_that("Concat and Stack produce correct results", {
+      1 test_that("Comprehensive tensor operations test suite", {
+      1 test_that("Comprehensive GPU vs CPU runtime comparison", {
+      1 test_that("Complex GPU operation chains maintain GPU execution", {
+      1 test_that("Comparison operators match CPU", {
+      1 test_that("Broadcasting error detection works", {
+      1 test_that("All operations confirmed to use CUDA kernels", {
+      1 test_tensor_info <- function() {
+      1 test_tensor_info()
+      1   test_sizes <- c(1e5, 5e5, 1e6, 2e6)
+      1   test_sizes <- c(1e3, 5e3, 1e4, 5e4, 1e5, 5e5, 1e6)
+      1 test_permute_views <- function() {
+      1 test_permute_views()
+      1 test_performance_impact <- function() {
+      1 test_performance_impact()
+      1 test_outer_product_noncontiguous <- function() {
+      1 test_outer_product_noncontiguous()
+      1 test_memory_efficiency <- function() {
+      1 test_memory_efficiency()
+      1 test_matvec_noncontiguous <- function() {
+      1 test_matvec_noncontiguous()
+      1 test_efficient_transpose <- function() {
+      1 test_efficient_transpose()
+      1   test_data <- runif(100, -5, 5)
+      1 test_contiguity_handling <- function() {
+      1 test_contiguity_handling()
+      1   test_cases <- list(
+      1   sizes_to_test <- list(
+      1   shapes_to_test <- list(c(24), c(6, 4), c(3, 8), c(2, 3, 4))
+      1 create_noncontiguous_test <- function() {
+      1       cat("Operation '", op, "': CPU faster across all test sizes (transfer overhead)\n", sep="")
+      1     cat("\n", name, " test (", format(n, scientific=TRUE), " elements):\n", sep="")

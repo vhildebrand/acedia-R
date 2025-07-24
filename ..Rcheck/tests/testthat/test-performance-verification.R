@@ -24,7 +24,7 @@ test_that("Comprehensive GPU vs CPU runtime comparison", {
     
     # === MULTIPLICATION BENCHMARK ===
     cpu_mult_times <- replicate(3, system.time(a * b)[["elapsed"]])
-    cpu_mult_time <- median(cpu_mult_times)
+    cpu_mult_time <- max(median(cpu_mult_times), 1e-6)  # Minimum measurable time
     
     gpu_mult_times <- replicate(3, system.time(gpu_multiply(a, b, warn_fallback = FALSE))[["elapsed"]])
     gpu_mult_time <- median(gpu_mult_times)
@@ -34,7 +34,7 @@ test_that("Comprehensive GPU vs CPU runtime comparison", {
     
     # === ADDITION BENCHMARK ===  
     cpu_add_times <- replicate(3, system.time(a + b)[["elapsed"]])
-    cpu_add_time <- median(cpu_add_times)
+    cpu_add_time <- max(median(cpu_add_times), 1e-6)  # Minimum measurable time
     
     gpu_add_times <- replicate(3, system.time(gpu_add(a, b, warn_fallback = FALSE))[["elapsed"]])
     gpu_add_time <- median(gpu_add_times)
@@ -44,7 +44,7 @@ test_that("Comprehensive GPU vs CPU runtime comparison", {
     
     # === SCALING BENCHMARK ===
     cpu_scale_times <- replicate(3, system.time(a * scalar)[["elapsed"]])
-    cpu_scale_time <- median(cpu_scale_times)
+    cpu_scale_time <- max(median(cpu_scale_times), 1e-6)  # Minimum measurable time
     
     gpu_scale_times <- replicate(3, system.time(gpu_scale(a, scalar, warn_fallback = FALSE))[["elapsed"]])
     gpu_scale_time <- median(gpu_scale_times)
@@ -54,7 +54,7 @@ test_that("Comprehensive GPU vs CPU runtime comparison", {
     
     # === DOT PRODUCT BENCHMARK ===
     cpu_dot_times <- replicate(3, system.time(sum(a * b))[["elapsed"]])
-    cpu_dot_time <- median(cpu_dot_times)
+    cpu_dot_time <- max(median(cpu_dot_times), 1e-6)  # Minimum measurable time
     
     gpu_dot_times <- replicate(3, system.time(gpu_dot(a, b, warn_fallback = FALSE))[["elapsed"]])
     gpu_dot_time <- median(gpu_dot_times)

@@ -1,0 +1,433 @@
+      5   v_tensor <- as_tensor(v_data, dtype = "float32")
+      4     tensor_a <- as_tensor(a, dtype = "float32")
+      3   print(as.array(transposed))
+      3   A_tensor <- as_tensor(A_data, dtype = "float32")
+      3   a_tensor <- as_tensor(a_data, dtype = "float32")
+      2 verify_gpu_tensor <- function(tensor, operation_name = "operation") {
+      2   result_gpu <- outer_product(a_tensor, b_tensor)
+      2     # Pre-create tensor for timing
+      2   large_tensor <- as_tensor(1:24, dtype = "float32")
+      2     info <- tensor_info_unified(tensor)
+      2   if (exists("matmul")) {
+      2   cat("Is contiguous:", is_contiguous(transposed), "\n")
+      2   b_tensor <- as_tensor(b_data, dtype = "float32")
+      1   x_t <- transpose(x)
+      1   x <- as_tensor(matrix(1:6, 2, 3), dtype = "float32")
+      1   v_tensor_2 <- as_tensor(v_data_2, dtype = "float32")
+      1   v_small_tensor <- as_tensor(v_small_data, dtype = "float32")
+      1     view_tensor <- view(transposed, c(24))  # Try to create 1D view
+      1   verify_gpu_tensor(vec_tensor, "vector for broadcasting")
+      1     verify_gpu_tensor(transposed, "transpose result")
+      1   verify_gpu_tensor(transposed, "transpose operation")
+      1   verify_gpu_tensor(transposed_a, "matrix transpose")
+      1   verify_gpu_tensor(tensor_x, "softmax input")
+      1       verify_gpu_tensor(tensor_pos, paste("positive tensor", dtype, size))
+      1   verify_gpu_tensor(tensor_orig, "original tensor for reshaping")
+      1     verify_gpu_tensor(tensor_f64, "converted to double")
+      1   verify_gpu_tensor(tensor_f32, "float32 tensor for conversion")
+      1       verify_gpu_tensor(tensor_exp, paste("exp tensor", dtype, size))
+      1   verify_gpu_tensor(tensor_b, "tensor B creation")
+      1       verify_gpu_tensor(tensor_b_safe, paste("safe tensor creation", dtype, size))
+      1       verify_gpu_tensor(tensor_b, paste("tensor_b creation", dtype, size))
+      1     verify_gpu_tensor(tensor_back, "converted back to float")
+      1   verify_gpu_tensor(tensor_a, "tensor A creation")
+      1       verify_gpu_tensor(tensor_a, paste("tensor_a creation", dtype, size))
+      1   verify_gpu_tensor(tensor_3d, "3D tensor creation")
+      1   verify_gpu_tensor(tensor_2x3, "tensor 2x3 creation")
+      1   verify_gpu_tensor(tensor_2x2, "tensor 2x2 creation")
+      1   verify_gpu_tensor(soft_gpu, "softmax result")
+      1       verify_gpu_tensor(slice_result, "slice result dtype conversion")
+      1   verify_gpu_tensor(slice_result, "slice extraction")
+      1   verify_gpu_tensor(s_gpu, "stack result")
+      1   verify_gpu_tensor(scaled_result, "scalar multiplication")
+      1   verify_gpu_tensor(r_gpu, "repeat")
+      1   verify_gpu_tensor(result, "transpose + scalar")
+      1       verify_gpu_tensor(result_sub_gpu, paste("subtraction", dtype, size))
+      1         verify_gpu_tensor(result_sqrt_gpu, paste("sqrt operation", dtype, size))
+      1       verify_gpu_tensor(result_scalar_mul_gpu, paste("scalar multiplication", dtype, size))
+      1       verify_gpu_tensor(result_scalar_add_gpu, paste("scalar addition", dtype, size))
+      1   verify_gpu_tensor(result, "permuted tensor arithmetic")
+      1   verify_gpu_tensor(result_ops, "contiguity test result")
+      1       verify_gpu_tensor(result_mul_gpu, paste("multiplication", dtype, size))
+      1         verify_gpu_tensor(result_log_gpu, paste("log operation", dtype, size))
+      1       verify_gpu_tensor(result_gpu, paste("matmul result", mat_size$m, "x", mat_size$n))
+      1         verify_gpu_tensor(result_exp_gpu, paste("exp operation", dtype, size))
+      1       verify_gpu_tensor(result_div_gpu, paste("division", dtype, size))
+      1       verify_gpu_tensor(result_add_gpu, paste("addition", dtype, size))
+      1       verify_gpu_tensor(reshaped, paste("reshape to", paste(shape, collapse="x")))
+      1   verify_gpu_tensor(permuted, "permute operation")
+      1   verify_gpu_tensor(parent, "slice mutation")
+      1   verify_gpu_tensor(parent, "parent tensor creation")
+      1   verify_gpu_tensor(pad_gpu, "pad")
+      1   verify_gpu_tensor(mat_tensor, "matrix tensor creation")
+      1   verify_gpu_tensor(mat_tensor, "matrix for transpose")
+      1   verify_gpu_tensor(mat_tensor, "matrix for broadcasting")
+      1     verify_gpu_tensor(matmul_result, "matrix multiplication")
+      1   verify_gpu_tensor(mat_b, "matrix B creation")
+      1   verify_gpu_tensor(mat_a, "matrix A creation")
+      1   verify_gpu_tensor(mat, "2D slice mutation")
+      1   verify_gpu_tensor(mat, "2D matrix creation")
+      1   verify_gpu_tensor <- function(tensor, operation_name = "operation") {
+      1   verify_gpu_tensor(c_gpu, "concat result")
+      1   verify_gpu_tensor(b_tensor, "tensor B creation")
+      1     verify_gpu_tensor(B_tensor, paste("matrix B", mat_size$k, "x", mat_size$n))
+      1   verify_gpu_tensor(broadcast_result, "broadcasting addition")
+      1   verify_gpu_tensor(broadcast_result, "broadcast addition")
+      1   verify_gpu_tensor(big_tensor, "big tensor for contiguity test")
+      1   verify_gpu_tensor(a_tensor, "tensor A creation")
+      1     verify_gpu_tensor(A_tensor, paste("matrix A", mat_size$m, "x", mat_size$k))
+      1   verify_gpu_tensor(a, "concat a"); verify_gpu_tensor(b, "concat b")
+      1 verify_all_gpu <- function(tensor_list, operation_name = "operation") {
+      1   vec_tensor <- as_tensor(vec_data, dtype = "float")
+      1   vec_b <- as_tensor(runif(1000), dtype = "float")
+      1   vec_a <- as_tensor(runif(1000), dtype = "float")
+      1   v2_tensor <- as_tensor(v2_data, dtype = "float32")
+      1   tx <- as_tensor(x, dtype="float")
+      1   transposed <- transpose(original_matrix)
+      1   transposed <- transpose(original)
+      1   transposed <- transpose(mat_tensor)
+      1       transposed <- transpose(mat_tensor)
+      1   transposed <- transpose(matrix_tensor)  # This creates a non-contiguous view
+      1     transposed <- transpose(large_tensor)
+      1   transposed <- transpose(large_matrix)  # Should be 6x4
+      1       transposed <- t(mat_tensor)
+      1   transposed_tensor <- transpose(matrix_tensor)
+      1   transposed_a <- transpose(mat_a)
+      1   transposed2 <- transpose_view(original)
+      1   # Time efficient transpose (view)
+      1       threshold <- min(gpu_wins$size)
+      1   t <- gpu_tensor(1:4, c(2,2))
+      1   # Test transpose_view function
+      1   # Test transpose chaining (memory efficiency)
+      1 test_that("Softmax GPU runtime reasonable", {
+      1 test_that("Softmax and Argmax work correctly on GPU", {
+      1 test_tensor_info <- function() {
+      1 test_tensor_info()
+      1 test_outer_product_noncontiguous <- function() {
+      1 test_outer_product_noncontiguous()
+      1   # Test new efficient transpose
+      1 test_efficient_transpose <- function() {
+      1 test_efficient_transpose()
+      1   tensor_x <- as_tensor(x, dtype = "float")
+      1   tensor_time <- system.time({
+      1       tensor_sum <- sum(tensor_a * tensor_b)
+      1     tensor_sum_result <- sum(tensor_a * tensor_b)
+      1     tensor_result2 <- tensor_result1 * 2.0
+      1     tensor_result1 <- tensor_a * tensor_b
+      1       tensor_pos <- as_tensor(data_pos, dtype = dtype)
+      1   tensor_orig <- as_tensor(original_data, dtype = "float")
+      1       tensor_mult <- tensor_a * tensor_b
+      1     tensor_mul_result <- tensor_a * tensor_b
+      1     tensor_final <- sum(tensor_result2)
+      1     tensor_f64 <- to_dtype(tensor_f32, "double")
+      1   tensor_f32 <- as_tensor(test_data, dtype = "float")
+      1       tensor_exp <- as_tensor(data_exp, dtype = dtype)
+      1       tensor_b_temp <- as_tensor(b, dtype = "float32")
+      1       tensor_b_safe <- as_tensor(data_b_safe, dtype = dtype)
+      1   tensor_b <- gpu_tensor(runif(12), shape = c(3, 4), dtype = "float")
+      1     tensor_b <- gpu_tensor(b_data, shape)
+      1       tensor_b <- gpu_tensor(b_data, shape)
+      1     tensor_b <- gpu_tensor(b_data, length(b_data))
+      1       tensor_b <- as_tensor(data_b, dtype = dtype)
+      1     tensor_b <- as_tensor(b, dtype = "float32") 
+      1     tensor_b <- as_tensor(b, dtype = "float32")
+      1     tensor_back <- to_dtype(tensor_f64, "float")
+      1       tensor_a * tensor_b
+      1       tensor_a_temp <- as_tensor(a, dtype = "float32")
+      1       tensor <- as_tensor(runif(size, -1, 1), dtype = "float32")
+      1       tensor_a * scalar
+      1   tensor_a <- gpu_tensor(runif(24), shape = c(2, 3, 4), dtype = "float")
+      1     tensor_a <- gpu_tensor(a_data, shape)
+      1       tensor_a <- gpu_tensor(a_data, shape)
+      1     tensor_a <- gpu_tensor(a_data, length(a_data))
+      1       tensor_add <- tensor_a + tensor_b
+      1     tensor_add_result <- tensor_a + tensor_b
+      1       tensor_a <- as_tensor(data_a, dtype = dtype)
+      1   tensor_3d <- gpu_tensor(1:24, shape = c(2, 3, 4), dtype = "float")
+      1   tensor_3d <- as_tensor(array(1:24, dim = c(2, 3, 4)), dtype = "float32")
+      1   tensor_2x3 <- gpu_tensor(1:6, shape = c(2, 3), dtype = "float")
+      1     tensor_2x3 <- gpu_tensor(1:6, c(2, 3))
+      1   tensor_2x2 <- gpu_tensor(1:4, shape = c(2, 2), dtype = "float")
+      1     tensor_1x3 <- gpu_tensor(c(10, 20, 30), c(1, 3))
+      1     temp_tensor <- gpu_tensor(runif(1000), c(10, 100))
+      1     temp_sum <- sum(temp_result)
+      1   t2 <- gpu_tensor(13:24, c(3,4), dtype="float")
+      1   t1 <- gpu_tensor(1:12, c(3,4), dtype="float")
+      1       synchronize(tensor_mult)
+      1     synchronize(tensor_mul_result)
+      1     synchronize(tensor_add_result)
+      1       synchronize(tensor_add)
+      1       sum_throughput = sum_throughput
+      1     sum_throughput <- n / gpu_sum_time / 1e9
+      1       sum(tensor_a)
+      1       sum_speedup = sum_speedup,
+      1     sum_speedup <- cpu_sum_time / gpu_sum_time
+      1       sum_gpu <- sum(tensor_a)
+      1       sum_cpu <- sum(data_a)
+      1       sum(a)
+      1   subset_j <- 1:min(100, n2)
+      1   subset_indices <- 1:min(100, n1)
+      1   step4 <- gpu_scale(step2, 1.0/step3)  # (a * b + c) / sum(...)
+      1   step3 <- sum(step2)                   # sum(a * b + c)
+      1       step2 <- transpose(step1)      # 3x4 result  
+      1       step1 <- matmul(mat_a, mat_b)  # 4x3 result
+      1   # so non-contiguous vector tests are not very meaningful
+      1   softmax_result <- softmax(t1)
+      1   # Softmax
+      1   soft_gpu <- softmax(tensor_x)
+      1   soft_cpu <- exp(x) / sum(exp(x))
+      1     slice_sum <- slice1 + slice2
+      1   slice_result <- tensor_a[1, , ]  # Extract first slice (3x4)
+      1       slice_result <- as_tensor(as.array(slice_result), dtype = "float", shape = shape(slice_result))
+      1   # Show that transpose creates a new contiguous tensor
+      1     rm(temp_tensor, temp_result, temp_sum)
+      1   result <- transposed + 1.0
+      1       result_sub_gpu <- tensor_a - tensor_b
+      1         result_sqrt_gpu <- sqrt(tensor_pos)
+      1       result_scalar_mul_gpu <- tensor_a * scalar_val
+      1       result_scalar_add_gpu <- tensor_a + scalar_val
+      1     result <- outer_product(large_a, large_b)
+      1   result_outer <- outer_product(a_tensor, b_tensor)
+      1     result_noncontiguous <- vecmat(v_tensor_2, noncontiguous_matrix)
+      1       result_mul_gpu <- tensor_a * tensor_b
+      1         result_log_gpu <- log(tensor_pos)
+      1         result_gpu <- matmul(A_tensor, B_tensor)
+      1     result_gpu_large <- outer_product(a_tensor_large, b_tensor_large)
+      1         result_exp_gpu <- exp(tensor_exp)
+      1       result_div_gpu <- tensor_a / tensor_b_safe
+      1     result_chain <- transpose(transpose(matrix_tensor) + 1.0)
+      1       result <- as.array(tensor_a_temp + tensor_b_temp)
+      1       result_add_gpu <- tensor_a + tensor_b
+      1         reshaped <- view(tensor_orig, shape)
+      1         reshaped <- reshape(tensor_orig, shape)
+      1     reshaped <- reshape(large_tensor_1d, c(100, 100))
+      1     # Print summary for this size
+      1     # Pre-create tensors for timing
+      1           # Pre-create tensors for timing
+      1   permuted <- permute(tensor_3d, c(3L, 1L, 2L))
+      1   permuted <- permute(tensor_3d, c(2, 3, 1))  # (2,3,4) -> (3,4,2)
+      1   permuted2 <- permute_view(tensor_3d, c(2, 3, 1))
+      1   parent <- gpu_tensor(1:120, shape = c(4, 5, 6), dtype = "float")
+      1   original <- as_tensor(matrix(1:12, nrow=3, ncol=4), dtype = "float32")
+      1   original <- as_tensor(1:24, dtype = "float32")
+      1   operations <- c("add", "multiply", "scalar_multiply", "matmul", "reductions")
+      1     noncontiguous_matrix = transposed
+      1           negative_tensor <- as_tensor(c(-1, -4, -9), dtype = "float")
+      1           negative_tensor <- as_tensor(c(-1, -2, -3), dtype = "float")
+      1     mult_result <- gpu_multiply(a[1:min(100, n)], b[1:min(100, n)])
+      1         min_gpu <- min(tensor_pos)
+      1         min_cpu <- min(data_pos)
+      1   # Memory bandwidth estimation (assuming single-precision floats = 4 bytes)
+      1         mean_gpu <- mean(tensor_a)
+      1         mean_cpu <- mean(data_a)
+      1           " (max speedup: ", sprintf("%.2f", max_speedup), "x)\n", sep="")
+      1       max_speedup <- max(op_results$speedup)
+      1   max_mul_throughput <- max(results_df$mul_throughput)
+      1         max_gpu <- max(tensor_pos)
+      1         max_cpu <- max(data_pos)
+      1   max_add_throughput <- max(results_df$add_throughput)
+      1   max_add_bandwidth <- max_add_throughput * 12  # GB/s
+      1   mat_tensor <- gpu_tensor(mat_data, shape = c(4, 5), dtype = "float")
+      1   mat_tensor <- as_tensor(mat_data, dtype = "float")
+      1   mat_tensor <- as_tensor(mat_data_5x3, dtype = "float")
+      1   matrix_tensor <- gpu_tensor(1:20, c(4, 5))
+      1           matmul_speedup <- cpu_matmul_time / gpu_matmul_time
+      1     matmul_result <- matmul(mat_a, mat_b)
+      1           matmul_gflops <- flops / gpu_matmul_time / 1e9
+      1             matmul(A_tensor, B_tensor)
+      1   mat <- gpu_tensor(matrix(1:20, 4, 5), shape = c(4, 5), dtype = "float")
+      1   match_result <- all.equal(as.array(transposed), expected, tolerance = 1e-6)
+      1   match_result2 <- all.equal(as.array(transposed2), expected, tolerance = 1e-6)
+      1   mat_b <- gpu_tensor(matrix(runif(20), 4, 5), shape = c(4, 5), dtype = "float")
+      1   mat_b <- gpu_tensor(matrix(runif(15, -1, 1), 5, 3), c(5, 3))
+      1   mat_a <- gpu_tensor(matrix(runif(20, -1, 1), 4, 5), c(4, 5))
+      1   mat_a <- gpu_tensor(matrix(runif(12), 3, 4), shape = c(3, 4), dtype = "float")
+      1     large_throughput <- results[[as.character(max(thread_counts))]]$throughput
+      1   large_tensor <- gpu_tensor(1:120, c(4, 5, 6))
+      1   large_tensor <- as_tensor(matrix(large_data, 100, 100), dtype = "float32")
+      1   large_tensor_1d <- as_tensor(large_data, dtype = "float")
+      1   large_b <- as_tensor(runif(1000), dtype = "float32")
+      1   large_a <- as_tensor(runif(1000), dtype = "float32")
+      1       info <- tensor_info_unified(tensor)
+      1   info2 <- tensor_info(transposed_tensor)
+      1   info1 <- tensor_info(matrix_tensor)
+      1     if (!verify_gpu_tensor(tensor_list[[i]], paste(operation_name, "result", i))) {
+      1   if (verify_gpu_tensor(t1, "tensor creation 1") && verify_gpu_tensor(t2, "tensor creation 2")) {
+      1   if (verify_gpu_tensor(stack_result, "stack operation")) {
+      1   if (verify_gpu_tensor(softmax_result, "softmax operation")) {
+      1   if (verify_gpu_tensor(repeat_result, "repeat operation")) {
+      1   if (verify_gpu_tensor(pad_result, "pad operation")) {
+      1   if (verify_gpu_tensor(concat_result, "concat operation")) {
+      1   if (verify_gpu_tensor(comparison_result, "comparison operation")) {
+      1     if (n <= 1e6) {  # Only test matmul for reasonable sizes
+      1   if (exists("transpose")) {
+      1   if (exists("t.gpuTensor") || exists("transpose")) {
+      1       if (exists("mean.gpuTensor")) {
+      1       if (exists("max.gpuTensor")) {
+      1   if (exists("matmul") && exists("transpose")) {
+      1     if (exists("matmul") || exists("%*%.gpuTensor")) {
+      1       if (exists("matmul")) {
+      1         if (exists("matmul")) {
+      1     if (dtype(tensor_b) == "float") {
+      1   if (dtype(slice_result) != dtype(tensor_b)) {
+      1   gx <- as_tensor(x, dtype="float")
+      1     # GPU timing (should show parallel speedup for larger sizes)
+      1   gpu_time <- max(system.time({res_gpu <- softmax(gx); synchronize(res_gpu)})[["elapsed"]], 1e-6)
+      1     gpu_sum_times <- replicate(5, system.time({
+      1     gpu_sum_time <- median(gpu_sum_times)
+      1                 gpu_sum_time, cpu_sum_time, sum_speedup, sum_throughput))
+      1     gpu_sum_result <- sum(tensor_a)
+      1     gpu_scalar_result_tensor <- tensor_a * scalar
+      1     gpu_mul_result_tensor <- tensor_a * tensor_b  
+      1           gpu_matmul_times <- replicate(3, system.time({
+      1           gpu_matmul_time <- median(gpu_matmul_times)
+      1                       gpu_matmul_time, cpu_matmul_time, matmul_speedup, matmul_gflops))
+      1           gpu_matmul_result_tensor <- matmul(A_tensor, B_tensor)
+      1           gpu_matmul_result <- as.array(gpu_matmul_result_tensor)
+      1     gpu_add_result <- as.array(tensor_a + tensor_b)
+      1   for (i in seq_along(tensor_list)) {
+      1       final_sum <- sum(step3)       # Reduce to scalar
+      1   final_sum <- sum(scaled_result)
+      1     final_result <- sum(result2)
+      1   expect_true(is.numeric(final_sum))
+      1     expect_true(is.numeric(final_sum))
+      1       expect_true(is_contiguous(tensor_a))
+      1     expect_no_error(matmul(A, B))
+      1   expect_lt(tensor_time, 5.0)
+      1   expect_length(final_sum, 1)
+      1     expect_length(final_sum, 1)
+      1   expect_gt(gpu_time, 1e-7)    # Should actually take measurable time (adjusted for minimum)
+      1   expect_error(tensor_2x3 + tensor_2x2, "(shape|dimension|broadcast)", ignore.case = TRUE)
+      1     expect_error(matmul(A, C), "Incompatible.*dimensions")
+      1   expect_error(gpu_tensor(1:3, c(3), dtype = "int8"), "Unsupported dtype")
+      1   expect_error(as_tensor(numeric(0)), "positive")
+      1   expect_error(as_tensor(c(1,2,3), shape = c(2, 3)), "size.*match")
+      1   expect_error(as_tensor(c(1,2,3), dtype = "invalid_dtype"))
+      1     expect_equal(tensor_sum_result, cpu_sum, tolerance = 1e-8)
+      1     expect_equal(tensor_sum, cpu_sum, tolerance = 1e-10)
+      1       expect_equal(sum_gpu, sum_cpu, tolerance = 1e-5)
+      1   expect_equal(sum(as.array(soft_gpu)), 1, tolerance = 1e-6)
+      1   expect_equal(shape(transposed_a), c(4, 3))
+      1     expect_equal(shape(matmul_result), c(3, 5))
+      1     expect_equal(mult_result, (a * b)[1:min(100, n)], tolerance = 1e-12)
+      1         expect_equal(min_gpu, min_cpu, tolerance = 1e-6)
+      1         expect_equal(mean_gpu, mean_cpu, tolerance = 1e-6)
+      1         expect_equal(max_gpu, max_cpu, tolerance = 1e-6)
+      1     expect_equal(gpu_sum_result, cpu_sum_result, tolerance = 1e-5)
+      1           expect_equal(gpu_matmul_result, cpu_matmul_result, tolerance = 1e-4)
+      1   expect_equal(gpu_dot, sum(a * b), tolerance = 1e-14)
+      1   expect_equal(final_result, tensor_final, tolerance = 1e-10)
+      1     expect_equal(dtype(tensor_f64), "double")
+      1     expect_equal(dtype(tensor_back), "float")
+      1       expect_equal(dtype(tensor_a), dtype)
+      1     expect_equal(dim(slice_sum), c(2, 5, 6))
+      1     expect_equal(as.vector(tensor_mult), cpu_mult, tolerance = 1e-12)
+      1     expect_equal(as.vector(tensor_mul_result), cpu_mul, tolerance = 1e-10) 
+      1     expect_equal(as.vector(tensor_add_result), cpu_add, tolerance = 1e-10)
+      1     expect_equal(as.vector(tensor_add), cpu_add, tolerance = 1e-12)
+      1       expect_equal(as.numeric(size(tensor_a)), size)
+      1     expect_equal(as.array(transposed), result_cpu, tolerance = 1e-7)
+      1     expect_equal(as.array(tensor_f64), test_data, tolerance = 1e-6)
+      1     expect_equal(as.array(tensor_back), test_data, tolerance = 1e-6)
+      1     expect_equal(add_result, (a + b)[1:min(100, n)], tolerance = 1e-12)
+      1     expected_broadcast <- as.vector(as.array(tensor_2x3)) + rep(as.vector(as.array(tensor_1x3)), each=2)
+      1   # Ensure slice result has same dtype as tensor_b
+      1     # Each double is 8 bytes, assume 3 memory operations per arithmetic op (2 reads + 1 write)
+      1   dot_product_manual <- sum(element_product)
+      1       data_exp <- pmax(pmin(data_a, 5), -5)  # Clip to [-5, 5]
+      1       data_b_safe <- pmax(data_b, 0.1)  # Avoid division by zero
+      1   c <- runif(n, min = 1, max = 10)
+      1   # Create transpose view
+      1     # CPU timing (reference)
+      1   cpu_time <- max(system.time({res_cpu <- exp(x)/sum(exp(x))})[["elapsed"]], 1e-6)
+      1     cpu_sum_times <- replicate(5, system.time({
+      1     cpu_sum_time <- median(cpu_sum_times)
+      1     cpu_sum <- sum(a_data * b_data)
+      1       cpu_sum <- sum(a_data * b_data)
+      1     cpu_sum_result <- sum(a)
+      1   cpu_step3 <- sum(cpu_step2)
+      1     cpu_scale_time <- max(median(cpu_scale_times), 1e-6)  # Minimum measurable time
+      1         cpu_result <- sum((a * b * scalar + a) * b)
+      1     cpu_mult_time <- max(median(cpu_mult_times), 1e-6)  # Minimum measurable time
+      1         cpu_matmul_times <- replicate(3, system.time({
+      1         cpu_matmul_time <- median(cpu_matmul_times)
+      1         cpu_matmul_result <- A_data %*% B_data
+      1     cpu_dot_times <- replicate(3, system.time(sum(a * b))[["elapsed"]])
+      1     cpu_dot_time <- max(median(cpu_dot_times), 1e-6)  # Minimum measurable time
+      1       cpu_dot_result <- sum(a * b)
+      1     cpu_add_time <- max(median(cpu_add_times), 1e-6)  # Minimum measurable time
+      1   contiguous_tensor <- gpu_tensor(1:24, c(4, 6))
+      1   contiguous_tensor <- as_tensor(1:12, dtype = "float32")
+      1 context("Views, slice mutation, transpose/permute & broadcasting")
+      1 context("New GPU operations: softmax, argmax, concat, stack, repeat, pad, reductions, comparisons")
+      1   # Complex computation: (a * b + c) / sum(a * b + c)
+      1     # Complex chain: A * B -> transpose -> add scalar -> reduce
+      1   # Compare with CPU transpose
+      1     # Chain: transpose -> add scalar -> transpose back
+      1     cat("❌ transpose_view: INCORRECT\n")
+      1     cat("✅ transpose_view: CORRECT\n")
+      1   cat("- transpose() now creates a VIEW, not a copy\n")
+      1   cat("Transposed shape:", shape(transposed), "\n")
+      1   cat("Transposed shape:", shape(transposed), "- contiguous:", is_contiguous(transposed), "\n")
+      1   cat("Transposed is contiguous:", is_contiguous(transposed), "\n")
+      1   cat("This means:\n")
+      1 cat("✅ They work correctly with contiguous tensors (which includes transpose results)\n")
+      1   cat("The current transpose() implementation creates a new contiguous tensor\n")
+      1   cat("The contiguity check adds minimal overhead:\n")
+      1   cat("Testing transpose chaining...\n")
+      1   cat("Tensor operations time:    ", sprintf("%.6f", tensor_time), "s\n")
+      1   cat(sprintf("Peak Multiplication Throughput: %.2f GE/s\n", max_mul_throughput))
+      1   cat(sprintf("Peak Addition Throughput: %.2f GE/s\n", max_add_throughput))
+      1   cat(sprintf("Estimated Memory Bandwidth (Addition): %.2f GB/s\n", max_add_bandwidth))
+      1   cat("Slice dtype:", dtype(slice_result), "Tensor B dtype:", dtype(tensor_b), "\n")
+      1     cat("✅ outer_product: PASSED\n")
+      1     cat("❌ outer_product: FAILED\n")
+      1   cat("Original is contiguous:", is_contiguous(tensor_3d), "\n")
+      1   cat("Original 3D tensor shape:", shape(tensor_3d), "\n")
+      1   cat("\n--- Using transpose_view() function ---\n")
+      1   cat("\n--- Timing efficient transpose (view-based) ---\n")
+      1   cat("\n--- Testing outer_product ---\n")
+      1 cat("Non-contiguous tensors typically arise from operations like transpose,\n")
+      1   cat("\n--- Efficient transpose (view-based) ---\n")
+      1   cat("\n=== Analysis: Current transpose creates contiguous copies ===\n")
+      1   cat("Memory different:", !identical(as.array(original_matrix), t(as.array(transposed))), "\n")
+      1   cat("Looking at TensorLinearAlgebra.cpp, the current outer_product, matvec,\n")
+      1   cat("- Implement stride-aware versions of outer_product, matvec, vecmat kernels\n")
+      1     cat("❌ Efficient transpose: INCORRECT\n")
+      1     cat("✅ Efficient transpose: CORRECT\n")
+      1 cat("  - Efficient transpose as view (no data copying)\n")
+      1 cat("❌ Current outer_product, matvec, vecmat do NOT support non-contiguous tensors\n")
+      1   cat("3. Assume contiguous memory layout in the kernels\n")
+      1   cat("100 transpose views took:", format(view_time, digits = 4), "\n")
+      1     C <- as_tensor(matrix(1:4, 2, 2), dtype = "float")
+      1   b_tensor_large <- as_tensor(b_large, dtype = "float32")
+      1   b_tensor <- gpu_tensor(b_data, shape = c(3), dtype = "float")
+      1           B_tensor <- as_tensor(B_data, dtype = "float32")
+      1   b_tensor <- as_tensor(b_data, dtype = "float32") 
+      1     B_tensor <- as_tensor(B_data, dtype = "float")
+      1   b <- runif(n, min = 1, max = 10)
+      1     b <- runif(n, min = 1, max = 10)
+      1     broadcast_result <- tensor_2x3 + tensor_1x3
+      1   broadcast_result <- slice_result + tensor_b
+      1   big_tensor <- as_tensor(runif(1000, -1, 1), dtype = "float")
+      1   b <- gpu_tensor(c(2,2,2,2), c(4))
+      1   b <- gpu_tensor(7:12, c(2,3))
+      1     B <- as_tensor(matrix(1:6, 3, 2), dtype = "float")
+      1   b <- as_tensor(c(5, 6, 7, 8), dtype = "float32")
+      1       avg_throughput <- mean(op_large$throughput)
+      1   a_tensor_large <- as_tensor(a_large, dtype = "float32")
+      1   a_tensor <- gpu_tensor(a_data, shape = c(2, 3), dtype = "float")
+      1           A_tensor <- as_tensor(A_data, dtype = "float32")
+      1     A_tensor <- as_tensor(A_data, dtype = "float")
+      1   a <- runif(n, min = 1, max = 10)
+      1     a <- runif(n, min = 1, max = 10)
+      1   # Argmax
+      1   am_gpu <- argmax(tensor_x)
+      1   am_cpu <- which.max(x)
+      1   a <- gpu_tensor(c(1,3,2,4), c(4))
+      1   a <- gpu_tensor(1:6, c(2,3))
+      1   # Adjust vector size for transposed matrix (6x4 needs 4-element vector)
+      1     add_result <- gpu_add(a[1:min(100, n)], b[1:min(100, n)])
+      1     A <- as_tensor(matrix(1:6, 2, 3), dtype = "float")
+      1   a <- as_tensor(c(1, 2, 3, 4), dtype = "float32")
+      1   # 6. Softmax operation

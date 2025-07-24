@@ -183,28 +183,13 @@ flush(stderr()); flush(stdout())
 ##D   cat("Using CPU-only mode\n")
 ##D }
 ## End(Not run)
-
-Get GPU Information
-
-Returns detailed information about available CUDA GPUs.
-
 ## Not run: 
 ##D cat(gpu_info())
 ## End(Not run)
-
-Get Available GPU Memory
-
-Returns the amount of free GPU memory in bytes.
-
 ## Not run: 
 ##D mem_gb <- gpu_memory_available() / 1e9
 ##D cat("Available GPU memory:", round(mem_gb, 1), "GB\n")
 ## End(Not run)
-
-Comprehensive GPU Status
-
-Returns comprehensive information about GPU availability and status.
-
 ## Not run: 
 ##D status <- gpu_status()
 ##D print(status)
