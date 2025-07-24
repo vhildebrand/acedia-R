@@ -139,6 +139,105 @@ __global__ void matmul_tiled_kernel(T* C, const T* A, const T* B, size_t M, size
     }
 }
 
+// Outer product kernel: result[i,j] = a[i] * b[j]
+// Note: R uses column-major layout, so we use col * M + row indexing
+template<typename T>
+__global__ void outer_product_kernel(T* result, const T* a, const T* b, size_t M, size_t N) {
+    size_t row = blockIdx.y * blockDim.y + threadIdx.y;
+    size_t col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < M && col < N) {
+        // For R's column-major layout: result[i,j] is at col * M + row
+        result[col * M + row] = a[row] * b[col];
+    }
+}
+
+// Matrix-vector multiplication kernel: result[i] = sum_j(A[i,j] * v[j])
+// Note: R uses column-major layout, so A[i,j] is at j * M + i
+template<typename T>
+__global__ void matvec_kernel(T* result, const T* A, const T* v, size_t M, size_t N) {
+    size_t row = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < M) {
+        T sum = T(0);
+        for (size_t j = 0; j < N; ++j) {
+            // For R's column-major layout: A[i,j] is at j * M + i
+            sum += A[j * M + row] * v[j];
+        }
+        result[row] = sum;
+    }
+}
+
+// Optimized matrix-vector multiplication with shared memory reduction
+template<typename T>
+__global__ void matvec_optimized_kernel(T* result, const T* A, const T* v, size_t M, size_t N) {
+    extern __shared__ char shared_mem[];
+    T* shared_v = reinterpret_cast<T*>(shared_mem);
+    
+    size_t row = blockIdx.x;
+    size_t tid = threadIdx.x;
+    size_t blockSize = blockDim.x;
+    
+    if (row >= M) return;
+    
+    // Load vector into shared memory (if it fits)
+    if (N <= blockSize) {
+        if (tid < N) {
+            shared_v[tid] = v[tid];
+        }
+        __syncthreads();
+        
+        // Each thread computes partial sum
+        T sum = T(0);
+        for (size_t j = tid; j < N; j += blockSize) {
+            // For R's column-major layout: A[i,j] is at j * M + i
+            sum += A[j * M + row] * shared_v[j];
+        }
+        
+        // Reduce within block
+        shared_v[tid] = sum;
+        __syncthreads();
+        
+        // Tree reduction
+        for (size_t s = blockSize / 2; s > 0; s /= 2) {
+            if (tid < s) {
+                shared_v[tid] += shared_v[tid + s];
+            }
+            __syncthreads();
+        }
+        
+        if (tid == 0) {
+            result[row] = shared_v[0];
+        }
+    } else {
+        // Fallback to simple version for large vectors
+        if (tid == 0) {
+            T sum = T(0);
+            for (size_t j = 0; j < N; ++j) {
+                // For R's column-major layout: A[i,j] is at j * M + i  
+                sum += A[j * M + row] * v[j];
+            }
+            result[row] = sum;
+        }
+    }
+}
+
+// Vector-matrix multiplication kernel: result[j] = sum_i(v[i] * A[i,j])
+// Note: R uses column-major layout, so A[i,j] is at j * M + i
+template<typename T>
+__global__ void vecmat_kernel(T* result, const T* v, const T* A, size_t M, size_t N) {
+    size_t col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (col < N) {
+        T sum = T(0);
+        for (size_t i = 0; i < M; ++i) {
+            // For R's column-major layout: A[i,j] is at j * M + i
+            sum += v[i] * A[col * M + i];
+        }
+        result[col] = sum;
+    }
+}
+
 // Generic broadcast kernel for element-wise binary operations
 template<typename T, typename Op>
 __global__ void broadcast_binary_kernel(
@@ -268,7 +367,7 @@ __global__ void stack_kernel(
         }
     }
     
-    // Calculate source index using input strides (column-major order)
+    // Calculate source index using input  strides (column-major order)
     int src_idx = 0;
     for (int i = 0; i < ndims - 1; ++i) {
         src_idx += input_coords[i] * input_strides[i];

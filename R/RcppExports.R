@@ -121,6 +121,18 @@ tensor_matmul_unified <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_tensor_matmul_unified`, a_ptr, b_ptr)
 }
 
+tensor_outer_product_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_outer_product_unified`, a_ptr, b_ptr)
+}
+
+tensor_matvec_unified <- function(A_ptr, v_ptr) {
+    .Call(`_acediaR_tensor_matvec_unified`, A_ptr, v_ptr)
+}
+
+tensor_vecmat_unified <- function(v_ptr, A_ptr) {
+    .Call(`_acediaR_tensor_vecmat_unified`, v_ptr, A_ptr)
+}
+
 tensor_exp_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_exp_unified`, tensor_ptr)
 }

@@ -350,6 +350,42 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_outer_product_unified
+SEXP tensor_outer_product_unified(SEXP a_ptr, SEXP b_ptr);
+RcppExport SEXP _acediaR_tensor_outer_product_unified(SEXP a_ptrSEXP, SEXP b_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type a_ptr(a_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type b_ptr(b_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_outer_product_unified(a_ptr, b_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_matvec_unified
+SEXP tensor_matvec_unified(SEXP A_ptr, SEXP v_ptr);
+RcppExport SEXP _acediaR_tensor_matvec_unified(SEXP A_ptrSEXP, SEXP v_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type A_ptr(A_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type v_ptr(v_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_matvec_unified(A_ptr, v_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_vecmat_unified
+SEXP tensor_vecmat_unified(SEXP v_ptr, SEXP A_ptr);
+RcppExport SEXP _acediaR_tensor_vecmat_unified(SEXP v_ptrSEXP, SEXP A_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type v_ptr(v_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type A_ptr(A_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_vecmat_unified(v_ptr, A_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
 // tensor_exp_unified
 SEXP tensor_exp_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_exp_unified(SEXP tensor_ptrSEXP) {
@@ -591,6 +627,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_tensor_synchronize_unified", (DL_FUNC) &_acediaR_tensor_synchronize_unified, 1},
     {"_acediaR_tensor_is_contiguous_unified", (DL_FUNC) &_acediaR_tensor_is_contiguous_unified, 1},
     {"_acediaR_tensor_matmul_unified", (DL_FUNC) &_acediaR_tensor_matmul_unified, 2},
+    {"_acediaR_tensor_outer_product_unified", (DL_FUNC) &_acediaR_tensor_outer_product_unified, 2},
+    {"_acediaR_tensor_matvec_unified", (DL_FUNC) &_acediaR_tensor_matvec_unified, 2},
+    {"_acediaR_tensor_vecmat_unified", (DL_FUNC) &_acediaR_tensor_vecmat_unified, 2},
     {"_acediaR_tensor_exp_unified", (DL_FUNC) &_acediaR_tensor_exp_unified, 1},
     {"_acediaR_tensor_log_unified", (DL_FUNC) &_acediaR_tensor_log_unified, 1},
     {"_acediaR_tensor_sqrt_unified", (DL_FUNC) &_acediaR_tensor_sqrt_unified, 1},

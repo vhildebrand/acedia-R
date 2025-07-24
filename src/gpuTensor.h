@@ -519,6 +519,23 @@ public:
     const T* data() const { return data_; }
     bool requires_grad() const { return requires_grad_flag_; }
     
+    // Get TensorDescriptor for stride-aware operations
+    cuda_utils::TensorDescriptor descriptor() const {
+        cuda_utils::TensorDescriptor desc;
+        desc.data = static_cast<void*>(data_);
+        desc.ndims = static_cast<int>(ndims());
+        desc.offset = offset_;
+        desc.total_size = size();
+        
+        // Copy shape and strides (convert size_t to int)
+        for (int i = 0; i < desc.ndims && i < 8; ++i) {
+            desc.shape[i] = static_cast<int>(shape_.dims[i]);
+            desc.strides[i] = static_cast<int>(strides_[i]);
+        }
+        
+        return desc;
+    }
+    
     // Enable gradient computation
     gpuTensor& requires_grad_(bool requires = true) {
         requires_grad_flag_ = requires;
@@ -545,16 +562,21 @@ public:
         return strides_ == expected_strides;
     }
     
-    // Create a view with new shape
+    // Create a view with new shape - SUPPORTS NON-CONTIGUOUS TENSORS
     gpuTensor view(const Shape& new_shape) {
         if (new_shape.size() != shape_.size()) {
             throw std::runtime_error("View shape size must match original size");
         }
         
+        // For non-contiguous tensors, create contiguous copy first, then view
         if (!is_contiguous()) {
-            throw std::runtime_error("View requires contiguous tensor");
+            gpuTensor contiguous_copy = contiguous(); 
+            auto new_strides = compute_strides(new_shape);
+            return gpuTensor(contiguous_copy.storage_, new_shape, new_strides, 
+                           contiguous_copy.offset_, device_, stream_);
         }
         
+        // For contiguous tensors, create view directly
         auto new_strides = compute_strides(new_shape);
         return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
     }
@@ -573,40 +595,29 @@ public:
         }
     }
     
-    // Transpose (2D only for now)
+    // Transpose (2D only for now) - EFFICIENT VIEW IMPLEMENTATION
     gpuTensor transpose() const {
         if (ndims() != 2) {
             throw std::runtime_error("Transpose currently supports 2D tensors only");
         }
         
-        // For R compatibility, we need to physically transpose the data, not just swap strides
-        // R uses column-major storage, so we need to handle the layout correctly
-        
+        // Create transpose as a VIEW by swapping dimensions and strides
         size_t rows = shape_[0];
         size_t cols = shape_[1]; 
         
-        Shape new_shape({cols, rows});  // Swap dimensions
-        gpuTensor result(new_shape, device_);
+        // New shape: swap dimensions
+        Shape new_shape({cols, rows});
         
-        // Copy data from host and transpose it properly
-        std::vector<T> host_data = to_host();
-        std::vector<T> transposed_data(rows * cols);
+        // New strides: swap strides to achieve transpose effect
+        std::vector<size_t> new_strides(2);
+        new_strides[0] = strides_[1];  // First dim gets old second dim stride
+        new_strides[1] = strides_[0];  // Second dim gets old first dim stride
         
-        // Transpose the data: result[j][i] = original[i][j]
-        // R stores matrices column-major, so element (i,j) is at index i + j*rows
-        for (size_t i = 0; i < rows; ++i) {
-            for (size_t j = 0; j < cols; ++j) {
-                // Original: (i,j) -> i + j*rows (column-major)
-                // Transposed: (j,i) -> j + i*cols (column-major)
-                transposed_data[j + i * cols] = host_data[i + j * rows];
-            }
-        }
-        
-        result.copy_from_host(transposed_data.data());
-        return result;
+        // Create view that shares storage but has transposed layout
+        return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
     }
     
-    // Permute dimensions (general case)
+    // Permute dimensions as VIEW (PyTorch-like behavior)
     gpuTensor permute(const std::vector<int>& dims) const {
         if (dims.size() != ndims()) {
             throw std::runtime_error("Permute dimensions must match tensor dimensions");
@@ -621,53 +632,19 @@ public:
             used[dims[i]] = true;
         }
         
-        // For R compatibility, we need to physically rearrange the data
-        // R uses column-major storage, so permutation needs proper data layout
-        
-        // Calculate new shape
+        // Create permuted view by rearranging shape and strides
         std::vector<size_t> new_shape_dims(ndims());
+        std::vector<size_t> new_strides(ndims());
+        
         for (size_t i = 0; i < ndims(); ++i) {
-            new_shape_dims[i] = shape_[dims[i]];
+            new_shape_dims[i] = shape_[dims[i]];  // New shape from permuted dimensions
+            new_strides[i] = strides_[dims[i]];   // New strides from permuted dimensions
         }
+        
         Shape new_shape(new_shape_dims);
         
-        gpuTensor result(new_shape, device_);
-        
-        // Get original data and rearrange it
-        std::vector<T> host_data = to_host();
-        std::vector<T> permuted_data(size());
-        
-        // Calculate strides for indexing
-        std::vector<size_t> old_strides = compute_strides(shape_);
-        std::vector<size_t> new_strides = compute_strides(new_shape);
-        
-        // Permute the data element by element
-        for (size_t linear_idx = 0; linear_idx < size(); ++linear_idx) {
-            // Convert linear index to multi-dimensional coordinates in result tensor (COLUMN-MAJOR)
-            std::vector<size_t> result_coords(ndims());
-            size_t temp_idx = linear_idx;
-            for (size_t d = 0; d < ndims(); ++d) {
-                result_coords[d] = temp_idx % new_shape_dims[d];
-                temp_idx /= new_shape_dims[d];
-            }
-            
-            // Convert result coordinates to original tensor coordinates
-            std::vector<size_t> orig_coords(ndims());
-            for (size_t d = 0; d < ndims(); ++d) {
-                orig_coords[dims[d]] = result_coords[d];
-            }
-            
-            // Calculate original linear index
-            size_t orig_linear_idx = 0;
-            for (size_t d = 0; d < ndims(); ++d) {
-                orig_linear_idx += orig_coords[d] * old_strides[d];
-            }
-            
-            permuted_data[linear_idx] = host_data[orig_linear_idx];
-        }
-        
-        result.copy_from_host(permuted_data.data());
-        return result;
+        // Create view that shares storage but has permuted layout
+        return gpuTensor(storage_, new_shape, new_strides, offset_, device_, stream_);
     }
     
     // Create a contiguous copy
@@ -752,28 +729,7 @@ public:
 #endif
     }
     
-    // Create tensor descriptor for strided operations
-    cuda_utils::TensorDescriptor descriptor() const {
-        cuda_utils::TensorDescriptor desc;
-        desc.data = static_cast<void*>(data_);
-        desc.ndims = static_cast<int>(ndims());
-        desc.offset = offset_;
-        desc.total_size = shape_.size();
-        
-        // Copy shape and strides (convert from size_t to int)
-        for (int i = 0; i < desc.ndims; ++i) {
-            desc.shape[i] = static_cast<int>(shape_[i]);
-            desc.strides[i] = static_cast<int>(strides_[i]);
-        }
-        
-        // Zero out unused dimensions
-        for (int i = desc.ndims; i < 8; ++i) {
-            desc.shape[i] = 0;
-            desc.strides[i] = 0;
-        }
-        
-        return desc;
-    }
+
     
     // Print tensor info (always available)
     std::string info() const {

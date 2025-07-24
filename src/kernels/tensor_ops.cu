@@ -252,6 +252,35 @@ void launch_matmul(T* C, const T* A, const T* B, size_t M, size_t N, size_t K, c
     matmul_tiled_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(C, A, B, M, N, K);
 }
 
+// Launch outer product: result[i,j] = a[i] * b[j]
+template<typename T>
+void launch_outer_product(T* result, const T* a, const T* b, size_t M, size_t N, cudaStream_t stream = 0) {
+    dim3 threadsPerBlock(16, 16);
+    dim3 blocksPerGrid((N + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                       (M + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    
+    outer_product_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(result, a, b, M, N);
+}
+
+// Launch matrix-vector multiplication: result[i] = sum_j(A[i,j] * v[j])
+template<typename T>
+void launch_matvec(T* result, const T* A, const T* v, size_t M, size_t N, cudaStream_t stream = 0) {
+    int blockSize = 256;
+    int gridSize = (M + blockSize - 1) / blockSize;
+    
+    // Temporarily use simple version for debugging
+    matvec_kernel<<<gridSize, blockSize, 0, stream>>>(result, A, v, M, N);
+}
+
+// Launch vector-matrix multiplication: result[j] = sum_i(v[i] * A[i,j])
+template<typename T>
+void launch_vecmat(T* result, const T* v, const T* A, size_t M, size_t N, cudaStream_t stream = 0) {
+    int blockSize = 256;
+    int gridSize = (N + blockSize - 1) / blockSize;
+    
+    vecmat_kernel<<<gridSize, blockSize, 0, stream>>>(result, v, A, M, N);
+}
+
 // Launch helper for broadcast operations
 template<typename T, typename Op>
 void launch_broadcast_binary(
@@ -989,6 +1018,45 @@ void tensor_matmul_float32(float* C, const float* A, const float* B, size_t M, s
 
 void tensor_matmul_float64(double* C, const double* A, const double* B, size_t M, size_t N, size_t K) {
     launch_matmul<double>(C, A, B, M, N, K);
+}
+
+// Outer product operations
+void tensor_outer_product_float16(half* result, const half* a, const half* b, size_t M, size_t N) {
+    launch_outer_product<half>(result, a, b, M, N);
+}
+
+void tensor_outer_product_float32(float* result, const float* a, const float* b, size_t M, size_t N) {
+    launch_outer_product<float>(result, a, b, M, N);
+}
+
+void tensor_outer_product_float64(double* result, const double* a, const double* b, size_t M, size_t N) {
+    launch_outer_product<double>(result, a, b, M, N);
+}
+
+// Matrix-vector multiplication operations
+void tensor_matvec_float16(half* result, const half* A, const half* v, size_t M, size_t N) {
+    launch_matvec<half>(result, A, v, M, N);
+}
+
+void tensor_matvec_float32(float* result, const float* A, const float* v, size_t M, size_t N) {
+    launch_matvec<float>(result, A, v, M, N);
+}
+
+void tensor_matvec_float64(double* result, const double* A, const double* v, size_t M, size_t N) {
+    launch_matvec<double>(result, A, v, M, N);
+}
+
+// Vector-matrix multiplication operations
+void tensor_vecmat_float16(half* result, const half* v, const half* A, size_t M, size_t N) {
+    launch_vecmat<half>(result, v, A, M, N);
+}
+
+void tensor_vecmat_float32(float* result, const float* v, const float* A, size_t M, size_t N) {
+    launch_vecmat<float>(result, v, A, M, N);
+}
+
+void tensor_vecmat_float64(double* result, const double* v, const double* A, size_t M, size_t N) {
+    launch_vecmat<double>(result, v, A, M, N);
 }
 
 // Strided copy operations
