@@ -3,9 +3,35 @@
 
 #include "gpuTensor.h"
 #include <memory>
+#include <stdexcept>
+#include <cuda_runtime.h>
+#include <cuda_fp16.h>
 #include <typeinfo>
 #include <unordered_map>
 #include <functional>
+
+// Forward declarations for CUDA kernel functions
+extern "C" {
+    // Sum reductions
+    float tensor_sum_float16(const half* input, size_t n);
+    float tensor_sum_float32(const float* input, size_t n);
+    double tensor_sum_float64(const double* input, size_t n);
+    int64_t tensor_sum_int64(const int64_t* input, size_t n);
+    
+    // Min/max reductions
+    float tensor_max_float32(const float* input, size_t n);
+    double tensor_max_float64(const double* input, size_t n);
+    float tensor_min_float32(const float* input, size_t n);
+    double tensor_min_float64(const double* input, size_t n);
+
+    // Product reductions
+    float tensor_prod_float32(const float* input, size_t n);
+    double tensor_prod_float64(const double* input, size_t n);
+
+    // Variance computations (population)
+    double tensor_var_float32(const float* input, size_t n);
+    double tensor_var_float64(const double* input, size_t n);
+}
 
 // Forward declarations of CUDA kernels (see tensor_ops.cu)
 extern "C" {
@@ -84,7 +110,12 @@ public:
     virtual std::unique_ptr<TensorBase> mul(const TensorBase& other) const = 0;
     virtual std::unique_ptr<TensorBase> scalar_mul(double scalar) const = 0;
     virtual std::unique_ptr<TensorBase> matmul(const TensorBase& other) const = 0;
-    virtual double sum() const = 0;
+    virtual std::unique_ptr<TensorBase> sum() const = 0;  // Return tensor instead of scalar
+    virtual std::unique_ptr<TensorBase> mean() const = 0;  // Add mean
+    virtual std::unique_ptr<TensorBase> max() const = 0;   // Add max
+    virtual std::unique_ptr<TensorBase> min() const = 0;   // Add min
+    virtual std::unique_ptr<TensorBase> prod() const = 0;  // Add prod
+    virtual std::unique_ptr<TensorBase> var() const = 0;   // Add var
     
     // Clone operation
     virtual std::unique_ptr<TensorBase> clone() const = 0;
@@ -309,16 +340,121 @@ public:
         return std::make_unique<TensorWrapper<T>>(result);
     }
 
-    double sum() const override {
+    std::unique_ptr<TensorBase> sum() const override {
         gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
         if constexpr (std::is_same_v<T, float>) {
-            return static_cast<double>(tensor_sum_float32(a_contig.data(), a_contig.size()));
+            float result_val = tensor_sum_float32(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<float>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(float), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<float>>(result);
         } else if constexpr (std::is_same_v<T, double>) {
-            return tensor_sum_float64(a_contig.data(), a_contig.size());
+            double result_val = tensor_sum_float64(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<double>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(double), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<double>>(result);
         } else if constexpr (std::is_same_v<T, half>) {
-            return static_cast<double>(tensor_sum_float16(a_contig.data(), a_contig.size()));
+            float result_val = tensor_sum_float16(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<half>>(Shape{1});
+            half half_val = __float2half(result_val);
+            cudaMemcpy(result->data(), &half_val, sizeof(half), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<half>>(result);
         } else {
             throw std::runtime_error("sum not implemented for this type");
+        }
+    }
+
+    std::unique_ptr<TensorBase> mean() const override {
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        if constexpr (std::is_same_v<T, float>) {
+            float sum_val = tensor_sum_float32(a_contig.data(), a_contig.size());
+            float result_val = sum_val / static_cast<float>(a_contig.size());
+            auto result = std::make_shared<gpuTensor<float>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(float), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<float>>(result);
+        } else if constexpr (std::is_same_v<T, double>) {
+            double sum_val = tensor_sum_float64(a_contig.data(), a_contig.size());
+            double result_val = sum_val / static_cast<double>(a_contig.size());
+            auto result = std::make_shared<gpuTensor<double>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(double), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<double>>(result);
+        } else if constexpr (std::is_same_v<T, half>) {
+            float sum_val = tensor_sum_float16(a_contig.data(), a_contig.size());
+            float result_val = sum_val / static_cast<float>(a_contig.size());
+            auto result = std::make_shared<gpuTensor<half>>(Shape{1});
+            half half_val = __float2half(result_val);
+            cudaMemcpy(result->data(), &half_val, sizeof(half), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<half>>(result);
+        } else {
+            throw std::runtime_error("mean not implemented for this type");
+        }
+    }
+
+    std::unique_ptr<TensorBase> max() const override {
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        if constexpr (std::is_same_v<T, float>) {
+            float result_val = tensor_max_float32(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<float>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(float), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<float>>(result);
+        } else if constexpr (std::is_same_v<T, double>) {
+            double result_val = tensor_max_float64(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<double>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(double), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<double>>(result);
+        } else {
+            throw std::runtime_error("max not implemented for this type");
+        }
+    }
+
+    std::unique_ptr<TensorBase> min() const override {
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        if constexpr (std::is_same_v<T, float>) {
+            float result_val = tensor_min_float32(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<float>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(float), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<float>>(result);
+        } else if constexpr (std::is_same_v<T, double>) {
+            double result_val = tensor_min_float64(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<double>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(double), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<double>>(result);
+        } else {
+            throw std::runtime_error("min not implemented for this type");
+        }
+    }
+
+    std::unique_ptr<TensorBase> prod() const override {
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        if constexpr (std::is_same_v<T, float>) {
+            float result_val = tensor_prod_float32(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<float>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(float), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<float>>(result);
+        } else if constexpr (std::is_same_v<T, double>) {
+            double result_val = tensor_prod_float64(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<double>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(double), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<double>>(result);
+        } else {
+            throw std::runtime_error("prod not implemented for this type");
+        }
+    }
+
+    std::unique_ptr<TensorBase> var() const override {
+        gpuTensor<T> a_contig = tensor_->is_contiguous() ? *tensor_ : tensor_->contiguous();
+        if constexpr (std::is_same_v<T, float>) {
+            double result_val = tensor_var_float32(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<float>>(Shape{1});
+            float float_val = static_cast<float>(result_val);
+            cudaMemcpy(result->data(), &float_val, sizeof(float), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<float>>(result);
+        } else if constexpr (std::is_same_v<T, double>) {
+            double result_val = tensor_var_float64(a_contig.data(), a_contig.size());
+            auto result = std::make_shared<gpuTensor<double>>(Shape{1});
+            cudaMemcpy(result->data(), &result_val, sizeof(double), cudaMemcpyHostToDevice);
+            return std::make_unique<TensorWrapper<double>>(result);
+        } else {
+            throw std::runtime_error("var not implemented for this type");
         }
     }
     

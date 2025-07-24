@@ -38,8 +38,8 @@ test_that("Sum reduction works correctly", {
   tensor_1d <- as_tensor(data_1d, dtype = "float")
   result_1d <- sum(tensor_1d)
   
-  # Reductions return R scalars, not gpuTensors
-  expect_equal(as.numeric(result_1d), expected_1d, tolerance = 1e-6)
+  # Reductions now return tensors, not scalars
+  expect_equal(as.vector(result_1d), expected_1d, tolerance = 1e-6)
   
   # Test 2D sum
   data_2d <- matrix(1:12, nrow = 3, ncol = 4)
@@ -48,7 +48,7 @@ test_that("Sum reduction works correctly", {
   tensor_2d <- as_tensor(data_2d, dtype = "float")
   result_2d <- sum(tensor_2d)
   
-  expect_equal(as.numeric(result_2d), expected_2d, tolerance = 1e-6)
+  expect_equal(as.vector(result_2d), expected_2d, tolerance = 1e-6)
 })
 
 test_that("Mean reduction works correctly", {
@@ -59,7 +59,7 @@ test_that("Mean reduction works correctly", {
   tensor_1d <- as_tensor(data_1d, dtype = "float")
   result_1d <- mean(tensor_1d)
   
-  expect_equal(as.numeric(result_1d), expected_1d, tolerance = 1e-6)
+  expect_equal(as.vector(result_1d), expected_1d, tolerance = 1e-6)
   
   # Test 2D mean
   data_2d <- matrix(1:6, nrow = 2, ncol = 3)
@@ -68,7 +68,7 @@ test_that("Mean reduction works correctly", {
   tensor_2d <- as_tensor(data_2d, dtype = "float")
   result_2d <- mean(tensor_2d)
   
-  expect_equal(as.numeric(result_2d), expected_2d, tolerance = 1e-6)
+  expect_equal(as.vector(result_2d), expected_2d, tolerance = 1e-6)
 })
 
 test_that("Max reduction works correctly", {
@@ -79,7 +79,7 @@ test_that("Max reduction works correctly", {
   tensor_1d <- as_tensor(data_1d, dtype = "float")
   result_1d <- max(tensor_1d)
   
-  expect_equal(as.numeric(result_1d), expected_1d, tolerance = 1e-6)
+  expect_equal(as.vector(result_1d), expected_1d, tolerance = 1e-6)
   
   # Test 2D max
   data_2d <- matrix(c(1, 5, 2, 8, 3, 7), nrow = 2, ncol = 3)
@@ -88,7 +88,7 @@ test_that("Max reduction works correctly", {
   tensor_2d <- as_tensor(data_2d, dtype = "float")
   result_2d <- max(tensor_2d)
   
-  expect_equal(as.numeric(result_2d), expected_2d, tolerance = 1e-6)
+  expect_equal(as.vector(result_2d), expected_2d, tolerance = 1e-6)
 })
 
 test_that("Min reduction works correctly", {
@@ -99,7 +99,7 @@ test_that("Min reduction works correctly", {
   tensor_1d <- as_tensor(data_1d, dtype = "float")
   result_1d <- min(tensor_1d)
   
-  expect_equal(as.numeric(result_1d), expected_1d, tolerance = 1e-6)
+  expect_equal(as.vector(result_1d), expected_1d, tolerance = 1e-6)
   
   # Test 2D min
   data_2d <- matrix(c(5, 1, 8, 2, 7, 3), nrow = 2, ncol = 3)
@@ -108,7 +108,7 @@ test_that("Min reduction works correctly", {
   tensor_2d <- as_tensor(data_2d, dtype = "float")
   result_2d <- min(tensor_2d)
   
-  expect_equal(as.numeric(result_2d), expected_2d, tolerance = 1e-6)
+  expect_equal(as.vector(result_2d), expected_2d, tolerance = 1e-6)
 })
 
 test_that("Product and variance reductions work correctly", {
@@ -119,7 +119,7 @@ test_that("Product and variance reductions work correctly", {
   tensor_1d <- as_tensor(data_1d, dtype = "float")
   result_1d <- prod(tensor_1d)
   
-  expect_equal(as.numeric(result_1d), expected_1d, tolerance = 1e-6)
+  expect_equal(as.vector(result_1d), expected_1d, tolerance = 1e-6)
   
   # Test 1D variance
   data_var <- c(1, 2, 3, 4, 5)
@@ -128,7 +128,7 @@ test_that("Product and variance reductions work correctly", {
   tensor_var <- as_tensor(data_var, dtype = "float")
   result_var <- var(tensor_var)
   
-  expect_equal(as.numeric(result_var), expected_var, tolerance = 1e-5)
+  expect_equal(as.vector(result_var), expected_var, tolerance = 1e-5)
 })
 
 # =============================================================================
@@ -412,9 +412,9 @@ test_that("Advanced operations maintain GPU execution with large tensors", {
   # Verify results are reasonable
   expect_true(all(as.vector(relu_result) >= 0))  # ReLU output should be non-negative
   
-  # Reduction operations (return scalars)
+  # Reduction operations (return tensors now)
   sum_result <- sum(large_tensor)
-  expect_true(is.finite(as.numeric(sum_result)))
+  expect_true(is.finite(as.vector(sum_result)))
 })
 
 test_that("Chained advanced operations work correctly", {
@@ -425,10 +425,10 @@ test_that("Chained advanced operations work correctly", {
   # Chain: relu -> exp -> sum
   relu_result <- relu(tensor)
   exp_result <- exp(relu_result * 0.5)  # Small multiplier
-  final_sum <- sum(exp_result)  # This returns a scalar
+  final_sum <- sum(exp_result)  # This returns a tensor now
   
   expect_true(verify_gpu_tensor(relu_result, "chained relu"))
   expect_true(verify_gpu_tensor(exp_result, "chained exp"))
-  expect_true(is.finite(as.numeric(final_sum)))
-  expect_gt(as.numeric(final_sum), 0)  # Should be positive
+  expect_true(is.finite(as.vector(final_sum)))
+  expect_gt(as.vector(final_sum), 0)  # Should be positive
 }) 

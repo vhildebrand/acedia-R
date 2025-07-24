@@ -483,7 +483,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // tensor_sum_unified
-double tensor_sum_unified(SEXP tensor_ptr);
+SEXP tensor_sum_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_sum_unified(SEXP tensor_ptrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -494,7 +494,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // tensor_mean_unified
-double tensor_mean_unified(SEXP tensor_ptr);
+SEXP tensor_mean_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_mean_unified(SEXP tensor_ptrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -505,7 +505,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // tensor_max_unified
-double tensor_max_unified(SEXP tensor_ptr);
+SEXP tensor_max_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_max_unified(SEXP tensor_ptrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -516,7 +516,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // tensor_min_unified
-double tensor_min_unified(SEXP tensor_ptr);
+SEXP tensor_min_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_min_unified(SEXP tensor_ptrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -527,7 +527,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // tensor_prod_unified
-double tensor_prod_unified(SEXP tensor_ptr);
+SEXP tensor_prod_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_prod_unified(SEXP tensor_ptrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -538,7 +538,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // tensor_var_unified
-double tensor_var_unified(SEXP tensor_ptr);
+SEXP tensor_var_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_var_unified(SEXP tensor_ptrSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

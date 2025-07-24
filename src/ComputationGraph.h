@@ -6,6 +6,8 @@
 #include <string>
 #include <functional>
 #include <unordered_set>
+#include <stdexcept>
+#include "TensorRegistry.h"  // Added for tensor utilities
 
 // Forward declarations
 template<typename T> class gpuTensor;
@@ -36,6 +38,9 @@ public:
     
     // Get the tensor associated with this node
     virtual std::shared_ptr<TensorBase> get_tensor() const = 0;
+
+    // New: clear stored gradient (optional override)
+    virtual void clear_gradient() { /* default no-op */ }
 };
 
 /**
@@ -64,7 +69,8 @@ public:
     void set_gradient(std::shared_ptr<TensorBase> grad) override {
         if (gradient_) {
             // Accumulate gradients if already exists
-            gradient_ = gradient_->add(*grad);
+            auto accumulated = gradient_->add(*grad);
+            gradient_.reset(accumulated.release());
         } else {
             gradient_ = grad;
         }
@@ -77,6 +83,10 @@ public:
     bool requires_grad() const override { return requires_grad_; }
     
     std::shared_ptr<TensorBase> get_tensor() const override { return tensor_; }
+
+    void clear_gradient() override {
+        gradient_.reset();
+    }
 };
 
 /**
@@ -107,7 +117,13 @@ public:
     }
     
     void set_gradient(std::shared_ptr<TensorBase> grad) override {
-        output_gradient_ = grad;
+        if (output_gradient_) {
+            // Accumulate gradients (add returns unique_ptr)
+            auto accumulated = output_gradient_->add(*grad);
+            output_gradient_.reset(accumulated.release());
+        } else {
+            output_gradient_ = grad;
+        }
     }
     
     std::shared_ptr<TensorBase> get_gradient() const override {
@@ -117,6 +133,13 @@ public:
     bool requires_grad() const override { return requires_grad_; }
     
     std::shared_ptr<TensorBase> get_tensor() const override { return output_tensor_; }
+
+    void clear_gradient() override {
+        output_gradient_.reset();
+        for (auto& inp : inputs_) {
+            inp->clear_gradient();
+        }
+    }
 
 protected:
     void set_output_tensor(std::shared_ptr<TensorBase> tensor) {
@@ -248,12 +271,9 @@ private:
 public:
     // Execute backward pass from a root node
     void backward(std::shared_ptr<GraphNode> root) {
-        // Set gradient of root to ones (for scalar outputs)
-        if (!root->get_gradient()) {
-            // Create ones tensor with same shape as root
-            auto ones = create_ones_like(root->get_tensor());
-            root->set_gradient(ones);
-        }
+        // Always add unit gradient to the root (accumulates internally)
+        auto ones = create_ones_like(root->get_tensor());
+        root->set_gradient(ones);
         
         // Get topological ordering
         std::vector<std::shared_ptr<GraphNode>> topo_order;
@@ -284,9 +304,29 @@ private:
     }
     
     std::shared_ptr<TensorBase> create_ones_like(std::shared_ptr<TensorBase> tensor) {
-        // TODO: Implement create_ones_like function
-        // For now, return nullptr - this needs to be implemented
-        return nullptr;
+        using TensorPtr = std::shared_ptr<TensorBase>;
+        auto shape = tensor->shape();
+        auto dtype = tensor->dtype();
+        // Create empty tensor with same dtype/shape
+        std::unique_ptr<TensorBase> empty = TensorWrapper<float>::create_empty_tensor_by_dtype_enum(shape, dtype);
+        TensorPtr ones(empty.release());
+
+        size_t n = tensor->size();
+        switch (dtype) {
+            case DType::FLOAT32: {
+                std::vector<float> host(n, 1.0f);
+                ones->copy_from_host_generic(host.data());
+                break;
+            }
+            case DType::FLOAT64: {
+                std::vector<double> host(n, 1.0);
+                ones->copy_from_host_generic(host.data());
+                break;
+            }
+            default:
+                throw std::runtime_error("create_ones_like: dtype not supported");
+        }
+        return ones;
     }
 };
 

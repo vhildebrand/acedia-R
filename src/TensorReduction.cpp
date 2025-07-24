@@ -29,11 +29,8 @@ extern "C" {
     double tensor_var_float64(const double* input, size_t n);
 }
 
-// Declare the tensor_sum_unified function (needed for mean calculation)
-double tensor_sum_unified(SEXP tensor_ptr);
-
 // [[Rcpp::export]]
-double tensor_sum_unified(SEXP tensor_ptr) {
+SEXP tensor_sum_unified(SEXP tensor_ptr) {
     try {
         XPtr<TensorBase> tensor(tensor_ptr);
         
@@ -41,57 +38,21 @@ double tensor_sum_unified(SEXP tensor_ptr) {
             stop("Invalid tensor pointer");
         }
         
-        DType dtype = tensor->dtype();
-        double result = 0.0;
+        // Use the new TensorBase::sum() method that returns a tensor
+        auto result_tensor = tensor->sum();
         
-        switch (dtype) {
-            case DType::FLOAT16: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<half>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT16");
-                }
-                result = static_cast<double>(tensor_sum_float16(tensor_wrapper->tensor().data(), 
-                                                              tensor->size()));
-                break;
-            }
-            case DType::FLOAT32: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
-                }
-                result = static_cast<double>(tensor_sum_float32(tensor_wrapper->tensor().data(), 
-                                                              tensor->size()));
-                break;
-            }
-            case DType::FLOAT64: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
-                }
-                result = tensor_sum_float64(tensor_wrapper->tensor().data(), tensor->size());
-                break;
-            }
-            case DType::INT64: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<int64_t>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for INT64");
-                }
-                result = static_cast<double>(tensor_sum_int64(tensor_wrapper->tensor().data(), 
-                                                            tensor->size()));
-                break;
-            }
-            default:
-                stop("Sum operation not yet implemented for dtype: " + dtype_to_string(dtype));
-        }
-        
-        return result;
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor sum: " + std::string(e.what()));
     }
 }
 
 // [[Rcpp::export]]
-double tensor_mean_unified(SEXP tensor_ptr) {
+SEXP tensor_mean_unified(SEXP tensor_ptr) {
     try {
         XPtr<TensorBase> tensor(tensor_ptr);
         
@@ -100,19 +61,24 @@ double tensor_mean_unified(SEXP tensor_ptr) {
         }
         
         if (tensor->size() == 0) {
-            return 0.0;
+            stop("Cannot compute mean of empty tensor");
         }
         
-        // Get sum and divide by size
-        double total_sum = tensor_sum_unified(tensor_ptr);
-        return total_sum / static_cast<double>(tensor->size());
+        // Use the new TensorBase::mean() method that returns a tensor
+        auto result_tensor = tensor->mean();
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor mean: " + std::string(e.what()));
     }
 }
 
 // [[Rcpp::export]]
-double tensor_max_unified(SEXP tensor_ptr) {
+SEXP tensor_max_unified(SEXP tensor_ptr) {
     try {
         XPtr<TensorBase> tensor(tensor_ptr);
         
@@ -120,39 +86,21 @@ double tensor_max_unified(SEXP tensor_ptr) {
             stop("Invalid tensor pointer");
         }
         
-        DType dtype = tensor->dtype();
-        double result = 0.0;
+        // Use the new TensorBase::max() method that returns a tensor
+        auto result_tensor = tensor->max();
         
-        switch (dtype) {
-            case DType::FLOAT32: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
-                }
-                result = static_cast<double>(tensor_max_float32(tensor_wrapper->tensor().data(), 
-                                                              tensor->size()));
-                break;
-            }
-            case DType::FLOAT64: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
-                }
-                result = tensor_max_float64(tensor_wrapper->tensor().data(), tensor->size());
-                break;
-            }
-            default:
-                stop("Max operation not yet implemented for dtype: " + dtype_to_string(dtype));
-        }
-        
-        return result;
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor max: " + std::string(e.what()));
     }
 }
 
 // [[Rcpp::export]]
-double tensor_min_unified(SEXP tensor_ptr) {
+SEXP tensor_min_unified(SEXP tensor_ptr) {
     try {
         XPtr<TensorBase> tensor(tensor_ptr);
         
@@ -160,91 +108,53 @@ double tensor_min_unified(SEXP tensor_ptr) {
             stop("Invalid tensor pointer");
         }
         
-        DType dtype = tensor->dtype();
-        double result = 0.0;
+        // Use the new TensorBase::min() method that returns a tensor
+        auto result_tensor = tensor->min();
         
-        switch (dtype) {
-            case DType::FLOAT32: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
-                }
-                result = static_cast<double>(tensor_min_float32(tensor_wrapper->tensor().data(), 
-                                                              tensor->size()));
-                break;
-            }
-            case DType::FLOAT64: {
-                auto tensor_wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
-                if (!tensor_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
-                }
-                result = tensor_min_float64(tensor_wrapper->tensor().data(), tensor->size());
-                break;
-            }
-            default:
-                stop("Min operation not yet implemented for dtype: " + dtype_to_string(dtype));
-        }
-        
-        return result;
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor min: " + std::string(e.what()));
     }
 } 
 
 // [[Rcpp::export]]
-double tensor_prod_unified(SEXP tensor_ptr) {
+SEXP tensor_prod_unified(SEXP tensor_ptr) {
     try {
         XPtr<TensorBase> tensor(tensor_ptr);
         if (!tensor) stop("Invalid tensor pointer");
-        DType dtype = tensor->dtype();
-        double result = 1.0;
-        switch (dtype) {
-            case DType::FLOAT32: {
-                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
-                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
-                result = static_cast<double>(tensor_prod_float32(tw->tensor().data(), tensor->size()));
-                break;
-            }
-            case DType::FLOAT64: {
-                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
-                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
-                result = tensor_prod_float64(tw->tensor().data(), tensor->size());
-                break;
-            }
-            default:
-                stop("Product operation not yet implemented for dtype: " + dtype_to_string(dtype));
-        }
-        return result;
+        
+        // Use the new TensorBase::prod() method that returns a tensor
+        auto result_tensor = tensor->prod();
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor prod: " + std::string(e.what()));
     }
 }
 
 // [[Rcpp::export]]
-double tensor_var_unified(SEXP tensor_ptr) {
+SEXP tensor_var_unified(SEXP tensor_ptr) {
     try {
         XPtr<TensorBase> tensor(tensor_ptr);
         if (!tensor) stop("Invalid tensor pointer");
-        if (tensor->size() == 0) return 0.0;
-        DType dtype = tensor->dtype();
-        double result = 0.0;
-        switch (dtype) {
-            case DType::FLOAT32: {
-                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
-                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
-                result = tensor_var_float32(tw->tensor().data(), tensor->size());
-                break;
-            }
-            case DType::FLOAT64: {
-                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
-                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
-                result = tensor_var_float64(tw->tensor().data(), tensor->size());
-                break;
-            }
-            default:
-                stop("Variance operation not yet implemented for dtype: " + dtype_to_string(dtype));
-        }
-        return result;
+        if (tensor->size() == 0) stop("Cannot compute variance of empty tensor");
+        
+        // Use the new TensorBase::var() method that returns a tensor
+        auto result_tensor = tensor->var();
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor variance: " + std::string(e.what()));
     }
