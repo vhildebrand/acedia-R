@@ -216,6 +216,34 @@ to_numeric <- function(x) {
   }
 }
 
+#' Create Ones Like Tensor
+#'
+#' Creates a tensor filled with ones that has the same shape, dtype, and device as the input tensor.
+#'
+#' @param tensor A gpuTensor object to match shape/dtype/device
+#' @return A gpuTensor filled with ones
+#' @export
+create_ones_like <- function(tensor) {
+  if (!inherits(tensor, "gpuTensor")) {
+    stop("Input must be a gpuTensor")
+  }
+  
+  # Get tensor properties
+  tensor_shape <- shape(tensor)
+  tensor_dtype <- attr(tensor, "dtype", exact=TRUE) %||% "double"
+  
+  # Create empty tensor with same properties
+  ones <- empty_tensor(tensor_shape, dtype = tensor_dtype)
+  
+  # Fill with ones using scalar addition: 0 + 1 = 1
+  zeros <- empty_tensor(tensor_shape, dtype = tensor_dtype)
+  # Use scalar addition to fill with ones
+  result <- tensor_scalar_add_unified(zeros, 1.0)
+  
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
 #' Get Tensor Shape
 #'
 #' @param tensor A gpuTensor object
