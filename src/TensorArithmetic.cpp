@@ -47,10 +47,37 @@ extern "C" {
     void tensor_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
                                     const cuda_utils::TensorDescriptor& a_desc,
                                     const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_add_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_add_strided_int8(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc);
     void tensor_mul_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
                                     const cuda_utils::TensorDescriptor& a_desc,
                                     const cuda_utils::TensorDescriptor& b_desc);
     void tensor_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_mul_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_sub_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_sub_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_div_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_div_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_sub_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                    const cuda_utils::TensorDescriptor& a_desc,
+                                    const cuda_utils::TensorDescriptor& b_desc);
+    void tensor_div_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
                                     const cuda_utils::TensorDescriptor& a_desc,
                                     const cuda_utils::TensorDescriptor& b_desc);
 
@@ -123,9 +150,10 @@ std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shap
 SEXP tensor_scalar_add_unified(SEXP tensor_ptr, double scalar);
 SEXP tensor_scalar_mul_unified(SEXP tensor_ptr, double scalar);
 
-template<typename KernelFunc, typename WrapperType, typename ScalarT>
-std::unique_ptr<TensorBase> binary_elementwise_execute(const TensorBase& a_t, const TensorBase& b_t,
-                                                       KernelFunc kernel) {
+template<typename ContiguousKernelFunc, typename StridedKernelFunc, typename WrapperType, typename ScalarT>
+std::unique_ptr<TensorBase> binary_elementwise_execute_stride_aware(const TensorBase& a_t, const TensorBase& b_t,
+                                                                   ContiguousKernelFunc contiguous_kernel,
+                                                                   StridedKernelFunc strided_kernel) {
     const auto* a_wrap = dynamic_cast<const WrapperType*>(&a_t);
     const auto* b_wrap = dynamic_cast<const WrapperType*>(&b_t);
     if (!a_wrap || !b_wrap) {
@@ -136,23 +164,29 @@ std::unique_ptr<TensorBase> binary_elementwise_execute(const TensorBase& a_t, co
     const gpuTensor<ScalarT>& a_tensor = a_wrap->tensor();
     const gpuTensor<ScalarT>& b_tensor = b_wrap->tensor();
 
-    // Ensure both tensors are contiguous to guarantee correct element order
-    gpuTensor<ScalarT> a_contiguous = a_tensor.is_contiguous() ? a_tensor : a_tensor.contiguous();
-    gpuTensor<ScalarT> b_contiguous = b_tensor.is_contiguous() ? b_tensor : b_tensor.contiguous();
+    // Allocate result tensor (always contiguous)
+    auto result = std::make_shared<gpuTensor<ScalarT>>(a_tensor.shape());
 
-    // Allocate result tensor
-    auto result = std::make_shared<gpuTensor<ScalarT>>(a_contiguous.shape());
-
-    // Launch CUDA kernel (expects contiguous memory)
-    kernel(result->data(), a_contiguous.data(), b_contiguous.data(), result->size());
+    // Check if both tensors are contiguous - if so, use faster contiguous kernel
+    if (a_tensor.is_contiguous() && b_tensor.is_contiguous()) {
+        // Launch fast contiguous CUDA kernel
+        contiguous_kernel(result->data(), a_tensor.data(), b_tensor.data(), result->size());
+    } else {
+        // Use stride-aware kernel for non-contiguous tensors
+        auto a_desc = a_tensor.descriptor();
+        auto b_desc = b_tensor.descriptor();
+        auto out_desc = result->descriptor();
+        
+        strided_kernel(out_desc, a_desc, b_desc);
+    }
 
     return std::make_unique<TensorWrapper<ScalarT>>(result);
 }
 
 // helper macro to reduce duplication
-#define HANDLE_BINARY_OP(dtype_enum, scalar_t, func_name) \
+#define HANDLE_BINARY_OP(dtype_enum, scalar_t, contiguous_func, strided_func) \
     case dtype_enum: { \
-        result_tensor = binary_elementwise_execute<decltype(func_name), TensorWrapper<scalar_t>, scalar_t>(*a_promoted, *b_promoted, func_name); \
+        result_tensor = binary_elementwise_execute_stride_aware<decltype(contiguous_func), decltype(strided_func), TensorWrapper<scalar_t>, scalar_t>(*a_promoted, *b_promoted, contiguous_func, strided_func); \
         break; }
 
 static SEXP tensor_binary_template(SEXP a_ptr, SEXP b_ptr,
@@ -174,9 +208,15 @@ static SEXP tensor_binary_template(SEXP a_ptr, SEXP b_ptr,
     std::unique_ptr<TensorBase> result_tensor;
 
     switch (res_type) {
-        HANDLE_BINARY_OP(DType::FLOAT16, half, is_sub ? tensor_sub_float16 : tensor_div_float16)
-        HANDLE_BINARY_OP(DType::FLOAT32, float, is_sub ? tensor_sub_float32 : tensor_div_float32)
-        HANDLE_BINARY_OP(DType::FLOAT64, double, is_sub ? tensor_sub_float64 : tensor_div_float64)
+        HANDLE_BINARY_OP(DType::FLOAT16, half, 
+                         is_sub ? tensor_sub_float16 : tensor_div_float16,
+                         is_sub ? tensor_sub_strided_float16 : tensor_div_strided_float16)
+        HANDLE_BINARY_OP(DType::FLOAT32, float, 
+                         is_sub ? tensor_sub_float32 : tensor_div_float32,
+                         is_sub ? tensor_sub_strided_float32 : tensor_div_strided_float32)
+        HANDLE_BINARY_OP(DType::FLOAT64, double, 
+                         is_sub ? tensor_sub_float64 : tensor_div_float64,
+                         is_sub ? tensor_sub_strided_float64 : tensor_div_strided_float64)
         default:
             stop("Operation not implemented for dtype: " + dtype_to_string(res_type));
     }
@@ -319,9 +359,22 @@ SEXP tensor_add_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Type promotion failed for FLOAT16");
                 }
+                
                 auto result = std::make_shared<gpuTensor<half>>(a_wrapper->tensor().shape());
-                tensor_add_float16(result->data(), a_wrapper->tensor().data(), 
-                                 b_wrapper->tensor().data(), result->size());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_add_float16(result->data(), a_wrapper->tensor().data(), 
+                                     b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_add_strided_float16(out_desc, a_desc, b_desc);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<half>>(result);
                 break;
             }
@@ -381,9 +434,22 @@ SEXP tensor_add_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Type promotion failed for INT8");
                 }
+                
                 auto result = std::make_shared<gpuTensor<int8_t>>(a_wrapper->tensor().shape());
-                tensor_add_int8(result->data(), a_wrapper->tensor().data(), 
-                              b_wrapper->tensor().data(), result->size());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_add_int8(result->data(), a_wrapper->tensor().data(), 
+                                  b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_add_strided_int8(out_desc, a_desc, b_desc);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<int8_t>>(result);
                 break;
             }
@@ -546,9 +612,22 @@ SEXP tensor_mul_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT16");
                 }
+                
                 auto result = std::make_shared<gpuTensor<half>>(a_wrapper->tensor().shape());
-                tensor_mul_float16(result->data(), a_wrapper->tensor().data(), 
-                                 b_wrapper->tensor().data(), result->size());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_mul_float16(result->data(), a_wrapper->tensor().data(), 
+                                     b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_mul_strided_float16(out_desc, a_desc, b_desc);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<half>>(result);
                 break;
             }
@@ -558,13 +637,22 @@ SEXP tensor_mul_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
                 }
-                // Ensure both tensors are contiguous
-                auto a_tensor_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
-                auto b_tensor_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
-
-                auto result = std::make_shared<gpuTensor<float>>(a_tensor_contig.shape());
-                tensor_mul_float32(result->data(), a_tensor_contig.data(), 
-                                   b_tensor_contig.data(), result->size());
+                
+                auto result = std::make_shared<gpuTensor<float>>(a_wrapper->tensor().shape());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_mul_float32(result->data(), a_wrapper->tensor().data(), 
+                                       b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_mul_strided_float32(out_desc, a_desc, b_desc);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
@@ -574,13 +662,22 @@ SEXP tensor_mul_unified(SEXP a_ptr, SEXP b_ptr) {
                 if (!a_wrapper || !b_wrapper) {
                     throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
                 }
-                // Ensure both tensors are contiguous
-                auto a_tensor_contig = a_wrapper->tensor().is_contiguous() ? a_wrapper->tensor() : a_wrapper->tensor().contiguous();
-                auto b_tensor_contig = b_wrapper->tensor().is_contiguous() ? b_wrapper->tensor() : b_wrapper->tensor().contiguous();
-
-                auto result = std::make_shared<gpuTensor<double>>(a_tensor_contig.shape());
-                tensor_mul_float64(result->data(), a_tensor_contig.data(), 
-                                   b_tensor_contig.data(), result->size());
+                
+                auto result = std::make_shared<gpuTensor<double>>(a_wrapper->tensor().shape());
+                
+                // Choose kernel based on contiguity
+                if (a_wrapper->tensor().is_contiguous() && b_wrapper->tensor().is_contiguous()) {
+                    // Fast path: use flat kernel for contiguous tensors
+                    tensor_mul_float64(result->data(), a_wrapper->tensor().data(), 
+                                       b_wrapper->tensor().data(), result->size());
+                } else {
+                    // Strided path: use descriptor-based kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto a_desc = a_wrapper->tensor().descriptor();
+                    auto b_desc = b_wrapper->tensor().descriptor();
+                    tensor_mul_strided_float64(out_desc, a_desc, b_desc);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }

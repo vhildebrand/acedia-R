@@ -1235,6 +1235,32 @@ void tensor_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
     cudaDeviceSynchronize();
 }
 
+void tensor_add_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<half, AddOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_add_strided_int8(const cuda_utils::TensorDescriptor& out_desc,
+                            const cuda_utils::TensorDescriptor& a_desc,
+                            const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<int8_t, AddOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
 void tensor_exp_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
                                 const cuda_utils::TensorDescriptor& in_desc) {
     size_t total_elements = out_desc.total_size;
@@ -1281,6 +1307,97 @@ void tensor_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
     int grid_size = (total_elements + block_size - 1) / block_size;
     
     strided_binary_kernel<double, MulOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_mul_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<half, MulOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_sub_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, SubOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_sub_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, SubOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_div_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, DivOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_div_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, DivOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_sub_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<half, SubOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_div_strided_float16(const cuda_utils::TensorDescriptor& out_desc,
+                                const cuda_utils::TensorDescriptor& a_desc,
+                                const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<half, DivOp><<<grid_size, block_size>>>(
         out_desc, a_desc, b_desc, total_elements
     );
     cudaDeviceSynchronize();
