@@ -644,8 +644,28 @@ __global__ void axis_reduction_kernel(
         }
     }
     
-    // Store thread result in shared memory
-    sdata[tid] = thread_accumulator;
+    // Store thread result in shared memory, but handle threads that processed no elements
+    if (op == 3 && thread_first) {  // min operation and thread processed no elements
+        // Set to positive infinity so it doesn't affect the min reduction
+        if constexpr (std::is_same_v<AccumType, float>) {
+            sdata[tid] = INFINITY;
+        } else if constexpr (std::is_same_v<AccumType, double>) {
+            sdata[tid] = INFINITY;
+        } else {
+            sdata[tid] = thread_accumulator;  // Fallback for other types
+        }
+    } else if (op == 2 && thread_first) {  // max operation and thread processed no elements
+        // Set to negative infinity so it doesn't affect the max reduction
+        if constexpr (std::is_same_v<AccumType, float>) {
+            sdata[tid] = -INFINITY;
+        } else if constexpr (std::is_same_v<AccumType, double>) {
+            sdata[tid] = -INFINITY;
+        } else {
+            sdata[tid] = thread_accumulator;  // Fallback for other types
+        }
+    } else {
+        sdata[tid] = thread_accumulator;
+    }
     __syncthreads();
     
     // Reduce within block

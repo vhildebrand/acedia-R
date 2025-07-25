@@ -6,14 +6,11 @@
 #' @param shape An integer vector specifying the tensor dimensions
 #' @param dtype Data type: "double" or "float" (default: "double")
 #' @param device Device location: "cuda" or "cpu" (default: "cuda")
-#' @param requires_grad Whether to track gradients (default: FALSE)
-#' 
 #' @return A gpuTensor object
 #' 
 #' @details
 #' This function creates a multi-dimensional GPU tensor with the specified shape.
-#' The tensor supports views, broadcasting, async operations, and automatic differentiation
-#' when requires_grad=TRUE.
+#' The tensor supports views, broadcasting, and async operations.
 #' 
 #' @examples
 #' \dontrun{
@@ -24,12 +21,12 @@
 #' # Create a 3D tensor
 #' tensor_3d <- gpu_tensor(runif(24), shape = c(2, 3, 4))
 #' 
-#' # Create with gradient tracking
-#' tensor_grad <- gpu_tensor(1:6, shape = c(2, 3), requires_grad = TRUE)
+#' # Create float32 tensor
+#' tensor_f32 <- gpu_tensor(1:6, shape = c(2, 3), dtype = "float")
 #' }
 #' 
 #' @export
-gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_grad = FALSE) {
+gpu_tensor <- function(data, shape, dtype = "double", device = "cuda") {
   if (!is.numeric(data)) {
     stop("Data must be numeric")
   }
@@ -64,10 +61,7 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
   # Create tensor using unified interface
   tensor <- create_tensor_unified(as.numeric(data), shape, dtype)
   
-  # Note: requires_grad functionality needs to be implemented for unified interface  
-  if (requires_grad) {
-    warning("requires_grad is not yet implemented for the unified interface")
-  }
+
   
   # Ensure proper class structure (avoid duplicates)
   # Fix any= class duplication issues from C++ 
@@ -92,12 +86,10 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
 #' @param shape An integer vector specifying the tensor dimensions
 #' @param dtype Data type: "double" or "float" (default: "double")
 #' @param device Device location: "cuda" or "cpu" (default: "cuda")
-#' @param requires_grad Whether to track gradients (default: FALSE)
-#' 
 #' @return An empty gpuTensor object
 #' 
 #' @export
-empty_tensor <- function(shape, dtype = "double", device = "cuda", requires_grad = FALSE) {
+empty_tensor <- function(shape, dtype = "double", device = "cuda") {
   # Validate and normalize dtype for empty tensor
   if (dtype == "float32") {
     dtype <- "float"  # Map float32 to float for compatibility
@@ -124,10 +116,7 @@ empty_tensor <- function(shape, dtype = "double", device = "cuda", requires_grad
   # Create empty tensor using unified interface
   tensor <- create_empty_tensor_unified(shape, dtype)
   
-  # Note: requires_grad functionality needs to be implemented for unified interface
-  if (requires_grad) {
-    warning("requires_grad is not yet implemented for the unified interface")
-  }
+
   
   class(tensor) <- c("gpuTensor", class(tensor))
   return(tensor)
@@ -146,19 +135,18 @@ as_tensor <- function(x, ...) {
 
 #' @rdname as_tensor
 #' @param dtype Data type for the tensor (default: "double")
-#' @param requires_grad Whether to track gradients (default: FALSE)
 #' @param shape Optional shape to reshape the data (default: NULL, uses input shape)
 #' @export
-as_tensor.default <- function(x, dtype = "double", requires_grad = FALSE, shape = NULL, ...) {
+as_tensor.default <- function(x, dtype = "double", shape = NULL, ...) {
   if (is.array(x) || is.matrix(x)) {
     if (!is.null(shape)) {
       # Check if size matches
       if (length(as.vector(x)) != prod(shape)) {
         stop("Data size (", length(as.vector(x)), ") does not match shape size (", prod(shape), ")")
       }
-      gpu_tensor(data = as.vector(x), shape = shape, dtype = dtype, requires_grad = requires_grad)
+      gpu_tensor(data = as.vector(x), shape = shape, dtype = dtype)
     } else {
-      gpu_tensor(data = as.vector(x), shape = dim(x), dtype = dtype, requires_grad = requires_grad)
+      gpu_tensor(data = as.vector(x), shape = dim(x), dtype = dtype)
     }
   } else if (is.vector(x)) {
     if (!is.null(shape)) {
@@ -166,9 +154,9 @@ as_tensor.default <- function(x, dtype = "double", requires_grad = FALSE, shape 
       if (length(x) != prod(shape)) {
         stop("Data size (", length(x), ") does not match shape size (", prod(shape), ")")
       }
-      gpu_tensor(data = x, shape = shape, dtype = dtype, requires_grad = requires_grad)
+      gpu_tensor(data = x, shape = shape, dtype = dtype)
     } else {
-      gpu_tensor(data = x, shape = length(x), dtype = dtype, requires_grad = requires_grad)
+      gpu_tensor(data = x, shape = length(x), dtype = dtype)
     }
   } else {
     stop("Cannot convert object of class '", class(x)[1], "' to tensor")
@@ -659,22 +647,7 @@ synchronize <- function(tensor) {
   invisible(tensor)
 }
 
-#' Enable Gradient Computation
-#'
-#' Sets whether gradients should be computed for this tensor.
-#'
-#' @param tensor A gpuTensor object
-#' @param requires_grad Boolean indicating whether to track gradients
-#' @return The tensor (for method chaining)
-#' @export
-requires_grad <- function(tensor, requires_grad = TRUE) {
-  if (!inherits(tensor, "gpuTensor")) {
-    stop("Object is not a gpuTensor")
-  }
-  
-  # Autograd not yet implemented in unified interface
-  stop("Autograd not yet implemented in unified interface")
-}
+
 
 #' @export
 `-.gpuTensor` <- function(a, b = NULL) {

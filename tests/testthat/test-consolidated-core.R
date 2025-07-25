@@ -235,32 +235,178 @@ test_that("Mathematical functions work correctly", {
 })
 
 # =============================================================================
-# ACTIVATION FUNCTIONS
+# MATH AND ACTIVATION FUNCTIONS
 # =============================================================================
 
+test_that("Math functions work correctly", {
+  # Positive values for sqrt, log tests
+  data_pos <- c(0.5, 1.0, 2.0, 4.0, 9.0)
+  tensor_pos <- as_tensor(data_pos, dtype = "float")
+  
+  # Test sqrt
+  result_sqrt <- sqrt(tensor_pos)
+  expect_s3_class(result_sqrt, "gpuTensor")
+  expect_equal(as.vector(result_sqrt), sqrt(data_pos), tolerance = 1e-6)
+  
+  # Test log
+  result_log <- log(tensor_pos)
+  expect_s3_class(result_log, "gpuTensor")
+  expect_equal(as.vector(result_log), log(data_pos), tolerance = 1e-6)
+  
+  # Test exp (with limited range to avoid overflow)
+  data_small <- c(-1, 0, 0.5, 1, 1.5)
+  tensor_small <- as_tensor(data_small, dtype = "float")
+  result_exp <- exp(tensor_small)
+  expect_s3_class(result_exp, "gpuTensor")
+  expect_equal(as.vector(result_exp), exp(data_small), tolerance = 1e-6)
+  
+  # Test trigonometric functions
+  data_trig <- c(-pi/2, -1, 0, 1, pi/2)
+  tensor_trig <- as_tensor(data_trig, dtype = "float")
+  
+  result_sin <- sin(tensor_trig)
+  expect_s3_class(result_sin, "gpuTensor")
+  expect_equal(as.vector(result_sin), sin(data_trig), tolerance = 1e-6)
+  
+  result_cos <- cos(tensor_trig)
+  expect_s3_class(result_cos, "gpuTensor")
+  expect_equal(as.vector(result_cos), cos(data_trig), tolerance = 1e-6)
+  
+  # Test abs
+  data_mixed <- c(-5, -2.5, 0, 2.5, 5)
+  tensor_mixed <- as_tensor(data_mixed, dtype = "float")
+  result_abs <- abs(tensor_mixed)
+  expect_s3_class(result_abs, "gpuTensor")
+  expect_equal(as.vector(result_abs), abs(data_mixed), tolerance = 1e-6)
+})
+
+# Phase 3.1: New unary math functions
+test_that("Phase 3.1 unary math functions work correctly", {
+  # Test data with decimal values for floor/ceiling/round
+  data_decimal <- c(-2.7, -1.3, -0.5, 0.0, 0.5, 1.3, 2.7, 3.9)
+  tensor_decimal <- as_tensor(data_decimal, dtype = "float")
+  
+  # Test floor function
+  result_floor <- floor(tensor_decimal)
+  expect_s3_class(result_floor, "gpuTensor")
+  expect_equal(as.vector(result_floor), floor(data_decimal), tolerance = 1e-6)
+  
+  # Test ceiling function
+  result_ceiling <- ceiling(tensor_decimal)
+  expect_s3_class(result_ceiling, "gpuTensor")
+  expect_equal(as.vector(result_ceiling), ceiling(data_decimal), tolerance = 1e-6)
+  
+  # Test round function
+  result_round <- round(tensor_decimal)
+  expect_s3_class(result_round, "gpuTensor")
+  expect_equal(as.vector(result_round), round(data_decimal), tolerance = 1e-6)
+  
+  # Test erf function
+  data_erf <- c(-2, -1, -0.5, 0, 0.5, 1, 2)
+  tensor_erf <- as_tensor(data_erf, dtype = "float")
+  result_erf <- erf(tensor_erf)
+  expect_s3_class(result_erf, "gpuTensor")
+  # Compare with R's built-in erf function if available, otherwise use approximation
+  if (exists("erf", where = "package:base")) {
+    expected_erf <- erf(data_erf)
+  } else {
+    # Use 2/sqrt(pi) * integral approximation for simple test cases
+    expected_erf <- 2/sqrt(pi) * data_erf  # Very rough approximation for small values
+  }
+  expect_equal(as.vector(result_erf), expected_erf, tolerance = 1e-4)
+  
+  # Test power operator (tensor ^ scalar)
+  data_power <- c(1, 2, 3, 4)
+  tensor_power <- as_tensor(data_power, dtype = "float")
+  
+  # Test various power values
+  result_square <- tensor_power ^ 2
+  expect_s3_class(result_square, "gpuTensor")
+  expect_equal(as.vector(result_square), data_power^2, tolerance = 1e-6)
+  
+  result_cube <- tensor_power ^ 3
+  expect_s3_class(result_cube, "gpuTensor")
+  expect_equal(as.vector(result_cube), data_power^3, tolerance = 1e-6)
+  
+  result_half <- tensor_power ^ 0.5
+  expect_s3_class(result_half, "gpuTensor")
+  expect_equal(as.vector(result_half), data_power^0.5, tolerance = 1e-6)
+  
+  # Test negative power
+  result_inv <- tensor_power ^ (-1)
+  expect_s3_class(result_inv, "gpuTensor")
+  expect_equal(as.vector(result_inv), data_power^(-1), tolerance = 1e-6)
+})
+
+# Phase 3.2: New binary element-wise operations
+test_that("Phase 3.2 binary element-wise operations work correctly", {
+  # Test data for pmax/pmin
+  data_a <- c(1, 5, 2, 8, 3)
+  data_b <- c(4, 2, 6, 1, 7)
+  tensor_a <- as_tensor(data_a, dtype = "float")
+  tensor_b <- as_tensor(data_b, dtype = "float")
+  
+  # Test pmax (element-wise maximum)
+  result_pmax <- pmax(tensor_a, tensor_b)
+  expect_s3_class(result_pmax, "gpuTensor")
+  expected_pmax <- pmax(data_a, data_b)
+  expect_equal(as.vector(result_pmax), expected_pmax, tolerance = 1e-6)
+  
+  # Test pmin (element-wise minimum)
+  result_pmin <- pmin(tensor_a, tensor_b)
+  expect_s3_class(result_pmin, "gpuTensor")
+  expected_pmin <- pmin(data_a, data_b)
+  expect_equal(as.vector(result_pmin), expected_pmin, tolerance = 1e-6)
+  
+  # Test tensor_pow (element-wise power a^b)
+  # Use smaller values to avoid overflow
+  data_base <- c(2, 3, 4, 2, 3)
+  data_exp <- c(1, 2, 1, 3, 1)
+  tensor_base <- as_tensor(data_base, dtype = "float")
+  tensor_exp <- as_tensor(data_exp, dtype = "float")
+  
+  result_tensor_pow <- tensor_pow(tensor_base, tensor_exp)
+  expect_s3_class(result_tensor_pow, "gpuTensor")
+  expected_tensor_pow <- data_base ^ data_exp
+  expect_equal(as.vector(result_tensor_pow), expected_tensor_pow, tolerance = 1e-6)
+})
+
 test_that("Activation functions work correctly", {
-  test_data <- c(-2, -1, 0, 1, 2)
-  tensor <- as_tensor(test_data, dtype = "float")
+  # Test data in appropriate ranges
+  data <- c(-2, -1, 0, 1, 2)
+  tensor <- as_tensor(data, dtype = "float")
   
-  # ReLU
-  if (exists("relu")) {
-    relu_result <- relu(tensor)
-    expected_relu <- pmax(test_data, 0)
-    expect_tensor_equal(relu_result, expected_relu)
-  }
+  # Test tanh
+  result_tanh <- tanh(tensor)
+  expect_s3_class(result_tanh, "gpuTensor")
+  expect_equal(as.vector(result_tanh), tanh(data), tolerance = 1e-6)
   
-  # Sigmoid
-  if (exists("sigmoid")) {
-    sigmoid_result <- sigmoid(tensor)
-    expected_sigmoid <- 1 / (1 + exp(-test_data))
-    expect_tensor_equal(sigmoid_result, expected_sigmoid)
-  }
+  # Test sigmoid
+  result_sigmoid <- sigmoid(tensor)
+  expect_s3_class(result_sigmoid, "gpuTensor")
+  expected_sigmoid <- 1 / (1 + exp(-data))
+  expect_equal(as.vector(result_sigmoid), expected_sigmoid, tolerance = 1e-6)
   
-  # Tanh
-  if (exists("tanh.gpuTensor")) {
-    tanh_result <- tanh(tensor)
-    expect_tensor_equal(tanh_result, tanh(test_data))
-  }
+  # Test ReLU
+  test_data <- c(-3, -1, 0, 1, 3)
+  test_tensor <- as_tensor(test_data, dtype = "float")
+  result_relu <- relu(test_tensor)
+  expect_s3_class(result_relu, "gpuTensor")
+  expected_relu <- pmax(test_data, 0)
+  expect_equal(as.vector(result_relu), expected_relu, tolerance = 1e-6)
+  
+  # Test softmax
+  result_softmax <- softmax(tensor)
+  expect_s3_class(result_softmax, "gpuTensor")
+  
+  # Compute expected softmax manually for numerical stability
+  exp_data <- exp(data - max(data))  # Subtract max for numerical stability
+  expected_softmax <- exp_data / sum(exp_data)
+  expect_equal(as.vector(result_softmax), expected_softmax, tolerance = 1e-6)
+  
+  # Verify softmax properties
+  expect_equal(sum(as.vector(result_softmax)), 1.0, tolerance = 1e-6)
+  expect_true(all(as.vector(result_softmax) >= 0))
 })
 
 # =============================================================================

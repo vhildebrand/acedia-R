@@ -1,0 +1,593 @@
+---
+title: "acediaR: Complete Guide to GPU Tensor Computing in R"
+author: "acediaR Development Team"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{acediaR: Complete Guide to GPU Tensor Computing in R}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE  # Set to TRUE if GPU is available for building
+)
+```
+
+# Introduction
+
+`acediaR` is a high-performance GPU tensor library for R that provides comprehensive support for GPU-accelerated tensor operations. This guide demonstrates the complete feature set of the library with practical examples.
+
+## Features
+
+- **Complete tensor operations**: All essential mathematical operations
+- **GPU acceleration**: CUDA-based kernels with cuBLAS integration
+- **Natural R integration**: S3 methods and operator overloading
+- **Advanced indexing**: Full slice assignment and boolean masking
+- **Production ready**: No experimental features, stable API
+
+```{r setup}
+library(acediaR)
+
+# Check GPU availability
+if (gpu_available()) {
+  cat("GPU detected:", gpu_info()$name, "\n")
+  cat("Memory available:", gpu_memory_available(), "MB\n")
+} else {
+  stop("GPU not available - this vignette requires CUDA support")
+}
+```
+
+# Tensor Creation and Basic Operations
+
+## Creating Tensors
+
+```{r tensor-creation}
+# Create tensors from vectors, matrices, and arrays
+vec <- gpu_tensor(c(1, 2, 3, 4, 5), dtype = "float")
+print(vec)
+
+# Create from matrix
+mat_data <- matrix(1:12, nrow = 3, ncol = 4)
+mat <- as_tensor(mat_data, dtype = "float")
+print(mat)
+
+# Create empty tensor
+empty <- empty_tensor(c(2, 3, 4), dtype = "float")
+print(shape(empty))
+
+# Different data types
+int_tensor <- gpu_tensor(1:10, c(2, 5), dtype = "int32")
+double_tensor <- gpu_tensor(runif(6), c(2, 3), dtype = "double")
+```
+
+## Tensor Properties
+
+```{r tensor-properties}
+# Inspect tensor properties
+cat("Shape:", shape(mat), "\n")
+cat("Data type:", dtype(mat), "\n")
+cat("Number of elements:", size(mat), "\n")
+cat("Number of dimensions:", ndims(mat), "\n")
+cat("Is contiguous:", is_contiguous(mat), "\n")
+
+# Convert back to R
+r_array <- as.array(mat)
+print(r_array)
+```
+
+# Mathematical Operations
+
+## Basic Arithmetic
+
+```{r arithmetic}
+# Create test tensors
+a <- gpu_tensor(c(1, 2, 3, 4), c(2, 2), dtype = "float")
+b <- gpu_tensor(c(5, 6, 7, 8), c(2, 2), dtype = "float")
+
+# Element-wise operations
+sum_result <- a + b
+diff_result <- a - b
+prod_result <- a * b
+div_result <- a / b
+
+print("Addition:")
+print(sum_result)
+
+# Broadcasting with scalars
+scaled <- a * 10
+shifted <- a + 0.5
+```
+
+## Advanced Mathematical Functions
+
+```{r math-functions}
+# Unary mathematical functions
+x <- gpu_tensor(c(0.5, 1.0, 2.0, 4.0), dtype = "float")
+
+# Basic math functions
+sqrt_x <- sqrt(x)
+log_x <- log(x)
+exp_x <- exp(x)
+
+print("Square root:")
+print(sqrt_x)
+
+# Trigonometric functions
+angles <- gpu_tensor(c(-pi/2, 0, pi/4, pi/2), dtype = "float")
+sin_angles <- sin(angles)
+cos_angles <- cos(angles)
+
+# New Phase 3.1 functions
+decimal_values <- gpu_tensor(c(-2.7, -1.3, 0.5, 1.7, 2.9), dtype = "float")
+floor_vals <- floor(decimal_values)
+ceiling_vals <- ceiling(decimal_values)
+round_vals <- round(decimal_values)
+
+print("Floor values:")
+print(floor_vals)
+
+# Error function
+erf_input <- gpu_tensor(c(-1, 0, 1), dtype = "float")
+erf_result <- erf(erf_input)
+
+# Power operations
+base <- gpu_tensor(c(2, 3, 4, 5), dtype = "float")
+squared <- base ^ 2
+cubed <- base ^ 3
+sqrt_base <- base ^ 0.5
+```
+
+## Element-wise Binary Operations
+
+```{r binary-ops}
+# New Phase 3.2 operations
+a <- gpu_tensor(c(1, 5, 2, 8, 3), dtype = "float")
+b <- gpu_tensor(c(4, 2, 6, 1, 7), dtype = "float")
+
+# Element-wise maximum and minimum
+max_vals <- pmax(a, b)
+min_vals <- pmin(a, b)
+
+print("Element-wise maximum:")
+print(max_vals)
+
+# Element-wise power (tensor^tensor)
+base_vals <- gpu_tensor(c(2, 3, 2, 4), dtype = "float")
+exp_vals <- gpu_tensor(c(1, 2, 3, 1), dtype = "float")
+power_result <- tensor_pow(base_vals, exp_vals)
+
+print("Element-wise power:")
+print(power_result)
+```
+
+# Activation Functions
+
+```{r activations}
+# Neural network activation functions
+input_data <- gpu_tensor(c(-2, -1, 0, 1, 2), dtype = "float")
+
+# ReLU activation
+relu_output <- relu(input_data)
+
+# Sigmoid activation  
+sigmoid_output <- sigmoid(input_data)
+
+# Hyperbolic tangent
+tanh_output <- tanh(input_data)
+
+# Softmax (for classification)
+logits <- gpu_tensor(c(1.0, 2.0, 3.0), dtype = "float")
+probabilities <- softmax(logits)
+
+print("Softmax probabilities:")
+print(probabilities)
+print("Sum:", sum(probabilities))  # Should be 1.0
+```
+
+# Comparison Operations
+
+```{r comparisons}
+# Comparison operations return 0/1 tensors
+a <- gpu_tensor(c(1, 3, 5, 7), dtype = "float")
+b <- gpu_tensor(c(2, 3, 4, 8), dtype = "float")
+
+# Various comparisons
+greater <- a > b
+less <- a < b
+equal <- a == b
+greater_equal <- a >= b
+
+print("a > b:")
+print(greater)
+
+# Can be used for conditional operations
+mask <- a > 4
+print("Elements > 4:")
+print(mask)
+```
+
+# Reduction Operations
+
+## Basic Reductions
+
+```{r reductions}
+# Create test data
+data_2d <- matrix(runif(20, 1, 10), nrow = 4, ncol = 5)
+tensor_2d <- as_tensor(data_2d, dtype = "float")
+
+# Global reductions
+total_sum <- sum(tensor_2d)
+mean_val <- mean(tensor_2d)
+max_val <- max(tensor_2d)
+min_val <- min(tensor_2d)
+product <- prod(tensor_2d)
+variance <- var(tensor_2d)
+
+print(paste("Sum:", total_sum))
+print(paste("Mean:", mean_val))
+print(paste("Max:", max_val))
+```
+
+## Axis-aware Reductions
+
+```{r axis-reductions}
+# Reduce along specific axes
+row_sums <- sum(tensor_2d, axis = 2, keep.dims = TRUE)  # Sum along columns
+col_sums <- sum(tensor_2d, axis = 1, keep.dims = TRUE)  # Sum along rows
+
+print("Row sums (sum along columns):")
+print(row_sums)
+
+# Argmax and argmin
+global_argmax <- argmax(tensor_2d)
+global_argmin <- argmin(tensor_2d)
+
+print(paste("Global argmax index:", global_argmax))
+print(paste("Global argmin index:", global_argmin))
+```
+
+# Linear Algebra
+
+## Matrix Operations
+
+```{r linear-algebra}
+# Matrix multiplication (optimized with cuBLAS)
+A <- gpu_tensor(matrix(runif(12), 3, 4), dtype = "float")
+B <- gpu_tensor(matrix(runif(20), 4, 5), dtype = "float")
+
+# Matrix multiplication
+C <- matmul(A, B)
+print("Matrix multiplication result shape:")
+print(shape(C))
+
+# Matrix-vector multiplication
+v <- gpu_tensor(runif(4), dtype = "float")
+Av <- matvec(A, v)
+print("Matrix-vector multiplication shape:")
+print(shape(Av))
+
+# Vector-matrix multiplication
+vA <- vecmat(v, A)
+print("Vector-matrix multiplication shape:")
+print(shape(vA))
+```
+
+## Advanced Linear Algebra
+
+```{r advanced-linalg}
+# Outer product
+u <- gpu_tensor(c(1, 2, 3), dtype = "float")
+v <- gpu_tensor(c(4, 5), dtype = "float")
+outer_prod <- outer_product(u, v)
+
+print("Outer product:")
+print(outer_prod)
+print("Shape:", shape(outer_prod))
+
+# Transpose operations
+mat <- gpu_tensor(matrix(1:12, 3, 4), dtype = "float")
+transposed <- transpose(mat)
+print("Original shape:", shape(mat))
+print("Transposed shape:", shape(transposed))
+```
+
+# Tensor Manipulation
+
+## Reshaping and Views
+
+```{r reshaping}
+# Create initial tensor
+original <- gpu_tensor(1:24, c(2, 3, 4), dtype = "float")
+print("Original shape:", shape(original))
+
+# Reshape (may copy data)
+reshaped <- reshape(original, c(6, 4))
+print("Reshaped:", shape(reshaped))
+
+# View (no data copy)
+viewed <- view(original, c(8, 3))
+print("Viewed:", shape(viewed))
+
+# Check if tensors share memory
+print("Shares memory:", shares_memory(original, viewed))
+
+# Make contiguous if needed
+contiguous_tensor <- contiguous(viewed)
+print("Is contiguous:", is_contiguous(contiguous_tensor))
+```
+
+## Permutation and Transposition
+
+```{r permutation}
+# Permute dimensions
+tensor_3d <- gpu_tensor(array(1:24, c(2, 3, 4)), dtype = "float")
+permuted <- permute(tensor_3d, c(3, 1, 2))  # Move last dim to first
+
+print("Original shape:", shape(tensor_3d))
+print("Permuted shape:", shape(permuted))
+
+# Transpose (special case of permutation for 2D)
+mat_2d <- gpu_tensor(matrix(1:12, 3, 4), dtype = "float")
+transposed <- transpose(mat_2d)
+print("Matrix shape:", shape(mat_2d))
+print("Transposed shape:", shape(transposed))
+```
+
+# Advanced Indexing and Assignment
+
+## Slice Indexing
+
+```{r slice-indexing}
+# Create test matrix
+mat <- gpu_tensor(matrix(1:20, 4, 5), dtype = "float")
+print("Original matrix:")
+print(mat)
+
+# Various slicing patterns
+row_slice <- mat[2, ]        # Extract row
+col_slice <- mat[, 3]        # Extract column
+submatrix <- mat[1:2, 2:4]   # Extract submatrix
+
+print("Row slice shape:", shape(row_slice))
+print("Submatrix:")
+print(submatrix)
+```
+
+## Slice Assignment (Phase 3.3)
+
+```{r slice-assignment}
+# Slice assignment - modifies tensor in place
+mat_copy <- gpu_tensor(matrix(1:20, 4, 5), dtype = "float")
+
+# Assign scalar to slice
+mat_copy[2:3, 2:4] <- 99
+print("After scalar assignment:")
+print(mat_copy)
+
+# Assign tensor to slice
+replacement <- gpu_tensor(matrix(c(101, 102, 103, 104), 2, 2), dtype = "float")
+mat_copy[1:2, 1:2] <- replacement
+print("After tensor assignment:")
+print(mat_copy)
+
+# Assign vector to slice (automatically reshaped)
+mat_copy[4, ] <- c(201, 202, 203, 204, 205)
+print("After vector assignment:")
+print(mat_copy)
+```
+
+## Boolean Indexing (Phase 3.3)
+
+```{r boolean-indexing}
+# Create test vector
+vec <- gpu_tensor(c(10, 20, 30, 40, 50, 60), dtype = "float")
+print("Original vector:")
+print(vec)
+
+# Boolean mask assignment with R logical vector
+mask <- c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE)
+vec[mask] <- 999
+print("After boolean mask assignment:")
+print(vec)
+
+# Boolean mask from tensor comparison
+mat <- gpu_tensor(matrix(1:12, 3, 4), dtype = "float")
+print("Original matrix:")
+print(mat)
+
+# Create mask and assign
+large_elements <- as.logical(as.vector(mat > 6))
+mat[large_elements] <- -1
+print("After conditional assignment (elements > 6 set to -1):")
+print(mat)
+```
+
+# Tensor Concatenation and Stacking
+
+```{r concat-stack}
+# Create test tensors
+a <- gpu_tensor(matrix(1:6, 2, 3), dtype = "float")
+b <- gpu_tensor(matrix(7:12, 2, 3), dtype = "float")
+
+print("Tensor A:")
+print(a)
+
+print("Tensor B:")
+print(b)
+
+# Concatenate along first dimension (rows)
+concat_result <- concat(list(a, b), axis = 1)
+print("Concatenated along rows:")
+print(concat_result)
+print("Shape:", shape(concat_result))
+
+# Stack along new dimension
+stack_result <- stack(list(a, b), axis = 3)
+print("Stacked along new dimension:")
+print("Shape:", shape(stack_result))
+
+# Advanced tensor operations
+repeated <- repeat_tensor(a, c(2, 1))  # Repeat along first dimension
+print("Repeated tensor shape:", shape(repeated))
+
+# Padding
+padded <- pad_tensor(a, c(1, 1, 1, 1))  # Pad 1 on each side
+print("Padded tensor shape:", shape(padded))
+```
+
+# Performance and GPU Utilization
+
+## Performance Comparison
+
+```{r performance}
+# Large tensor operations for performance testing
+n <- 10000
+large_a <- gpu_tensor(runif(n), c(100, 100), dtype = "float")
+large_b <- gpu_tensor(runif(n), c(100, 100), dtype = "float")
+
+# Time GPU operations
+system.time({
+  gpu_result <- large_a + large_b
+  sum_gpu <- sum(gpu_result)
+  synchronize(gpu_result)  # Ensure GPU work is complete
+})
+
+print("GPU computation completed")
+print(paste("GPU sum result:", sum_gpu))
+```
+
+## Memory Management
+
+```{r memory}
+# Check GPU memory usage
+initial_memory <- gpu_memory_available()
+print(paste("Initial GPU memory:", initial_memory, "MB"))
+
+# Create large tensors
+big_tensor1 <- gpu_tensor(runif(1e6), c(1000, 1000), dtype = "float")
+big_tensor2 <- gpu_tensor(runif(1e6), c(1000, 1000), dtype = "float")
+
+after_allocation <- gpu_memory_available()
+print(paste("Memory after allocation:", after_allocation, "MB"))
+print(paste("Memory used:", initial_memory - after_allocation, "MB"))
+
+# Perform operations
+result <- big_tensor1 * big_tensor2
+final_sum <- sum(result)
+
+# Memory is automatically managed - tensors will be freed when out of scope
+print("Operations completed successfully")
+```
+
+# Data Types and Type Conversion
+
+```{r dtypes}
+# Different data types
+float32_tensor <- gpu_tensor(c(1.5, 2.5, 3.5), dtype = "float")  # float32
+float64_tensor <- gpu_tensor(c(1.5, 2.5, 3.5), dtype = "double") # float64
+int32_tensor <- gpu_tensor(c(1, 2, 3), dtype = "int32")
+int64_tensor <- gpu_tensor(c(1, 2, 3), dtype = "int64")
+
+print("Float32 dtype:", dtype(float32_tensor))
+print("Float64 dtype:", dtype(float64_tensor))
+print("Int32 dtype:", dtype(int32_tensor))
+
+# Type promotion in operations
+mixed_result <- float32_tensor + float64_tensor  # Promotes to higher precision
+print("Mixed operation result dtype:", dtype(mixed_result))
+```
+
+# Error Handling and Debugging
+
+```{r error-handling, error=TRUE}
+# Demonstrate error handling
+tryCatch({
+  # Shape mismatch error
+  a <- gpu_tensor(c(1, 2, 3), c(3, 1), dtype = "float")
+  b <- gpu_tensor(c(1, 2), c(2, 1), dtype = "float")
+  result <- a + b  # This should fail due to shape mismatch
+}, error = function(e) {
+  print(paste("Caught error:", e$message))
+})
+
+# Index out of bounds
+tryCatch({
+  mat <- gpu_tensor(matrix(1:12, 3, 4), dtype = "float")
+  invalid_slice <- mat[1:5, 1:2]  # Row index out of bounds
+}, error = function(e) {
+  print(paste("Index error:", e$message))
+})
+
+# Data type compatibility
+tryCatch({
+  log_result <- log(gpu_tensor(c(-1, 0, 1), dtype = "float"))  # log of negative
+}, error = function(e) {
+  print(paste("Domain error:", e$message))
+})
+```
+
+# Best Practices
+
+## Efficient Memory Usage
+
+```{r best-practices}
+# Use views instead of copying when possible
+original <- gpu_tensor(matrix(1:100, 10, 10), dtype = "float")
+
+# Good: use view for transposition
+transposed_view <- transpose(original)
+print("Shares memory with original:", shares_memory(original, transposed_view))
+
+# Make contiguous only when necessary
+if (!is_contiguous(transposed_view)) {
+  contiguous_copy <- contiguous(transposed_view)
+}
+
+# Prefer in-place operations when possible
+mat <- gpu_tensor(matrix(runif(16), 4, 4), dtype = "float")
+mat[mat > 0.5] <- 1.0  # In-place boolean assignment
+```
+
+## Optimal Data Types
+
+```{r optimal-dtypes}
+# Use float32 for most applications (memory efficient, fast)
+efficient_tensor <- gpu_tensor(runif(1000), c(10, 100), dtype = "float")
+
+# Use float64 only when high precision is required
+high_precision <- gpu_tensor(runif(100), c(10, 10), dtype = "double")
+
+# Use int32 for indices and counts
+indices <- gpu_tensor(1:10, dtype = "int32")
+```
+
+# Conclusion
+
+This guide has demonstrated the complete feature set of `acediaR`:
+
+- **Comprehensive Operations**: All essential tensor operations from basic arithmetic to advanced linear algebra
+- **GPU Acceleration**: Optimized CUDA kernels with cuBLAS integration for maximum performance  
+- **Natural R Integration**: S3 methods and operator overloading that feel native to R
+- **Advanced Features**: Complete slice assignment and boolean indexing capabilities
+- **Production Ready**: Stable, well-tested API suitable for production use
+
+The library provides everything needed for high-performance GPU tensor computation in R without external dependencies or experimental features.
+
+For more information:
+- Check `?acediaR` for package overview
+- Use `gpu_status()` to monitor GPU utilization
+- See individual function documentation for detailed usage
+
+```{r cleanup}
+# GPU memory will be automatically freed when tensors go out of scope
+# Force garbage collection if needed
+gc()
+
+# Check final GPU status
+print("Final GPU status:")
+print(gpu_status())
+``` 

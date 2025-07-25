@@ -291,6 +291,121 @@ test_that("Slice mutation with different slice patterns (GPU verified)", {
   }
 })
 
+# Phase 3.3: Comprehensive slice assignment and boolean indexing tests
+test_that("Phase 3.3 slice assignment works correctly", {
+  # Test 2D slice assignment
+  mat_data <- matrix(1:20, nrow = 4, ncol = 5)
+  mat <- as_tensor(mat_data, dtype = "float")
+  
+  # Scalar assignment to slice
+  mat_copy <- as_tensor(mat_data, dtype = "float")
+  mat_copy[2:3, 2:4] <- 99
+  expected_mat <- mat_data
+  expected_mat[2:3, 2:4] <- 99
+  expect_equal(as.array(mat_copy), expected_mat, tolerance = 1e-6)
+  
+  # Tensor assignment to slice
+  mat_copy2 <- as_tensor(mat_data, dtype = "float")
+  replacement_data <- matrix(c(101, 102, 103, 104, 105, 106), nrow = 2, ncol = 3)
+  replacement_tensor <- as_tensor(replacement_data, dtype = "float")
+  mat_copy2[2:3, 2:4] <- replacement_tensor
+  expected_mat2 <- mat_data
+  expected_mat2[2:3, 2:4] <- replacement_data
+  expect_equal(as.array(mat_copy2), expected_mat2, tolerance = 1e-6)
+  
+  # Vector assignment to slice
+  mat_copy3 <- as_tensor(mat_data, dtype = "float")
+  vec_replacement <- c(201, 202, 203, 204, 205, 206)
+  mat_copy3[2:3, 2:4] <- vec_replacement
+  expected_mat3 <- mat_data
+  expected_mat3[2:3, 2:4] <- matrix(vec_replacement, nrow = 2, ncol = 3)
+  expect_equal(as.array(mat_copy3), expected_mat3, tolerance = 1e-6)
+})
+
+test_that("Phase 3.3 boolean mask assignment works correctly", {
+  # Test with vector tensor
+  vec_data <- c(1, 2, 3, 4, 5, 6)
+  vec_tensor <- as_tensor(vec_data, dtype = "float")
+  
+  # Create boolean mask (R logical vector)
+  mask_logical <- c(TRUE, FALSE, TRUE, FALSE, TRUE, FALSE)
+  vec_tensor[mask_logical] <- 99
+  expected_vec <- vec_data
+  expected_vec[mask_logical] <- 99
+  expect_equal(as.vector(vec_tensor), expected_vec, tolerance = 1e-6)
+  
+  # Test with 2D tensor
+  mat_data <- matrix(1:12, nrow = 3, ncol = 4)
+  mat_tensor <- as_tensor(mat_data, dtype = "float")
+  
+  # Boolean mask as logical matrix
+  mask_2d <- mat_data > 6
+  mat_tensor[mask_2d] <- -1
+  expected_mat <- mat_data
+  expected_mat[mask_2d] <- -1
+  expect_equal(as.array(mat_tensor), expected_mat, tolerance = 1e-6)
+  
+  # Test with gpuTensor boolean mask
+  vec_tensor2 <- as_tensor(c(10, 20, 30, 40, 50), dtype = "float")
+  condition_tensor <- vec_tensor2 > 25  # This should create a comparison tensor
+  # Note: This test assumes comparison operations return 0/1 tensors that can be used as masks
+  # The actual implementation may need adjustment based on how boolean indexing works
+  if (inherits(condition_tensor, "gpuTensor")) {
+    # Convert to logical if needed for mask assignment
+    mask_values <- as.logical(as.vector(condition_tensor))
+    vec_tensor2[mask_values] <- 999
+    expected_vec2 <- c(10, 20, 30, 40, 50)
+    expected_vec2[c(10, 20, 30, 40, 50) > 25] <- 999
+    expect_equal(as.vector(vec_tensor2), expected_vec2, tolerance = 1e-6)
+  }
+})
+
+test_that("Phase 3.3 complex slice patterns work correctly", {
+  # Test 3D tensor slice assignment
+  arr_data <- array(1:60, dim = c(3, 4, 5))
+  arr_tensor <- as_tensor(arr_data, dtype = "float")
+  
+  # Assign to 3D slice
+  arr_tensor[1:2, 2:3, 3:4] <- 777
+  expected_arr <- arr_data
+  expected_arr[1:2, 2:3, 3:4] <- 777
+  expect_equal(as.array(arr_tensor), expected_arr, tolerance = 1e-6)
+  
+  # Test single dimension assignment
+  mat_data <- matrix(1:20, nrow = 4, ncol = 5)
+  mat_tensor <- as_tensor(mat_data, dtype = "float")
+  
+  # Assign to entire row
+  mat_tensor[2, ] <- 888
+  expected_mat <- mat_data
+  expected_mat[2, ] <- 888
+  expect_equal(as.array(mat_tensor), expected_mat, tolerance = 1e-6)
+  
+  # Assign to entire column
+  mat_tensor2 <- as_tensor(mat_data, dtype = "float")
+  mat_tensor2[, 3] <- 999
+  expected_mat2 <- mat_data
+  expected_mat2[, 3] <- 999
+  expect_equal(as.array(mat_tensor2), expected_mat2, tolerance = 1e-6)
+})
+
+test_that("Phase 3.3 error handling for invalid assignments", {
+  mat_data <- matrix(1:12, nrow = 3, ncol = 4)
+  mat_tensor <- as_tensor(mat_data, dtype = "float")
+  
+  # Test shape mismatch error
+  wrong_shape_tensor <- as_tensor(matrix(1:4, nrow = 2, ncol = 2), dtype = "float")
+  expect_error(mat_tensor[1:3, 1:3] <- wrong_shape_tensor, "shape")
+  
+  # Test invalid slice bounds
+  expect_error(mat_tensor[1:5, 1:2] <- 1, "bound|index")
+  expect_error(mat_tensor[1:2, 1:6] <- 1, "bound|index")
+  
+  # Test invalid mask length
+  wrong_mask <- c(TRUE, FALSE, TRUE)  # Too short
+  expect_error(mat_tensor[wrong_mask] <- 1, "mask.*length|length.*mask")
+})
+
 # =============================================================================
 # MEMORY EFFICIENCY TESTS
 # =============================================================================
