@@ -70,7 +70,7 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda", requires_
   }
   
   # Ensure proper class structure (avoid duplicates)
-  # Fix any class duplication issues from C++ 
+  # Fix any= class duplication issues from C++ 
   current_class <- class(tensor)
   if (length(current_class) > 1 && all(current_class == "gpuTensor")) {
     class(tensor) <- "gpuTensor"

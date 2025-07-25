@@ -21,7 +21,7 @@ public:
     virtual ~GraphNode() = default;
     
     // Execute backward pass for this operation
-    virtual void backward() = 0;
+    virtual void backward() = 0;ww
     
     // Get the operation name (for debugging/visualization)
     virtual std::string name() const = 0;

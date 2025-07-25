@@ -506,7 +506,7 @@ __global__ void axis_reduction_kernel(
     int output_coords[8];
     int temp_idx = output_idx;
     
-    // Calculate result shape from input shape
+    // Calculate result shape from input shape (fixed version)
     int result_shape[8];
     int result_dim = 0;
     for (int i = 0; i < ndims; i++) {
@@ -523,10 +523,14 @@ __global__ void axis_reduction_kernel(
         }
     }
     
-    // Convert output index to coordinates
-    for (int i = 0; i < result_dim; i++) {
-        output_coords[i] = temp_idx % result_shape[i];
-        temp_idx /= result_shape[i];
+    // Convert output index to coordinates with bounds checking
+    for (int i = 0; i < result_dim && i < 8; i++) {
+        if (result_shape[i] > 0) {
+            output_coords[i] = temp_idx % result_shape[i];
+            temp_idx /= result_shape[i];
+        } else {
+            output_coords[i] = 0;
+        }
     }
     
     // Map output coordinates back to input coordinates (inserting reduced dimensions)
@@ -543,8 +547,12 @@ __global__ void axis_reduction_kernel(
         if (is_reduction_axis) {
             input_coords[i] = 0;  // Start from 0 for reduced dimensions
         } else {
-            input_coords[i] = output_coords[out_dim];
-            out_dim++;
+            if (out_dim < result_dim) {
+                input_coords[i] = output_coords[out_dim];
+                out_dim++;
+            } else {
+                input_coords[i] = 0;  // Safety fallback
+            }
         }
     }
     
@@ -570,9 +578,11 @@ __global__ void axis_reduction_kernel(
     int tid = threadIdx.x;
     int blockSize = blockDim.x;
     
-    // Use shared memory for block-level reduction
+    // Use generic shared memory buffer and cast to AccumType*
     extern __shared__ char shared_mem[];
-    AccumType* shared_data = reinterpret_cast<AccumType*>(shared_mem);
+    AccumType* sdata = reinterpret_cast<AccumType*>(shared_mem);
+    // shared_mem size is blockDim.x * sizeof(AccumType) allocated at launch
+ 
     AccumType thread_accumulator;
     
     if (op == 0 || op == 1) {  // sum or mean
@@ -605,9 +615,9 @@ __global__ void axis_reduction_kernel(
         }
         
         // Calculate linear input index
-        int input_idx = 0;
+        size_t input_idx = 0;
         for (int i = 0; i < ndims; i++) {
-            input_idx += input_coords[i] * input_strides[i];
+            input_idx += static_cast<size_t>(input_coords[i]) * static_cast<size_t>(input_strides[i]);
         }
         
         // Accumulate value
@@ -635,20 +645,20 @@ __global__ void axis_reduction_kernel(
     }
     
     // Store thread result in shared memory
-    shared_data[tid] = thread_accumulator;
+    sdata[tid] = thread_accumulator;
     __syncthreads();
     
     // Reduce within block
     for (int s = blockSize / 2; s > 0; s /= 2) {
         if (tid < s) {
             if (op == 0 || op == 1) {  // sum or mean
-                shared_data[tid] += shared_data[tid + s];
+                sdata[tid] += sdata[tid + s];
             } else if (op == 2) {  // max
-                shared_data[tid] = max(shared_data[tid], shared_data[tid + s]);
+                sdata[tid] = max(sdata[tid], sdata[tid + s]);
             } else if (op == 3) {  // min
-                shared_data[tid] = min(shared_data[tid], shared_data[tid + s]);
+                sdata[tid] = min(sdata[tid], sdata[tid + s]);
             } else if (op == 4) {  // prod
-                shared_data[tid] *= shared_data[tid + s];
+                sdata[tid] *= sdata[tid + s];
             }
         }
         __syncthreads();
@@ -656,7 +666,7 @@ __global__ void axis_reduction_kernel(
     
     // Thread 0 writes final result
     if (tid == 0) {
-        AccumType final_result = shared_data[0];
+        AccumType final_result = sdata[0];
         
         // For mean, divide by number of elements
         if (op == 1) {
@@ -694,6 +704,102 @@ __global__ void axis_variance_kernel(
     }
 } 
 
+// Argmax/Argmin kernels
+template<typename T>
+__global__ void argmax_kernel(int64_t* result, const T* input, size_t n) {
+    extern __shared__ char shared_mem[];
+    T* shared_values = reinterpret_cast<T*>(shared_mem);
+    int64_t* shared_indices = reinterpret_cast<int64_t*>(shared_mem + blockDim.x * sizeof(T));
+    
+    size_t tid = threadIdx.x;
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    // Initialize shared memory
+    if (i < n) {
+        shared_values[tid] = input[i];
+        shared_indices[tid] = static_cast<int64_t>(i);
+    } else {
+        if constexpr (std::is_same_v<T, float>) {
+            shared_values[tid] = -INFINITY;
+        } else if constexpr (std::is_same_v<T, double>) {
+            shared_values[tid] = -INFINITY;
+        } else {
+            shared_values[tid] = T(-INFINITY);
+        }
+        shared_indices[tid] = -1;
+    }
+    __syncthreads();
+    
+    // Tree-based reduction for argmax
+    for (size_t s = blockDim.x / 2; s > 0; s /= 2) {
+        if (tid < s) {
+            if (shared_values[tid] < shared_values[tid + s]) {
+                shared_values[tid] = shared_values[tid + s];
+                shared_indices[tid] = shared_indices[tid + s];
+            }
+        }
+        __syncthreads();
+    }
+    
+    // Write result
+    if (tid == 0) {
+        result[blockIdx.x] = shared_indices[0];
+    }
+}
+
+template<typename T>
+__global__ void argmin_kernel(int64_t* result, const T* input, size_t n) {
+    extern __shared__ char shared_mem[];
+    T* shared_values = reinterpret_cast<T*>(shared_mem);
+    int64_t* shared_indices = reinterpret_cast<int64_t*>(shared_mem + blockDim.x * sizeof(T));
+    
+    size_t tid = threadIdx.x;
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    // Initialize shared memory
+    if (i < n) {
+        shared_values[tid] = input[i];
+        shared_indices[tid] = static_cast<int64_t>(i);
+    } else {
+        if constexpr (std::is_same_v<T, float>) {
+            shared_values[tid] = INFINITY;
+        } else if constexpr (std::is_same_v<T, double>) {
+            shared_values[tid] = INFINITY;
+        } else {
+            shared_values[tid] = T(INFINITY);
+        }
+        shared_indices[tid] = -1;
+    }
+    __syncthreads();
+    
+    // Tree-based reduction for argmin
+    for (size_t s = blockDim.x / 2; s > 0; s /= 2) {
+        if (tid < s) {
+            if (shared_values[tid] > shared_values[tid + s]) {
+                shared_values[tid] = shared_values[tid + s];
+                shared_indices[tid] = shared_indices[tid + s];
+            }
+        }
+        __syncthreads();
+    }
+    
+    // Write result
+    if (tid == 0) {
+        result[blockIdx.x] = shared_indices[0];
+    }
+}
+
+// Helper kernel for copying values at indices
+template<typename T>
+__global__ void copy_values_at_indices_kernel(T* dest, const T* src, const int64_t* indices, int n, T default_val) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n && indices[i] >= 0) {
+        dest[i] = src[indices[i]];
+    } else if (i < n) {
+        dest[i] = default_val;
+    }
+}
+
 // C wrapper functions for axis-aware reductions
 
 extern "C" {
@@ -705,15 +811,52 @@ void tensor_axis_sum_float32(
     const int* result_strides, const int* reduction_axes,
     int num_reduction_axes, int ndims, size_t output_size
 ) {
+    // Add comprehensive error checking
+    cudaError_t err;
+    
+    // Check input parameters
+    if (!result || !input || !input_strides || !input_shape || !result_strides || !reduction_axes) {
+        throw std::runtime_error("Null pointer passed to tensor_axis_sum_float32");
+    }
+    
+    if (output_size == 0) {
+        throw std::runtime_error("Zero output size in tensor_axis_sum_float32");
+    }
+    
+    // Clear any previous CUDA errors
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::string error_msg = "Pre-existing CUDA error before kernel launch: " + std::string(cudaGetErrorString(err));
+        throw std::runtime_error(error_msg);
+    }
+    
     int blockSize = 256;
     int gridSize = static_cast<int>(output_size);
     size_t shared_mem_size = blockSize * sizeof(float);
+    
+    // Validate launch parameters
+    if (gridSize <= 0) {
+        throw std::runtime_error("Invalid grid size in tensor_axis_sum_float32: " + std::to_string(gridSize));
+    }
     
     axis_reduction_kernel<float, float><<<gridSize, blockSize, shared_mem_size>>>(
         result, input, input_strides, input_shape, result_strides,
         reduction_axes, num_reduction_axes, ndims, output_size, 0  // 0 = sum
     );
-    cudaDeviceSynchronize();
+    
+    // Check for kernel launch errors
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::string error_msg = "CUDA kernel launch failed in tensor_axis_sum_float32: " + std::string(cudaGetErrorString(err));
+        throw std::runtime_error(error_msg);
+    }
+    
+    // Synchronize and check for kernel execution errors
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        std::string error_msg = "CUDA kernel execution failed in tensor_axis_sum_float32: " + std::string(cudaGetErrorString(err));
+        throw std::runtime_error(error_msg);
+    }
 }
 
 void tensor_axis_sum_float64(
@@ -722,15 +865,47 @@ void tensor_axis_sum_float64(
     const int* result_strides, const int* reduction_axes,
     int num_reduction_axes, int ndims, size_t output_size
 ) {
+    cudaError_t err;
+
+    // Pre-launch sanity checks
+    if (!result || !input || !input_strides || !input_shape || !result_strides || !reduction_axes) {
+        throw std::runtime_error("Null pointer passed to tensor_axis_sum_float64");
+    }
+    if (output_size == 0) {
+        throw std::runtime_error("Zero output size in tensor_axis_sum_float64");
+    }
+
+    // Clear any stale error
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::string msg = "Pre-existing CUDA error before kernel launch: " + std::string(cudaGetErrorString(err));
+        throw std::runtime_error(msg);
+    }
+
     int blockSize = 256;
-    int gridSize = static_cast<int>(output_size);
+    int gridSize  = static_cast<int>(output_size);
     size_t shared_mem_size = blockSize * sizeof(double);
-    
+    if (gridSize <= 0) {
+        throw std::runtime_error("Invalid grid size in tensor_axis_sum_float64: " + std::to_string(gridSize));
+    }
+
     axis_reduction_kernel<double, double><<<gridSize, blockSize, shared_mem_size>>>(
         result, input, input_strides, input_shape, result_strides,
         reduction_axes, num_reduction_axes, ndims, output_size, 0  // 0 = sum
     );
-    cudaDeviceSynchronize();
+
+    // Post-launch checks
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::string msg = "CUDA kernel launch failed in tensor_axis_sum_float64: " + std::string(cudaGetErrorString(err));
+        throw std::runtime_error(msg);
+    }
+
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        std::string msg = "CUDA kernel execution failed in tensor_axis_sum_float64: " + std::string(cudaGetErrorString(err));
+        throw std::runtime_error(msg);
+    }
 }
 
 // Axis-aware mean reduction
@@ -906,6 +1081,43 @@ void tensor_axis_var_float64(
     cudaDeviceSynchronize();
 }
 
+// ------------------------------------------------------------
+// NEW: Global argmax / argmin wrappers (float32 & float64)
+// ------------------------------------------------------------
+
+static int64_t launch_and_fetch_index(void (*kernel)(int64_t*, const void*, size_t), const void* d_input, size_t n) {
+    // Never called – template trick placeholder.  Real overloads below.
+    return -1;
+}
+
+// tensor_argmax_* are provided in tensor_ops.cu; avoid duplicate definitions here.
+// float32 ARGMIN
+int64_t tensor_argmin_float32(const float* input, size_t n) {
+    int64_t* d_idx;
+    cudaMalloc(&d_idx, sizeof(int64_t));
+    int blockSize = 256;
+    argmin_kernel<float><<<1, blockSize>>>(d_idx, input, n);
+    cudaDeviceSynchronize();
+    int64_t h_idx;
+    cudaMemcpy(&h_idx, d_idx, sizeof(int64_t), cudaMemcpyDeviceToHost);
+    cudaFree(d_idx);
+    return h_idx;
+}
+
+// float64 ARGMIN
+int64_t tensor_argmin_float64(const double* input, size_t n) {
+    int64_t* d_idx;
+    cudaMalloc(&d_idx, sizeof(int64_t));
+    int blockSize = 256;
+    argmin_kernel<double><<<1, blockSize>>>(d_idx, input, n);
+    cudaDeviceSynchronize();
+    int64_t h_idx;
+    cudaMemcpy(&h_idx, d_idx, sizeof(int64_t), cudaMemcpyDeviceToHost);
+    cudaFree(d_idx);
+    return h_idx;
+}
+
+
 } // extern "C"
 
 // Explicit template instantiations for kernels used by tensor_ops.cu
@@ -1056,5 +1268,16 @@ template __global__ void axis_reduction_kernel<double, double>(double*, const do
 
 template __global__ void axis_variance_kernel<float>(float*, const float*, const int*, const int*, const int*, const int*, int, int, size_t);
 template __global__ void axis_variance_kernel<double>(double*, const double*, const int*, const int*, const int*, const int*, int, int, size_t); 
+
+// Argmax/Argmin kernels
+template __global__ void argmax_kernel<float>(int64_t*, const float*, size_t);
+template __global__ void argmax_kernel<double>(int64_t*, const double*, size_t);
+
+template __global__ void argmin_kernel<float>(int64_t*, const float*, size_t);
+template __global__ void argmin_kernel<double>(int64_t*, const double*, size_t);
+
+// Helper kernel instantiations
+template __global__ void copy_values_at_indices_kernel<float>(float*, const float*, const int64_t*, int, float);
+template __global__ void copy_values_at_indices_kernel<double>(double*, const double*, const int64_t*, int, double); 
 
  

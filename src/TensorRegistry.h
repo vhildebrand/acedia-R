@@ -32,6 +32,14 @@ extern "C" {
     // Variance computations (population)
     double tensor_var_float32(const float* input, size_t n);
     double tensor_var_float64(const double* input, size_t n);
+    
+    // Argmax/Argmin operations
+    int64_t tensor_argmax_float32(const float* input, size_t n);
+    int64_t tensor_argmax_float64(const double* input, size_t n);
+    int64_t tensor_argmin_float32(const float* input, size_t n);
+    int64_t tensor_argmin_float64(const double* input, size_t n);
+    
+    // NEW: Axis-aware reduction kernels
 }
 
 // Forward declarations of CUDA kernels (see tensor_ops.cu)
@@ -587,15 +595,60 @@ public:
     std::unique_ptr<TensorBase> argmax() const override {
         // Global argmax - return single index as int64 tensor
         auto result = std::make_shared<gpuTensor<int64_t>>(Shape{1});
-        // TODO: Call CUDA kernel for global argmax
-        throw std::runtime_error("argmax not yet implemented");
+        
+        if constexpr (std::is_same_v<T, float>) {
+            if (tensor_->is_contiguous()) {
+                int64_t index = tensor_argmax_float32(tensor_->data(), tensor_->size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            } else {
+                // For non-contiguous tensors, make contiguous first
+                auto contiguous_tensor = tensor_->contiguous();
+                int64_t index = tensor_argmax_float32(contiguous_tensor.data(), contiguous_tensor.size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (tensor_->is_contiguous()) {
+                int64_t index = tensor_argmax_float64(tensor_->data(), tensor_->size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            } else {
+                auto contiguous_tensor = tensor_->contiguous();
+                int64_t index = tensor_argmax_float64(contiguous_tensor.data(), contiguous_tensor.size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            }
+        } else {
+            throw std::runtime_error("argmax not implemented for this dtype: " + dtype_to_string(tensor_->dtype()));
+        }
+        
+        return std::make_unique<TensorWrapper<int64_t>>(result);
     }
     
     std::unique_ptr<TensorBase> argmin() const override {
         // Global argmin - return single index as int64 tensor
         auto result = std::make_shared<gpuTensor<int64_t>>(Shape{1});
-        // TODO: Call CUDA kernel for global argmin  
-        throw std::runtime_error("argmin not yet implemented");
+        
+        if constexpr (std::is_same_v<T, float>) {
+            if (tensor_->is_contiguous()) {
+                int64_t index = tensor_argmin_float32(tensor_->data(), tensor_->size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            } else {
+                auto contiguous_tensor = tensor_->contiguous();
+                int64_t index = tensor_argmin_float32(contiguous_tensor.data(), contiguous_tensor.size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (tensor_->is_contiguous()) {
+                int64_t index = tensor_argmin_float64(tensor_->data(), tensor_->size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            } else {
+                auto contiguous_tensor = tensor_->contiguous();
+                int64_t index = tensor_argmin_float64(contiguous_tensor.data(), contiguous_tensor.size());
+                cudaMemcpy(result->data(), &index, sizeof(int64_t), cudaMemcpyHostToDevice);
+            }
+        } else {
+            throw std::runtime_error("argmin not implemented for this dtype: " + dtype_to_string(tensor_->dtype()));
+        }
+        
+        return std::make_unique<TensorWrapper<int64_t>>(result);
     }
     
     std::unique_ptr<TensorBase> argmax(int axis, bool keep_dims = false) const override {
@@ -656,8 +709,23 @@ private:
     std::unique_ptr<TensorBase> perform_axis_reduction(const std::string& op_name, 
                                                       const std::vector<int>& axis, 
                                                       bool keep_dims) const {
+        // ------------------------------------------------------------------
+        // WORK-AROUND: kernel expects squeezed output (no keep-dims).  If the
+        // user requests keep_dims=TRUE we first execute the reduction with
+        // keep_dims == FALSE, then reshape the returned tensor to reinstate
+        // the singleton dimensions on the host.  This avoids the illegal
+        // memory access triggered by the kernel’s internal shape logic.
+        // ------------------------------------------------------------------
+        if (keep_dims) {
+            // 1) run reduction without keeping dims
+            auto tmp_result = perform_axis_reduction(op_name, axis, /*keep_dims*/ false);
+            // 2) compute final shape with singleton dims and reshape
+            Shape final_shape = calculate_reduction_shape(axis, /*keep_dims*/ true);
+            return tmp_result->reshape(final_shape);
+        }
+
         // Calculate output shape
-        Shape result_shape = calculate_reduction_shape(axis, keep_dims);
+        Shape result_shape = calculate_reduction_shape(axis, /*keep_dims*/ false);
         
         // Allocate device memory for the result tensor
         auto result_tensor = std::make_shared<gpuTensor<T>>(result_shape);
@@ -673,82 +741,101 @@ private:
         cudaMalloc(&d_reduction_axes, num_reduction_axes * sizeof(int));
         cudaMemcpy(d_reduction_axes, axis.data(), num_reduction_axes * sizeof(int), cudaMemcpyHostToDevice);
         
+        // Allocate device memory for shape and strides arrays (CRITICAL FIX!)
+        int* d_input_shape;
+        int* d_input_strides;
+        int* d_output_strides;
+        
+        cudaMalloc(&d_input_shape, input_desc.ndims * sizeof(int));
+        cudaMalloc(&d_input_strides, input_desc.ndims * sizeof(int));
+        cudaMalloc(&d_output_strides, output_desc.ndims * sizeof(int));
+        
+        cudaMemcpy(d_input_shape, input_desc.shape, input_desc.ndims * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_input_strides, input_desc.strides, input_desc.ndims * sizeof(int), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_output_strides, output_desc.strides, output_desc.ndims * sizeof(int), cudaMemcpyHostToDevice);
+        
         // Call the appropriate kernel based on operation and data type
         if constexpr (std::is_same_v<T, float>) {
             if (op_name == "sum") {
                 tensor_axis_sum_float32(result_tensor->data(), tensor_->data(),
-                                        input_desc.strides, input_desc.shape,
-                                        output_desc.strides, d_reduction_axes,
+                                        d_input_strides, d_input_shape,
+                                        d_output_strides, d_reduction_axes,
                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "mean") {
+                        } else if (op_name == "mean") {
                 tensor_axis_mean_float32(result_tensor->data(), tensor_->data(),
-                                         input_desc.strides, input_desc.shape,
-                                         output_desc.strides, d_reduction_axes,
+                                         d_input_strides, d_input_shape,
+                                         d_output_strides, d_reduction_axes,
                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "max") {
                 tensor_axis_max_float32(result_tensor->data(), tensor_->data(),
-                                         input_desc.strides, input_desc.shape,
-                                         output_desc.strides, d_reduction_axes,
+                                         d_input_strides, d_input_shape,
+                                         d_output_strides, d_reduction_axes,
                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "min") {
                 tensor_axis_min_float32(result_tensor->data(), tensor_->data(),
-                                         input_desc.strides, input_desc.shape,
-                                         output_desc.strides, d_reduction_axes,
+                                         d_input_strides, d_input_shape,
+                                         d_output_strides, d_reduction_axes,
                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "prod") {
                 tensor_axis_prod_float32(result_tensor->data(), tensor_->data(),
-                                          input_desc.strides, input_desc.shape,
-                                          output_desc.strides, d_reduction_axes,
+                                          d_input_strides, d_input_shape,
+                                          d_output_strides, d_reduction_axes,
                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "var") {
                 tensor_axis_var_float32(result_tensor->data(), tensor_->data(),
-                                          input_desc.strides, input_desc.shape,
-                                          output_desc.strides, d_reduction_axes,
-                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+                                         d_input_strides, d_input_shape,
+                                         d_output_strides, d_reduction_axes,
+                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else {
                 throw std::runtime_error("Unknown reduction operation: " + op_name);
             }
         } else if constexpr (std::is_same_v<T, double>) {
-            if (op_name == "sum") {
+                        if (op_name == "sum") {
                 tensor_axis_sum_float64(result_tensor->data(), tensor_->data(),
-                                         input_desc.strides, input_desc.shape,
-                                         output_desc.strides, d_reduction_axes,
+                                         d_input_strides, d_input_shape,
+                                         d_output_strides, d_reduction_axes,
                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "mean") {
                 tensor_axis_mean_float64(result_tensor->data(), tensor_->data(),
-                                          input_desc.strides, input_desc.shape,
-                                          output_desc.strides, d_reduction_axes,
+                                          d_input_strides, d_input_shape,
+                                          d_output_strides, d_reduction_axes,
                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "max") {
                 tensor_axis_max_float64(result_tensor->data(), tensor_->data(),
-                                          input_desc.strides, input_desc.shape,
-                                          output_desc.strides, d_reduction_axes,
-                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+                                         d_input_strides, d_input_shape,
+                                         d_output_strides, d_reduction_axes,
+                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "min") {
                 tensor_axis_min_float64(result_tensor->data(), tensor_->data(),
-                                          input_desc.strides, input_desc.shape,
-                                          output_desc.strides, d_reduction_axes,
+                                          d_input_strides, d_input_shape,
+                                          d_output_strides, d_reduction_axes,
                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "prod") {
                 tensor_axis_prod_float64(result_tensor->data(), tensor_->data(),
-                                           input_desc.strides, input_desc.shape,
-                                           output_desc.strides, d_reduction_axes,
+                                           d_input_strides, d_input_shape,
+                                           d_output_strides, d_reduction_axes,
                                            num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else if (op_name == "var") {
                 tensor_axis_var_float64(result_tensor->data(), tensor_->data(),
-                                           input_desc.strides, input_desc.shape,
-                                           output_desc.strides, d_reduction_axes,
-                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
+                                          d_input_strides, d_input_shape,
+                                          d_output_strides, d_reduction_axes,
+                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
             } else {
                 throw std::runtime_error("Unknown reduction operation: " + op_name);
             }
         } else {
+            // Fallback: compile for any T but raise at runtime if invoked.
             throw std::runtime_error("Axis-aware reduction not implemented for this dtype: " + dtype_to_string(tensor_->dtype()));
         }
-        
-        // Clean up device memory
+
+        // ------------------------------------------------------------
+        // NEW: free temporary device buffers (prevents memory leaks)
+        // ------------------------------------------------------------
         cudaFree(d_reduction_axes);
-        
+        cudaFree(d_input_shape);
+        cudaFree(d_input_strides);
+        cudaFree(d_output_strides);
+
         return std::make_unique<TensorWrapper<T>>(result_tensor);
     }
     

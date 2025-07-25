@@ -289,7 +289,7 @@ public:
 };
 
 /**
- * @brief Compute strides for row-major (C-style) memory layout (unchanged)
+ * @brief Compute strides for column-major (R/Fortran-style) memory layout
  */
 inline std::vector<size_t> compute_strides(const Shape& shape) {
     if (shape.ndims() == 0) return {};
