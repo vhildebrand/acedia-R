@@ -1246,27 +1246,9 @@ size.gpuTensor <- function(x) {
 #' @param ... Additional args (ignored)
 #' @return Numeric scalar
 #' @export
-prod.gpuTensor <- function(x, ...) {
-  if (!inherits(x, "gpuTensor")) {
-    stop("Object is not a gpuTensor")
-  }
-  tensor_prod_unified(x)
-}
-
-#' Variance (Population)
-#'
-#' Computes population variance of tensor elements.
-#'
-#' @param x A gpuTensor object
-#' @param ... Additional args (ignored)
-#' @return Numeric scalar (double)
+prod.gpuTensor <- function(x, ...) tensor_prod(x)
 #' @export
-var.gpuTensor <- function(x, ...) {
-  if (!inherits(x, "gpuTensor")) {
-    stop("Object is not a gpuTensor")
-  }
-  tensor_var_unified(x)
-}
+var.gpuTensor <- function(x, ...) tensor_var(x)
 
 softmax <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) stop("tensor must be gpuTensor")
@@ -1469,19 +1451,75 @@ tensor_sum <- function(x) {
   sum(x)
 }
 
+#' View / reshape without copy (returns gpuTensor)
+#' @export
+view <- function(x, shape) {
+  if (inherits(x, "gpuTensor")) {
+    tensor_view_unified(x, as.integer(shape))
+  } else {
+    array(x, dim = shape)
+  }
+}
+
+#' Softmax (last dimension)
+#' @export
+softmax <- function(x) tensor_softmax_unified(x)
+
+#' Argmax (linear index)
+#' @export
+argmax <- function(x) tensor_argmax_unified(x)
+
+#' Concat list of tensors
+#' @export
+concat <- function(lst, axis = 1L) tensor_concat_unified(lst, as.integer(axis))
+
+#' Stack list of tensors along new axis
+#' @export
+stack <- function(lst, axis = 1L) tensor_stack_unified(lst, as.integer(axis))
+
+#' Repeat tensor along each dimension
+#' @export
+repeat_tensor <- function(x, reps) tensor_repeat_unified(x, as.integer(reps))
+
+#' Pad tensor
+#' @export
+pad_tensor <- function(x, pad_width, mode="constant", value=0) tensor_pad_unified(x, pad_width, mode, value)
+
+#' Tensor info (list)
+#' @export
+tensor_info <- function(x) tensor_info_unified(x)
+
 # ---------------------------------------------------------------------------
 # $ operator for backward compatibility (soft-deprecated)
 # ---------------------------------------------------------------------------
 
 #' @export
 `$.gpuTensor` <- function(x, name) {
+  .Deprecated(msg = "Using the $ operator on gpuTensor is deprecated; please use functional helpers like matmul(), tensor_sum(), etc.")
   switch(name,
-         matmul = function(y) matmul(x, y),
-         matvec = function(v) matvec(x, v),
-         vecmat = function(v) vecmat(x, v),
-         sum    = function() tensor_sum(x),
-         transpose = function() transpose(x),
+         matmul     = function(y) matmul(x, y),
+         matvec     = function(v) matvec(x, v),
+         vecmat     = function(v) vecmat(x, v),
+         transpose  = function()  transpose(x),
+         sum        = function()  tensor_sum(x),
+         mean       = function()  tensor_mean(x),
+         prod       = function()  tensor_prod(x),
+         max        = function()  tensor_max(x),
+         min        = function()  tensor_min(x),
+         var        = function()  tensor_var(x),
          stop(sprintf("Unknown method '%s' for gpuTensor", name)))
 }
+
+# Scalar helpers (numeric)
+#' @export
+tensor_mean <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_mean_unified(x)) else mean(x) }
+#' @export
+tensor_prod <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_prod_unified(x)) else prod(x) }
+#' @export
+tensor_max <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_max_unified(x)) else max(x) }
+#' @export
+tensor_min <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_min_unified(x)) else min(x) }
+#' @export
+tensor_var <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_var_unified(x)) else var(x) }
 
 # ---------------------------------------------------------------------------

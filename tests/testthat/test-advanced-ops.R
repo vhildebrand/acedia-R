@@ -1,7 +1,6 @@
 context("Advanced operations: reductions, activations, comparisons, math functions")
 
-library(testthat)
-library(acediaR)
+## loaded in setup.R
 
 # Simplified GPU verification - just check class
 verify_gpu_tensor <- function(tensor, operation_name = "operation") {

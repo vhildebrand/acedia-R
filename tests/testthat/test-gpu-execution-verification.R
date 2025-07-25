@@ -1,3 +1,4 @@
+## loaded in setup.R
 test_that("GPU operations actually run on GPU with parallel execution", {
   skip_if_not(gpu_available(), "GPU not available")
   
@@ -41,7 +42,7 @@ test_that("GPU operations actually run on GPU with parallel execution", {
     # Verify correctness first (critical!)
     expect_equal(gpu_mult_result, cpu_mult_result, tolerance = 1e-10)
     expect_equal(gpu_scale_result, cpu_scale_result, tolerance = 1e-10)
-    expect_equal(gpu_dot_result, cpu_dot_result, tolerance = 1e-10)
+    expect_tensor_equal(gpu_dot_result, cpu_dot_result)
     
     # Performance verification
     expect_lt(gpu_mult_time, 10.0)  # Should complete within reasonable time
@@ -128,7 +129,7 @@ test_that("GPU tensor operations use parallel CUDA kernels", {
     # Multiple operations to test kernel efficiency
     tensor_add_result <- tensor_a + tensor_b
     tensor_mul_result <- tensor_a * tensor_b
-    tensor_sum_result <- sum(tensor_a * tensor_b)
+    tensor_sum_result <- tensor_sum(tensor_a * tensor_b)
     
     # Synchronize to ensure completion
     synchronize(tensor_add_result)
@@ -138,7 +139,7 @@ test_that("GPU tensor operations use parallel CUDA kernels", {
     # Verify correctness
     expect_equal(as.vector(tensor_add_result), cpu_add, tolerance = 1e-10)
     expect_equal(as.vector(tensor_mul_result), cpu_mul, tolerance = 1e-10) 
-    expect_equal(tensor_sum_result, cpu_sum, tolerance = 1e-8)
+    expect_tensor_equal(tensor_sum_result, cpu_sum)
     
     speedup <- cpu_time / gpu_time
     throughput <- n / gpu_time
@@ -177,7 +178,7 @@ test_that("CUDA kernel launches are actually parallel", {
     # Chain multiple GPU operations
     result1 <- gpu_multiply(data, rev(data))  # Element-wise multiply
     result2 <- gpu_scale(result1, 2.5)        # Scalar multiply  
-    final_result <- gpu_dot(result2, data[1:length(result2)])  # Dot product
+    final_result <- tensor_sum(result2)  # scalar numeric
     
     end_time <- Sys.time()
     elapsed <- as.numeric(end_time - start_time)
@@ -194,7 +195,7 @@ test_that("CUDA kernel launches are actually parallel", {
         " Throughput:", sprintf("%.2e", throughput), "elem/s\n")
     
     # Verify result correctness
-    expect_true(is.finite(final_result))
+    expect_true(is.finite(as.numeric(final_result)))
     expect_gt(final_result, 0)  # Should be positive for our test data
   }
   

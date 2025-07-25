@@ -1,7 +1,6 @@
 context("Memory layout and views: transpose, permute, contiguous, views, broadcasting")
 
-library(testthat)
-library(acediaR)
+## loaded in setup.R
 
 # Simplified GPU verification - just check class
 verify_gpu_tensor <- function(tensor, operation_name = "operation") {
