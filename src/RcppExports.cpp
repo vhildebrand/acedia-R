@@ -51,17 +51,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// tensor_argmax_unified
-int64_t tensor_argmax_unified(SEXP tensor_ptr);
-RcppExport SEXP _acediaR_tensor_argmax_unified(SEXP tensor_ptrSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
-    rcpp_result_gen = Rcpp::wrap(tensor_argmax_unified(tensor_ptr));
-    return rcpp_result_gen;
-END_RCPP
-}
 // tensor_tanh_unified
 SEXP tensor_tanh_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_tanh_unified(SEXP tensor_ptrSEXP) {
@@ -559,6 +548,132 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_sum_axis
+SEXP tensor_sum_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_sum_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_sum_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_mean_axis
+SEXP tensor_mean_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_mean_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_mean_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_max_axis
+SEXP tensor_max_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_max_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_max_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_min_axis
+SEXP tensor_min_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_min_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_min_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_prod_axis
+SEXP tensor_prod_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_prod_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_prod_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_var_axis
+SEXP tensor_var_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_var_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< Nullable<IntegerVector> >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_var_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_argmax_unified
+SEXP tensor_argmax_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_argmax_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_argmax_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_argmin_unified
+SEXP tensor_argmin_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_argmin_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_argmin_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_argmax_axis
+SEXP tensor_argmax_axis(SEXP tensor_ptr, int axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_argmax_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< int >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_argmax_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
+// tensor_argmin_axis
+SEXP tensor_argmin_axis(SEXP tensor_ptr, int axis, bool keep_dims);
+RcppExport SEXP _acediaR_tensor_argmin_axis(SEXP tensor_ptrSEXP, SEXP axisSEXP, SEXP keep_dimsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    Rcpp::traits::input_parameter< int >::type axis(axisSEXP);
+    Rcpp::traits::input_parameter< bool >::type keep_dims(keep_dimsSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_argmin_axis(tensor_ptr, axis, keep_dims));
+    return rcpp_result_gen;
+END_RCPP
+}
 // tensor_view_unified
 SEXP tensor_view_unified(SEXP tensor_ptr, IntegerVector new_shape);
 RcppExport SEXP _acediaR_tensor_view_unified(SEXP tensor_ptrSEXP, SEXP new_shapeSEXP) {
@@ -612,7 +727,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_gpu_info", (DL_FUNC) &_acediaR_gpu_info, 0},
     {"_acediaR_gpu_memory_available", (DL_FUNC) &_acediaR_gpu_memory_available, 0},
     {"_acediaR_tensor_softmax_unified", (DL_FUNC) &_acediaR_tensor_softmax_unified, 1},
-    {"_acediaR_tensor_argmax_unified", (DL_FUNC) &_acediaR_tensor_argmax_unified, 1},
     {"_acediaR_tensor_tanh_unified", (DL_FUNC) &_acediaR_tensor_tanh_unified, 1},
     {"_acediaR_tensor_sigmoid_unified", (DL_FUNC) &_acediaR_tensor_sigmoid_unified, 1},
     {"_acediaR_tensor_relu_unified", (DL_FUNC) &_acediaR_tensor_relu_unified, 1},
@@ -656,6 +770,16 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_tensor_min_unified", (DL_FUNC) &_acediaR_tensor_min_unified, 1},
     {"_acediaR_tensor_prod_unified", (DL_FUNC) &_acediaR_tensor_prod_unified, 1},
     {"_acediaR_tensor_var_unified", (DL_FUNC) &_acediaR_tensor_var_unified, 1},
+    {"_acediaR_tensor_sum_axis", (DL_FUNC) &_acediaR_tensor_sum_axis, 3},
+    {"_acediaR_tensor_mean_axis", (DL_FUNC) &_acediaR_tensor_mean_axis, 3},
+    {"_acediaR_tensor_max_axis", (DL_FUNC) &_acediaR_tensor_max_axis, 3},
+    {"_acediaR_tensor_min_axis", (DL_FUNC) &_acediaR_tensor_min_axis, 3},
+    {"_acediaR_tensor_prod_axis", (DL_FUNC) &_acediaR_tensor_prod_axis, 3},
+    {"_acediaR_tensor_var_axis", (DL_FUNC) &_acediaR_tensor_var_axis, 3},
+    {"_acediaR_tensor_argmax_unified", (DL_FUNC) &_acediaR_tensor_argmax_unified, 1},
+    {"_acediaR_tensor_argmin_unified", (DL_FUNC) &_acediaR_tensor_argmin_unified, 1},
+    {"_acediaR_tensor_argmax_axis", (DL_FUNC) &_acediaR_tensor_argmax_axis, 3},
+    {"_acediaR_tensor_argmin_axis", (DL_FUNC) &_acediaR_tensor_argmin_axis, 3},
     {"_acediaR_tensor_view_unified", (DL_FUNC) &_acediaR_tensor_view_unified, 2},
     {"_acediaR_tensor_reshape_unified", (DL_FUNC) &_acediaR_tensor_reshape_unified, 2},
     {"_acediaR_tensor_transpose_unified", (DL_FUNC) &_acediaR_tensor_transpose_unified, 1},

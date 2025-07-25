@@ -9,6 +9,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <functional>
+#include <set>  // For axis validation helper methods
 
 // Forward declarations for CUDA kernel functions
 extern "C" {
@@ -67,6 +68,62 @@ extern "C" {
     float  tensor_sum_float16(const half* input, size_t n);
     float  tensor_sum_float32(const float* input, size_t n);
     double tensor_sum_float64(const double* input, size_t n);
+    
+    // NEW: Axis-aware reduction kernels
+    // Axis-aware sum
+    void tensor_axis_sum_float32(float* result, const float* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    void tensor_axis_sum_float64(double* result, const double* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    // Axis-aware mean
+    void tensor_axis_mean_float32(float* result, const float* input,
+                                 const int* input_strides, const int* input_shape,
+                                 const int* result_strides, const int* reduction_axes,
+                                 int num_reduction_axes, int ndims, size_t output_size);
+    void tensor_axis_mean_float64(double* result, const double* input,
+                                 const int* input_strides, const int* input_shape,
+                                 const int* result_strides, const int* reduction_axes,
+                                 int num_reduction_axes, int ndims, size_t output_size);
+    // Axis-aware max
+    void tensor_axis_max_float32(float* result, const float* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    void tensor_axis_max_float64(double* result, const double* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    // Axis-aware min
+    void tensor_axis_min_float32(float* result, const float* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    void tensor_axis_min_float64(double* result, const double* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    // Axis-aware prod
+    void tensor_axis_prod_float32(float* result, const float* input,
+                                 const int* input_strides, const int* input_shape,
+                                 const int* result_strides, const int* reduction_axes,
+                                 int num_reduction_axes, int ndims, size_t output_size);
+    void tensor_axis_prod_float64(double* result, const double* input,
+                                 const int* input_strides, const int* input_shape,
+                                 const int* result_strides, const int* reduction_axes,
+                                 int num_reduction_axes, int ndims, size_t output_size);
+    // Axis-aware var
+    void tensor_axis_var_float32(float* result, const float* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
+    void tensor_axis_var_float64(double* result, const double* input,
+                                const int* input_strides, const int* input_shape,
+                                const int* result_strides, const int* reduction_axes,
+                                int num_reduction_axes, int ndims, size_t output_size);
 }
 
 // Helper for static_assert false in templated context
@@ -116,6 +173,20 @@ public:
     virtual std::unique_ptr<TensorBase> min() const = 0;   // Add min
     virtual std::unique_ptr<TensorBase> prod() const = 0;  // Add prod
     virtual std::unique_ptr<TensorBase> var() const = 0;   // Add var
+    
+    // NEW: Axis-aware reduction methods
+    virtual std::unique_ptr<TensorBase> sum(const std::vector<int>& axis, bool keep_dims = false) const = 0;
+    virtual std::unique_ptr<TensorBase> mean(const std::vector<int>& axis, bool keep_dims = false) const = 0;
+    virtual std::unique_ptr<TensorBase> max(const std::vector<int>& axis, bool keep_dims = false) const = 0;
+    virtual std::unique_ptr<TensorBase> min(const std::vector<int>& axis, bool keep_dims = false) const = 0;
+    virtual std::unique_ptr<TensorBase> prod(const std::vector<int>& axis, bool keep_dims = false) const = 0;
+    virtual std::unique_ptr<TensorBase> var(const std::vector<int>& axis, bool keep_dims = false) const = 0;
+    
+    // Argmax/argmin operations
+    virtual std::unique_ptr<TensorBase> argmax() const = 0;  // Global argmax
+    virtual std::unique_ptr<TensorBase> argmin() const = 0;  // Global argmin
+    virtual std::unique_ptr<TensorBase> argmax(int axis, bool keep_dims = false) const = 0;  // Axis-aware argmax
+    virtual std::unique_ptr<TensorBase> argmin(int axis, bool keep_dims = false) const = 0;  // Axis-aware argmin
     
     // Clone operation
     virtual std::unique_ptr<TensorBase> clone() const = 0;
@@ -456,6 +527,258 @@ public:
         } else {
             throw std::runtime_error("var not implemented for this type");
         }
+    }
+    
+    // NEW: Axis-aware reduction method implementations
+    std::unique_ptr<TensorBase> sum(const std::vector<int>& axis, bool keep_dims = false) const override {
+        // Validate and normalize axis values
+        std::vector<int> normalized_axis = validate_and_normalize_axis(axis);
+        
+        // For now, fall back to global reduction if all axes are being reduced
+        if (normalized_axis.size() == tensor_->ndims()) {
+            return sum();  // Global reduction
+        }
+        
+        // Call axis-aware reduction kernel
+        return perform_axis_reduction("sum", normalized_axis, keep_dims);
+    }
+    
+    std::unique_ptr<TensorBase> mean(const std::vector<int>& axis, bool keep_dims = false) const override {
+        std::vector<int> normalized_axis = validate_and_normalize_axis(axis);
+        if (normalized_axis.size() == tensor_->ndims()) {
+            return mean();  // Global reduction
+        }
+        return perform_axis_reduction("mean", normalized_axis, keep_dims);
+    }
+    
+    std::unique_ptr<TensorBase> max(const std::vector<int>& axis, bool keep_dims = false) const override {
+        std::vector<int> normalized_axis = validate_and_normalize_axis(axis);
+        if (normalized_axis.size() == tensor_->ndims()) {
+            return max();  // Global reduction
+        }
+        return perform_axis_reduction("max", normalized_axis, keep_dims);
+    }
+    
+    std::unique_ptr<TensorBase> min(const std::vector<int>& axis, bool keep_dims = false) const override {
+        std::vector<int> normalized_axis = validate_and_normalize_axis(axis);
+        if (normalized_axis.size() == tensor_->ndims()) {
+            return min();  // Global reduction
+        }
+        return perform_axis_reduction("min", normalized_axis, keep_dims);
+    }
+    
+    std::unique_ptr<TensorBase> prod(const std::vector<int>& axis, bool keep_dims = false) const override {
+        std::vector<int> normalized_axis = validate_and_normalize_axis(axis);
+        if (normalized_axis.size() == tensor_->ndims()) {
+            return prod();  // Global reduction
+        }
+        return perform_axis_reduction("prod", normalized_axis, keep_dims);
+    }
+    
+    std::unique_ptr<TensorBase> var(const std::vector<int>& axis, bool keep_dims = false) const override {
+        std::vector<int> normalized_axis = validate_and_normalize_axis(axis);
+        if (normalized_axis.size() == tensor_->ndims()) {
+            return var();  // Global reduction
+        }
+        return perform_axis_reduction("var", normalized_axis, keep_dims);
+    }
+    
+    // Argmax/argmin implementations
+    std::unique_ptr<TensorBase> argmax() const override {
+        // Global argmax - return single index as int64 tensor
+        auto result = std::make_shared<gpuTensor<int64_t>>(Shape{1});
+        // TODO: Call CUDA kernel for global argmax
+        throw std::runtime_error("argmax not yet implemented");
+    }
+    
+    std::unique_ptr<TensorBase> argmin() const override {
+        // Global argmin - return single index as int64 tensor
+        auto result = std::make_shared<gpuTensor<int64_t>>(Shape{1});
+        // TODO: Call CUDA kernel for global argmin  
+        throw std::runtime_error("argmin not yet implemented");
+    }
+    
+    std::unique_ptr<TensorBase> argmax(int axis, bool keep_dims = false) const override {
+        int normalized_axis = normalize_single_axis(axis);
+        // TODO: Call CUDA kernel for axis-aware argmax
+        throw std::runtime_error("axis-aware argmax not yet implemented");
+    }
+    
+    std::unique_ptr<TensorBase> argmin(int axis, bool keep_dims = false) const override {
+        int normalized_axis = normalize_single_axis(axis);
+        // TODO: Call CUDA kernel for axis-aware argmin
+        throw std::runtime_error("axis-aware argmin not yet implemented");
+    }
+
+private:
+    // Helper method to validate and normalize axis values
+    std::vector<int> validate_and_normalize_axis(const std::vector<int>& axis) const {
+        std::vector<int> normalized;
+        int ndims = static_cast<int>(tensor_->ndims());
+        
+        for (int ax : axis) {
+            // Handle negative indexing (Python-style)
+            int norm_ax = ax < 0 ? ndims + ax : ax;
+            
+            // Validate range
+            if (norm_ax < 0 || norm_ax >= ndims) {
+                throw std::runtime_error("axis " + std::to_string(ax) + " is out of bounds for tensor with " + 
+                                       std::to_string(ndims) + " dimensions");
+            }
+            
+            normalized.push_back(norm_ax);
+        }
+        
+        // Check for duplicates
+        std::sort(normalized.begin(), normalized.end());
+        auto last = std::unique(normalized.begin(), normalized.end());
+        if (last != normalized.end()) {
+            throw std::runtime_error("repeated axis in reduction");
+        }
+        
+        return normalized;
+    }
+    
+    // Helper method to normalize single axis  
+    int normalize_single_axis(int axis) const {
+        int ndims = static_cast<int>(tensor_->ndims());
+        int norm_ax = axis < 0 ? ndims + axis : axis;
+        
+        if (norm_ax < 0 || norm_ax >= ndims) {
+            throw std::runtime_error("axis " + std::to_string(axis) + " is out of bounds for tensor with " + 
+                                   std::to_string(ndims) + " dimensions");
+        }
+        
+        return norm_ax;
+    }
+    
+    // Core method that performs axis-aware reduction using CUDA kernels
+    std::unique_ptr<TensorBase> perform_axis_reduction(const std::string& op_name, 
+                                                      const std::vector<int>& axis, 
+                                                      bool keep_dims) const {
+        // Calculate output shape
+        Shape result_shape = calculate_reduction_shape(axis, keep_dims);
+        
+        // Allocate device memory for the result tensor
+        auto result_tensor = std::make_shared<gpuTensor<T>>(result_shape);
+        
+        // Use stride-aware axis reduction kernels
+        // Get input and output descriptors
+        cuda_utils::TensorDescriptor input_desc = tensor_->descriptor();
+        cuda_utils::TensorDescriptor output_desc = result_tensor->descriptor();
+        
+        // Get reduction axes as device array
+        int num_reduction_axes = static_cast<int>(axis.size());
+        int* d_reduction_axes;
+        cudaMalloc(&d_reduction_axes, num_reduction_axes * sizeof(int));
+        cudaMemcpy(d_reduction_axes, axis.data(), num_reduction_axes * sizeof(int), cudaMemcpyHostToDevice);
+        
+        // Call the appropriate kernel based on operation and data type
+        if constexpr (std::is_same_v<T, float>) {
+            if (op_name == "sum") {
+                tensor_axis_sum_float32(result_tensor->data(), tensor_->data(),
+                                        input_desc.strides, input_desc.shape,
+                                        output_desc.strides, d_reduction_axes,
+                                        num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "mean") {
+                tensor_axis_mean_float32(result_tensor->data(), tensor_->data(),
+                                         input_desc.strides, input_desc.shape,
+                                         output_desc.strides, d_reduction_axes,
+                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "max") {
+                tensor_axis_max_float32(result_tensor->data(), tensor_->data(),
+                                         input_desc.strides, input_desc.shape,
+                                         output_desc.strides, d_reduction_axes,
+                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "min") {
+                tensor_axis_min_float32(result_tensor->data(), tensor_->data(),
+                                         input_desc.strides, input_desc.shape,
+                                         output_desc.strides, d_reduction_axes,
+                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "prod") {
+                tensor_axis_prod_float32(result_tensor->data(), tensor_->data(),
+                                          input_desc.strides, input_desc.shape,
+                                          output_desc.strides, d_reduction_axes,
+                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "var") {
+                tensor_axis_var_float32(result_tensor->data(), tensor_->data(),
+                                          input_desc.strides, input_desc.shape,
+                                          output_desc.strides, d_reduction_axes,
+                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else {
+                throw std::runtime_error("Unknown reduction operation: " + op_name);
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (op_name == "sum") {
+                tensor_axis_sum_float64(result_tensor->data(), tensor_->data(),
+                                         input_desc.strides, input_desc.shape,
+                                         output_desc.strides, d_reduction_axes,
+                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "mean") {
+                tensor_axis_mean_float64(result_tensor->data(), tensor_->data(),
+                                          input_desc.strides, input_desc.shape,
+                                          output_desc.strides, d_reduction_axes,
+                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "max") {
+                tensor_axis_max_float64(result_tensor->data(), tensor_->data(),
+                                          input_desc.strides, input_desc.shape,
+                                          output_desc.strides, d_reduction_axes,
+                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "min") {
+                tensor_axis_min_float64(result_tensor->data(), tensor_->data(),
+                                          input_desc.strides, input_desc.shape,
+                                          output_desc.strides, d_reduction_axes,
+                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "prod") {
+                tensor_axis_prod_float64(result_tensor->data(), tensor_->data(),
+                                           input_desc.strides, input_desc.shape,
+                                           output_desc.strides, d_reduction_axes,
+                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else if (op_name == "var") {
+                tensor_axis_var_float64(result_tensor->data(), tensor_->data(),
+                                           input_desc.strides, input_desc.shape,
+                                           output_desc.strides, d_reduction_axes,
+                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
+            } else {
+                throw std::runtime_error("Unknown reduction operation: " + op_name);
+            }
+        } else {
+            throw std::runtime_error("Axis-aware reduction not implemented for this dtype: " + dtype_to_string(tensor_->dtype()));
+        }
+        
+        // Clean up device memory
+        cudaFree(d_reduction_axes);
+        
+        return std::make_unique<TensorWrapper<T>>(result_tensor);
+    }
+    
+    // Helper to calculate output shape after reduction
+    Shape calculate_reduction_shape(const std::vector<int>& axis, bool keep_dims) const {
+        const Shape& input_shape = tensor_->shape();
+        std::vector<size_t> result_dims;
+        
+        // Create set for fast lookup
+        std::set<int> axis_set(axis.begin(), axis.end());
+        
+        for (int i = 0; i < static_cast<int>(input_shape.ndims()); ++i) {
+            if (axis_set.find(i) != axis_set.end()) {
+                // This dimension is being reduced
+                if (keep_dims) {
+                    result_dims.push_back(1);  // Keep as size 1
+                }
+                // Otherwise, remove this dimension
+            } else {
+                // This dimension is not being reduced
+                result_dims.push_back(input_shape[i]);
+            }
+        }
+        
+        // If all dimensions were reduced and keep_dims=false, return scalar (shape [1])
+        if (result_dims.empty()) {
+            result_dims.push_back(1);
+        }
+        
+        return Shape(result_dims);
     }
     
     std::unique_ptr<TensorBase> clone() const override {

@@ -8,156 +8,36 @@
 #include <algorithm>
 #include <vector>
 #include "kernel_utils.cuh"
-#include "tensor_kernels.cu"
+#include "tensor_kernels.cuh"
 #include "../cuda_utils.h"
 #include <cublas_v2.h>
 
-// Function objects for operations - with both __host__ and __device__ support
-struct AddOp {
-    template<typename T>
-    __host__ __device__ T operator()(const T& a, const T& b) const { return a + b; }
-};
+// Operation functors are now defined in tensor_kernels.cuh
 
-struct MulOp {
-    template<typename T>
-    __host__ __device__ T operator()(const T& a, const T& b) const { return a * b; }
-};
+// Helper macros for common kernel launch patterns
+#define LAUNCH_BINARY_KERNEL(result, a, b, n, op) \
+    do { \
+        int threadsPerBlock = 256; \
+        int blocksPerGrid = ((n) + threadsPerBlock - 1) / threadsPerBlock; \
+        elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>((result), (a), (b), (n), (op)); \
+        cudaDeviceSynchronize(); \
+    } while(0)
 
-struct SubOp {
-    template<typename T>
-    __host__ __device__ T operator()(const T& a, const T& b) const { return a - b; }
-};
+#define LAUNCH_UNARY_KERNEL(result, input, n, op) \
+    do { \
+        int threadsPerBlock = 256; \
+        int blocksPerGrid = ((n) + threadsPerBlock - 1) / threadsPerBlock; \
+        elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>((result), (input), (n), (op)); \
+        cudaDeviceSynchronize(); \
+    } while(0)
 
-struct DivOp {
-    template<typename T>
-    __host__ __device__ T operator()(const T& a, const T& b) const { return a / b; }
-};
-
-// Unary operation functors - device only since they use CUDA math functions
-struct ExpOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return exp(a); }
-};
-
-struct LogOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return log(a); }
-};
-
-struct SqrtOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return sqrt(a); }
-};
-
-// Additional activation function functors
-struct TanhOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return tanh(a); }
-};
-
-struct SigmoidOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return T(1) / (T(1) + exp(-a)); }
-};
-
-struct ReluOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return fmax(a, T(0)); }
-};
-
-struct LeakyReluOp {
-    template<typename T>
-    __device__ T operator()(const T& a, const T& alpha = T(0.01)) const { 
-        return a > T(0) ? a : alpha * a; 
-    }
-};
-
-struct SinOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return sin(a); }
-};
-
-struct CosOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return cos(a); }
-};
-
-struct AbsOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return fabs(a); }
-};
-
-// Reduction operation functors - with both __host__ and __device__ support
-struct MaxOp {
-    template<typename T>
-    __host__ __device__ T operator()(const T& a, const T& b) const { 
-#ifdef __CUDA_ARCH__
-        return fmax(a, b); // Device version
-#else
-        return (a > b) ? a : b; // Host version
-#endif
-    }
-};
-
-struct MinOp {
-    template<typename T>
-    __host__ __device__ T operator()(const T& a, const T& b) const { 
-#ifdef __CUDA_ARCH__
-        return fmin(a, b); // Device version
-#else
-        return (a < b) ? a : b; // Host version
-#endif
-    }
-};
-
-// ===================== Comparison Functors ===================== //
-struct GreaterOp {
-    template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return (a > b) ? T(1) : T(0); }
-};
-
-struct LessOp {
-    template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return (a < b) ? T(1) : T(0); }
-};
-
-struct EqualOp {
-    template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return (a == b) ? T(1) : T(0); }
-};
-
-// Host interface functions using templates
-template<typename T>
-void launch_fill(T* data, T value, size_t n, cudaStream_t stream = 0) {
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
-    
-    fill_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(data, value, n);
-}
-
-template<typename T, typename Op>
-void launch_elementwise_binary(T* result, const T* a, const T* b, size_t n, Op op, cudaStream_t stream = 0) {
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
-    
-    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(result, a, b, n, op);
-}
-
-template<typename T, typename U, typename Op>
-void launch_elementwise_scalar(T* result, const T* input, U scalar, size_t n, Op op, cudaStream_t stream = 0) {
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
-    
-    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(result, input, scalar, n, op);
-}
-
-template<typename T, typename Op>
-void launch_elementwise_unary(T* result, const T* input, size_t n, Op op, cudaStream_t stream = 0) {
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
-    
-    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(result, input, n, op);
-}
+#define LAUNCH_SCALAR_KERNEL(result, input, scalar, n, op) \
+    do { \
+        int threadsPerBlock = 256; \
+        int blocksPerGrid = ((n) + threadsPerBlock - 1) / threadsPerBlock; \
+        elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>((result), (input), (scalar), (n), (op)); \
+        cudaDeviceSynchronize(); \
+    } while(0)
 
 template<typename To, typename From>
 void launch_type_conversion(To* output, const From* input, size_t n, cudaStream_t stream = 0) {
@@ -500,10 +380,7 @@ void launch_pad(T* result, const T* input,
 } 
 
 // ===================== Product and Variance Support ===================== //
-struct SquareOp {
-    template<typename T>
-    __device__ T operator()(const T& a) const { return a * a; }
-};
+// SquareOp is now defined in tensor_kernels.cuh
 
 // ===================== Softmax / Argmax Kernels ===================== //
 
@@ -609,76 +486,130 @@ extern "C" {
 // ===================== Unary Elementwise Math ===================== //
 
 void tensor_exp_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, ExpOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, ExpOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_exp_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, ExpOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, ExpOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_log_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, LogOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, LogOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_log_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, LogOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, LogOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_sqrt_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, SqrtOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, SqrtOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_sqrt_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, SqrtOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, SqrtOp());
+    cudaDeviceSynchronize();
 }
 
 // New activation functions
 void tensor_tanh_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, TanhOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, TanhOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_tanh_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, TanhOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, TanhOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_sigmoid_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, SigmoidOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, SigmoidOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_sigmoid_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, SigmoidOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, SigmoidOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_relu_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, ReluOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, ReluOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_relu_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, ReluOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, ReluOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_sin_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, SinOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, SinOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_sin_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, SinOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, SinOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_cos_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, CosOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, CosOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_cos_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, CosOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, CosOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_abs_float32(float* result, const float* input, size_t n) {
-    launch_elementwise_unary<float>(result, input, n, AbsOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, AbsOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_abs_float64(double* result, const double* input, size_t n) {
-    launch_elementwise_unary<double>(result, input, n, AbsOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, AbsOp());
+    cudaDeviceSynchronize();
 }
 
 // ===================== Reductions ===================== //
@@ -727,27 +658,45 @@ double tensor_min_float64(const double* input, size_t n) {
 // ===================== Comparison Functors ===================== //
 
 void tensor_gt_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, GreaterOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, GreaterOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_gt_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, GreaterOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, GreaterOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_lt_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, LessOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, LessOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_lt_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, LessOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, LessOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_eq_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, EqualOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, EqualOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_eq_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, EqualOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, EqualOp());
+    cudaDeviceSynchronize();
 }
 
 // Product reductions
@@ -766,7 +715,12 @@ double tensor_var_float32(const float* input, size_t n) {
     // Allocate temp buffer for squares
     float* d_squares = nullptr;
     cudaMalloc(&d_squares, n * sizeof(float));
-    launch_elementwise_unary<float>(d_squares, input, n, SquareOp());
+    
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_squares, input, n, SquareOp());
+    cudaDeviceSynchronize();
+    
     float sum = launch_reduction<float, float>(input, n, AddOp(), 0.0f);
     float sum_sq = launch_reduction<float, float>(d_squares, n, AddOp(), 0.0f);
     cudaFree(d_squares);
@@ -781,7 +735,12 @@ double tensor_var_float64(const double* input, size_t n) {
     // Allocate temp buffer for squares
     double* d_squares = nullptr;
     cudaMalloc(&d_squares, n * sizeof(double));
-    launch_elementwise_unary<double>(d_squares, input, n, SquareOp());
+    
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_squares, input, n, SquareOp());
+    cudaDeviceSynchronize();
+    
     double sum = launch_reduction<double, double>(input, n, AddOp(), 0.0);
     double sum_sq = launch_reduction<double, double>(d_squares, n, AddOp(), 0.0);
     cudaFree(d_squares);
@@ -927,96 +886,144 @@ void launch_pad_float64(double* result, const double* input,
 }
 
 void tensor_div_float16(half* result, const half* a, const half* b, size_t n) {
-    launch_elementwise_binary<half>(result, a, b, n, DivOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, DivOp());
+    cudaDeviceSynchronize();
 }
 
 // ===================== Missing Arithmetic Functions ===================== //
 
 // Multiplication operations
 void tensor_mul_float16(half* result, const half* a, const half* b, size_t n) {
-    launch_elementwise_binary<half>(result, a, b, n, MulOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MulOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_mul_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, MulOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MulOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_mul_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, MulOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MulOp());
+    cudaDeviceSynchronize();
 }
 
 // Subtraction operations
 void tensor_sub_float16(half* result, const half* a, const half* b, size_t n) {
-    launch_elementwise_binary<half>(result, a, b, n, SubOp());
+    LAUNCH_BINARY_KERNEL(result, a, b, n, SubOp());
 }
 
 void tensor_sub_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, SubOp());
+    LAUNCH_BINARY_KERNEL(result, a, b, n, SubOp());
 }
 
 void tensor_sub_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, SubOp());
+    LAUNCH_BINARY_KERNEL(result, a, b, n, SubOp());
 }
 
 // Division operations
 void tensor_div_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, DivOp());
+    LAUNCH_BINARY_KERNEL(result, a, b, n, DivOp());
 }
 
 void tensor_div_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, DivOp());
+    LAUNCH_BINARY_KERNEL(result, a, b, n, DivOp());
 }
 
 // Scalar operations
 void tensor_scalar_mul_float16(half* result, const half* input, float scalar, size_t n) {
-    launch_elementwise_scalar<half, float>(result, input, scalar, n, MulOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, scalar, n, MulOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_scalar_mul_float32(float* result, const float* input, float scalar, size_t n) {
-    launch_elementwise_scalar<float, float>(result, input, scalar, n, MulOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, scalar, n, MulOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_scalar_mul_float64(double* result, const double* input, double scalar, size_t n) {
-    launch_elementwise_scalar<double, double>(result, input, scalar, n, MulOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, scalar, n, MulOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_scalar_add_float16(half* result, const half* input, float scalar, size_t n) {
-    launch_elementwise_scalar<half, float>(result, input, scalar, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, scalar, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_scalar_add_float32(float* result, const float* input, float scalar, size_t n) {
-    launch_elementwise_scalar<float, float>(result, input, scalar, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, scalar, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_scalar_add_float64(double* result, const double* input, double scalar, size_t n) {
-    launch_elementwise_scalar<double, double>(result, input, scalar, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, scalar, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 // ===================== Additional Missing Functions ===================== //
 
 // Addition operations
 void tensor_add_float16(half* result, const half* a, const half* b, size_t n) {
-    launch_elementwise_binary<half>(result, a, b, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_add_float32(float* result, const float* a, const float* b, size_t n) {
-    launch_elementwise_binary<float>(result, a, b, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_add_float64(double* result, const double* a, const double* b, size_t n) {
-    launch_elementwise_binary<double>(result, a, b, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_add_int8(int8_t* result, const int8_t* a, const int8_t* b, size_t n) {
-    launch_elementwise_binary<int8_t>(result, a, b, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_add_int32(int32_t* result, const int32_t* a, const int32_t* b, size_t n) {
-    launch_elementwise_binary<int32_t>(result, a, b, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 void tensor_add_int64(int64_t* result, const int64_t* a, const int64_t* b, size_t n) {
-    launch_elementwise_binary<int64_t>(result, a, b, n, AddOp());
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, AddOp());
+    cudaDeviceSynchronize();
 }
 
 // Broadcast operations

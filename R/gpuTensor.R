@@ -492,14 +492,35 @@ vecmat <- function(v, A) {
 
 #' Tensor Sum
 #'
-#' Computes the sum of all elements in a tensor.
+#' Computes the sum of tensor elements along specified axes.
 #'
-#' @param tensor A gpuTensor object
-#' @return Scalar sum of all elements
+#' @param x A gpuTensor object
+#' @param axis Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
+#' @param ... Additional arguments (ignored)
+#' @return A tensor with reduced dimensions, or a scalar if all axes are reduced
 #' @export
-sum.gpuTensor <- function(tensor, ...) {
-  val <- tensor_sum_unified(tensor)
-  return(as.numeric(as.array(val)))
+sum.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (is.null(axis)) {
+    # Global reduction (backward compatibility)
+    val <- tensor_sum_unified(x)
+    return(as.numeric(as.array(val)))
+  } else {
+    # Axis-aware reduction
+    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_sum_axis(x, axis_cpp, keep.dims)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  }
 }
 
 #' Create Tensor View
@@ -1009,50 +1030,101 @@ Math.gpuTensor <- function(x, ...) {
 
 #' Mean (Average) Function
 #'
-#' Computes the arithmetic mean of all elements in the tensor.
+#' Computes the arithmetic mean of tensor elements along specified axes.
 #'
 #' @param x A gpuTensor object
+#' @param axis Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
 #' @param ... Additional arguments (ignored)
-#' @return The mean value of all tensor elements
+#' @return A tensor with reduced dimensions, or a scalar if all axes are reduced
 #' @export
-mean.gpuTensor <- function(x, ...) {
+mean.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
   
-  return(tensor_mean_unified(x))
+  if (is.null(axis)) {
+    # Global reduction (backward compatibility)
+    val <- tensor_mean_unified(x)
+    return(as.numeric(as.array(val)))
+  } else {
+    # Axis-aware reduction
+    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_mean_axis(x, axis_cpp, keep.dims)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  }
 }
 
 #' Maximum Function
 #'
-#' Finds the maximum element in the tensor.
+#' Finds the maximum element in the tensor along specified axes.
 #'
 #' @param x A gpuTensor object
+#' @param axis Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
 #' @param ... Additional arguments (ignored)
-#' @return The maximum value in the tensor
+#' @return A tensor with reduced dimensions, or a scalar if all axes are reduced
 #' @export
-max.gpuTensor <- function(x, ...) {
+max.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
   
-  return(tensor_max_unified(x))
+  if (is.null(axis)) {
+    # Global reduction (backward compatibility)
+    val <- tensor_max_unified(x)
+    return(as.numeric(as.array(val)))
+  } else {
+    # Axis-aware reduction
+    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_max_axis(x, axis_cpp, keep.dims)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  }
 }
 
 #' Minimum Function
 #'
-#' Finds the minimum element in the tensor.
+#' Finds the minimum element in the tensor along specified axes.
 #'
 #' @param x A gpuTensor object
+#' @param axis Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
 #' @param ... Additional arguments (ignored)
-#' @return The minimum value in the tensor
+#' @return A tensor with reduced dimensions, or a scalar if all axes are reduced
 #' @export
-min.gpuTensor <- function(x, ...) {
+min.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
   
-  return(tensor_min_unified(x))
+  if (is.null(axis)) {
+    # Global reduction (backward compatibility)
+    val <- tensor_min_unified(x)
+    return(as.numeric(as.array(val)))
+  } else {
+    # Axis-aware reduction
+    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_min_axis(x, axis_cpp, keep.dims)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  }
 }
 
 #' Concatenate Tensors
@@ -1243,10 +1315,70 @@ size.gpuTensor <- function(x) {
 #' @param x A gpuTensor object
 #' @param ... Additional args (ignored)
 #' @return Numeric scalar
+#' Product Function
+#'
+#' Computes the product of tensor elements along specified axes.
+#'
+#' @param x A gpuTensor object
+#' @param axis Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
+#' @param ... Additional arguments (ignored)
+#' @return A tensor with reduced dimensions, or a scalar if all axes are reduced
 #' @export
-prod.gpuTensor <- function(x, ...) tensor_prod(x)
+prod.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (is.null(axis)) {
+    # Global reduction (backward compatibility)
+    val <- tensor_prod_unified(x)
+    return(as.numeric(as.array(val)))
+  } else {
+    # Axis-aware reduction
+    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_prod_axis(x, axis_cpp, keep.dims)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  }
+}
+#' Variance Function
+#'
+#' Computes the population variance of tensor elements along specified axes.
+#'
+#' @param x A gpuTensor object
+#' @param axis Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
+#' @param ... Additional arguments (ignored)
+#' @return A tensor with reduced dimensions, or a scalar if all axes are reduced
 #' @export
-var.gpuTensor <- function(x, ...) tensor_var(x)
+var.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (is.null(axis)) {
+    # Global reduction (backward compatibility)
+    val <- tensor_var_unified(x)
+    return(as.numeric(as.array(val)))
+  } else {
+    # Axis-aware reduction
+    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_var_axis(x, axis_cpp, keep.dims)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  }
+}
 
 softmax <- function(tensor) {
   if (!inherits(tensor, "gpuTensor")) stop("tensor must be gpuTensor")
@@ -1504,9 +1636,83 @@ view <- function(x, shape) {
 #' @export
 softmax <- function(x) tensor_softmax_unified(x)
 
-#' Argmax (linear index)
+#' Argmax Function
+#'
+#' Finds the indices of the maximum values along specified axes.
+#'
+#' @param x A gpuTensor object
+#' @param axis Integer specifying which axis to find argmax along (1-based indexing). If NULL, returns global argmax.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
+#' @return A tensor of indices (int64) with reduced dimensions, or a scalar index if global argmax
 #' @export
-argmax <- function(x) tensor_argmax_unified(x) + 1
+argmax <- function(x, axis = NULL, keep.dims = FALSE) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (is.null(axis)) {
+    # Global argmax (backward compatibility)
+    result <- tensor_argmax_unified(x)
+    # Convert to 1-based indexing for R
+    return(as.numeric(as.array(result)) + 1)
+  } else {
+    # Axis-aware argmax
+    if (!is.numeric(axis) || length(axis) != 1 || axis < 1 || axis > length(shape(x))) {
+      stop("axis must be a single positive integer within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_argmax_axis(x, axis_cpp, keep.dims)
+    
+    # Convert indices to 1-based for R
+    result_array <- as.array(result)
+    result_array <- result_array + 1
+    
+    # Create new tensor with the adjusted indices
+    result_tensor <- gpu_tensor(as.vector(result_array), shape(result), dtype = "int64")
+    return(result_tensor)
+  }
+}
+
+#' Argmin Function
+#'
+#' Finds the indices of the minimum values along specified axes.
+#'
+#' @param x A gpuTensor object
+#' @param axis Integer specifying which axis to find argmin along (1-based indexing). If NULL, returns global argmin.
+#' @param keep.dims Logical. If TRUE, reduced dimensions are retained with size 1.
+#' @return A tensor of indices (int64) with reduced dimensions, or a scalar index if global argmin
+#' @export
+argmin <- function(x, axis = NULL, keep.dims = FALSE) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (is.null(axis)) {
+    # Global argmin
+    result <- tensor_argmin_unified(x)
+    # Convert to 1-based indexing for R
+    return(as.numeric(as.array(result)) + 1)
+  } else {
+    # Axis-aware argmin
+    if (!is.numeric(axis) || length(axis) != 1 || axis < 1 || axis > length(shape(x))) {
+      stop("axis must be a single positive integer within tensor dimensions")
+    }
+    
+    # Convert to 0-based indexing for C++
+    axis_cpp <- as.integer(axis - 1)
+    result <- tensor_argmin_axis(x, axis_cpp, keep.dims)
+    
+    # Convert indices to 1-based for R
+    result_array <- as.array(result)
+    result_array <- result_array + 1
+    
+    # Create new tensor with the adjusted indices
+    result_tensor <- gpu_tensor(as.vector(result_array), shape(result), dtype = "int64")
+    return(result_tensor)
+  }
+}
 
 #' Concat list of tensors
 #' @export
@@ -1553,4 +1759,59 @@ tensor_info <- function(x) tensor_info_unified(x)
          stop(sprintf("Unknown method '%s' for gpuTensor", name)))
 }
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# ADDITIONAL COMPARISON OPERATORS (Phase 2.2)
+# ===========================================================================
+
+#' Not Equal To Operator for GPU Tensors
+#'
+#' Element-wise inequality comparison between two tensors.
+#'
+#' @param x First gpuTensor  
+#' @param y Second gpuTensor
+#' @return A gpuTensor with boolean results (1.0 for true, 0.0 for false)
+#' @export
+`!=.gpuTensor` <- function(x, y) {
+  # Implement != as (x > y) || (x < y) which is equivalent to (x != y)
+  gt_result <- tensor_gt_unified(x, y)
+  lt_result <- tensor_lt_unified(x, y)
+  result <- tensor_add_unified(gt_result, lt_result)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Greater Than or Equal To Operator for GPU Tensors
+#'
+#' Element-wise greater than or equal comparison between two tensors.
+#' Implemented as (x > y) || (x == y).
+#'
+#' @param x First gpuTensor
+#' @param y Second gpuTensor  
+#' @return A gpuTensor with boolean results (1.0 for true, 0.0 for false)
+#' @export
+`>=.gpuTensor` <- function(x, y) {
+  # Implement >= as (x > y) || (x == y)
+  gt_result <- tensor_gt_unified(x, y)
+  eq_result <- tensor_eq_unified(x, y)
+  result <- tensor_add_unified(gt_result, eq_result)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Less Than or Equal To Operator for GPU Tensors
+#'
+#' Element-wise less than or equal comparison between two tensors.
+#' Implemented as (x < y) || (x == y).
+#'
+#' @param x First gpuTensor
+#' @param y Second gpuTensor
+#' @return A gpuTensor with boolean results (1.0 for true, 0.0 for false)  
+#' @export
+`<=.gpuTensor` <- function(x, y) {
+  # Implement <= as (x < y) || (x == y)
+  lt_result <- tensor_lt_unified(x, y)
+  eq_result <- tensor_eq_unified(x, y)
+  result <- tensor_add_unified(lt_result, eq_result)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}

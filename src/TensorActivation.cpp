@@ -55,24 +55,7 @@ SEXP tensor_softmax_unified(SEXP tensor_ptr) {
     return ptr;
 }
 
-// [[Rcpp::export]]
-int64_t tensor_argmax_unified(SEXP tensor_ptr) {
-    XPtr<TensorBase> tensor(tensor_ptr);
-    if(!tensor) stop("Invalid tensor pointer");
-    if (tensor->size()==0) stop("Empty tensor");
-    DType dtype=tensor->dtype();
-    switch(dtype){
-        case DType::FLOAT32: {
-            auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
-            return tensor_argmax_float32(tw->tensor().data(), tensor->size()); }
-        case DType::FLOAT64: {
-            auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
-            return tensor_argmax_float64(tw->tensor().data(), tensor->size()); }
-        default:
-            stop("Argmax currently supports float/double tensors only");
-    }
-    return -1;
-}
+// Removed tensor_argmax_unified - now implemented in TensorReduction.cpp with full axis support
 
 // Helper function for unary activation functions
 SEXP create_unary_activation_unified(SEXP tensor_ptr, 

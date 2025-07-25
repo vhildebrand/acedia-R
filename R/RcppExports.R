@@ -17,10 +17,6 @@ tensor_softmax_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_softmax_unified`, tensor_ptr)
 }
 
-tensor_argmax_unified <- function(tensor_ptr) {
-    .Call(`_acediaR_tensor_argmax_unified`, tensor_ptr)
-}
-
 tensor_tanh_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_tanh_unified`, tensor_ptr)
 }
@@ -191,6 +187,46 @@ tensor_prod_unified <- function(tensor_ptr) {
 
 tensor_var_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_var_unified`, tensor_ptr)
+}
+
+tensor_sum_axis <- function(tensor_ptr, axis = NULL, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_sum_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_mean_axis <- function(tensor_ptr, axis = NULL, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_mean_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_max_axis <- function(tensor_ptr, axis = NULL, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_max_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_min_axis <- function(tensor_ptr, axis = NULL, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_min_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_prod_axis <- function(tensor_ptr, axis = NULL, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_prod_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_var_axis <- function(tensor_ptr, axis = NULL, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_var_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_argmax_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_argmax_unified`, tensor_ptr)
+}
+
+tensor_argmin_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_argmin_unified`, tensor_ptr)
+}
+
+tensor_argmax_axis <- function(tensor_ptr, axis, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_argmax_axis`, tensor_ptr, axis, keep_dims)
+}
+
+tensor_argmin_axis <- function(tensor_ptr, axis, keep_dims = FALSE) {
+    .Call(`_acediaR_tensor_argmin_axis`, tensor_ptr, axis, keep_dims)
 }
 
 tensor_view_unified <- function(tensor_ptr, new_shape) {

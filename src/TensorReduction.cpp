@@ -159,3 +159,268 @@ SEXP tensor_var_unified(SEXP tensor_ptr) {
         stop("Error in unified tensor variance: " + std::string(e.what()));
     }
 } 
+
+// NEW: Axis-aware reduction functions
+
+// [[Rcpp::export]]
+SEXP tensor_sum_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis = R_NilValue, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        // Handle NULL axis (global reduction)
+        if (axis.isNull()) {
+            return tensor_sum_unified(tensor_ptr);
+        }
+        
+        // Convert R axis to C++ vector
+        IntegerVector axis_vec = axis.get();
+        std::vector<int> cpp_axis(axis_vec.begin(), axis_vec.end());
+        
+        // Use the new axis-aware method
+        auto result_tensor = tensor->sum(cpp_axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor sum: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_mean_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis = R_NilValue, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        if (tensor->size() == 0) {
+            stop("Cannot compute mean of empty tensor");
+        }
+        
+        // Handle NULL axis (global reduction)
+        if (axis.isNull()) {
+            return tensor_mean_unified(tensor_ptr);
+        }
+        
+        // Convert R axis to C++ vector
+        IntegerVector axis_vec = axis.get();
+        std::vector<int> cpp_axis(axis_vec.begin(), axis_vec.end());
+        
+        // Use the new axis-aware method
+        auto result_tensor = tensor->mean(cpp_axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor mean: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_max_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis = R_NilValue, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        // Handle NULL axis (global reduction)
+        if (axis.isNull()) {
+            return tensor_max_unified(tensor_ptr);
+        }
+        
+        // Convert R axis to C++ vector
+        IntegerVector axis_vec = axis.get();
+        std::vector<int> cpp_axis(axis_vec.begin(), axis_vec.end());
+        
+        // Use the new axis-aware method
+        auto result_tensor = tensor->max(cpp_axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor max: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_min_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis = R_NilValue, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        // Handle NULL axis (global reduction)
+        if (axis.isNull()) {
+            return tensor_min_unified(tensor_ptr);
+        }
+        
+        // Convert R axis to C++ vector
+        IntegerVector axis_vec = axis.get();
+        std::vector<int> cpp_axis(axis_vec.begin(), axis_vec.end());
+        
+        // Use the new axis-aware method
+        auto result_tensor = tensor->min(cpp_axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor min: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_prod_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis = R_NilValue, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        
+        // Handle NULL axis (global reduction)
+        if (axis.isNull()) {
+            return tensor_prod_unified(tensor_ptr);
+        }
+        
+        // Convert R axis to C++ vector
+        IntegerVector axis_vec = axis.get();
+        std::vector<int> cpp_axis(axis_vec.begin(), axis_vec.end());
+        
+        // Use the new axis-aware method
+        auto result_tensor = tensor->prod(cpp_axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor prod: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_var_axis(SEXP tensor_ptr, Nullable<IntegerVector> axis = R_NilValue, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        if (tensor->size() == 0) stop("Cannot compute variance of empty tensor");
+        
+        // Handle NULL axis (global reduction)
+        if (axis.isNull()) {
+            return tensor_var_unified(tensor_ptr);
+        }
+        
+        // Convert R axis to C++ vector
+        IntegerVector axis_vec = axis.get();
+        std::vector<int> cpp_axis(axis_vec.begin(), axis_vec.end());
+        
+        // Use the new axis-aware method
+        auto result_tensor = tensor->var(cpp_axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor variance: " + std::string(e.what()));
+    }
+} 
+
+// NEW: Argmax/argmin functions
+
+// [[Rcpp::export]]
+SEXP tensor_argmax_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        
+        // Use the new global argmax method
+        auto result_tensor = tensor->argmax();
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in tensor argmax: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_argmin_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        
+        // Use the new global argmin method
+        auto result_tensor = tensor->argmin();
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in tensor argmin: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_argmax_axis(SEXP tensor_ptr, int axis, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        
+        // Use the new axis-aware argmax method
+        auto result_tensor = tensor->argmax(axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor argmax: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_argmin_axis(SEXP tensor_ptr, int axis, bool keep_dims = false) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        if (!tensor) stop("Invalid tensor pointer");
+        
+        // Use the new axis-aware argmin method
+        auto result_tensor = tensor->argmin(axis, keep_dims);
+        
+        // Wrap the result and return as SEXP
+        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
+        result_ptr.attr("class") = "gpuTensor";
+        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
+        return result_ptr;
+    } catch (const std::exception& e) {
+        stop("Error in axis-aware tensor argmin: " + std::string(e.what()));
+    }
+} 
