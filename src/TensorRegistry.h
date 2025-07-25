@@ -653,225 +653,97 @@ public:
     
     std::unique_ptr<TensorBase> argmax(int axis, bool keep_dims = false) const override {
         int normalized_axis = normalize_single_axis(axis);
-        // TODO: Call CUDA kernel for axis-aware argmax
-        throw std::runtime_error("axis-aware argmax not yet implemented");
+        // Simple host fallback for float / double – copies data to host, computes indices
+        if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+            // Copy to host
+            std::vector<T> host_data(tensor_->size());
+            tensor_->copy_to_host(host_data.data());
+
+            const Shape& shp = tensor_->shape();
+            size_t outer = 1;
+            for (int i=0;i<normalized_axis;++i) outer *= shp[i];
+            size_t dim   = shp[normalized_axis];
+            size_t inner = 1;
+            for (size_t i=normalized_axis+1;i<shp.ndims();++i) inner *= shp[i];
+
+            // Result shape
+            Shape res_shape = calculate_reduction_shape({normalized_axis}, keep_dims);
+            auto result_tensor = std::make_shared<gpuTensor<int64_t>>(res_shape);
+            std::vector<int64_t> host_idx(result_tensor->size());
+
+            size_t out_index = 0;
+            for (size_t o=0; o<outer; ++o) {
+                for (size_t i=0; i<inner; ++i) {
+                    // scan along dim
+                    size_t base = o*dim*inner + i;
+                    T best = host_data[base];
+                    int64_t best_j = 0;
+                    for (size_t j=1;j<dim;++j) {
+                        T val = host_data[base + j*inner];
+                        if (val > best) { best = val; best_j = j; }
+                    }
+                    host_idx[out_index++] = best_j;
+                }
+            }
+            // copy indices to device
+            result_tensor->copy_from_host(host_idx.data());
+            // If keep_dims==true and we squeezed, reshape
+            if (keep_dims) {
+                Shape final_shape = calculate_reduction_shape({normalized_axis}, true);
+                auto view_tensor = result_tensor->reshape(final_shape);
+                return std::make_unique<TensorWrapper<int64_t>>( std::make_shared<gpuTensor<int64_t>>(std::move(view_tensor)) );
+            }
+            return std::make_unique<TensorWrapper<int64_t>>(result_tensor);
+        } else {
+            throw std::runtime_error("axis-aware argmax not implemented for this dtype");
+        }
     }
     
     std::unique_ptr<TensorBase> argmin(int axis, bool keep_dims = false) const override {
         int normalized_axis = normalize_single_axis(axis);
-        // TODO: Call CUDA kernel for axis-aware argmin
-        throw std::runtime_error("axis-aware argmin not yet implemented");
-    }
-
-private:
-    // Helper method to validate and normalize axis values
-    std::vector<int> validate_and_normalize_axis(const std::vector<int>& axis) const {
-        std::vector<int> normalized;
-        int ndims = static_cast<int>(tensor_->ndims());
-        
-        for (int ax : axis) {
-            // Handle negative indexing (Python-style)
-            int norm_ax = ax < 0 ? ndims + ax : ax;
-            
-            // Validate range
-            if (norm_ax < 0 || norm_ax >= ndims) {
-                throw std::runtime_error("axis " + std::to_string(ax) + " is out of bounds for tensor with " + 
-                                       std::to_string(ndims) + " dimensions");
-            }
-            
-            normalized.push_back(norm_ax);
-        }
-        
-        // Check for duplicates
-        std::sort(normalized.begin(), normalized.end());
-        auto last = std::unique(normalized.begin(), normalized.end());
-        if (last != normalized.end()) {
-            throw std::runtime_error("repeated axis in reduction");
-        }
-        
-        return normalized;
-    }
-    
-    // Helper method to normalize single axis  
-    int normalize_single_axis(int axis) const {
-        int ndims = static_cast<int>(tensor_->ndims());
-        int norm_ax = axis < 0 ? ndims + axis : axis;
-        
-        if (norm_ax < 0 || norm_ax >= ndims) {
-            throw std::runtime_error("axis " + std::to_string(axis) + " is out of bounds for tensor with " + 
-                                   std::to_string(ndims) + " dimensions");
-        }
-        
-        return norm_ax;
-    }
-    
-    // Core method that performs axis-aware reduction using CUDA kernels
-    std::unique_ptr<TensorBase> perform_axis_reduction(const std::string& op_name, 
-                                                      const std::vector<int>& axis, 
-                                                      bool keep_dims) const {
-        // ------------------------------------------------------------------
-        // WORK-AROUND: kernel expects squeezed output (no keep-dims).  If the
-        // user requests keep_dims=TRUE we first execute the reduction with
-        // keep_dims == FALSE, then reshape the returned tensor to reinstate
-        // the singleton dimensions on the host.  This avoids the illegal
-        // memory access triggered by the kernel’s internal shape logic.
-        // ------------------------------------------------------------------
-        if (keep_dims) {
-            // 1) run reduction without keeping dims
-            auto tmp_result = perform_axis_reduction(op_name, axis, /*keep_dims*/ false);
-            // 2) compute final shape with singleton dims and reshape
-            Shape final_shape = calculate_reduction_shape(axis, /*keep_dims*/ true);
-            return tmp_result->reshape(final_shape);
-        }
-
-        // Calculate output shape
-        Shape result_shape = calculate_reduction_shape(axis, /*keep_dims*/ false);
-        
-        // Allocate device memory for the result tensor
-        auto result_tensor = std::make_shared<gpuTensor<T>>(result_shape);
-        
-        // Use stride-aware axis reduction kernels
-        // Get input and output descriptors
-        cuda_utils::TensorDescriptor input_desc = tensor_->descriptor();
-        cuda_utils::TensorDescriptor output_desc = result_tensor->descriptor();
-        
-        // Get reduction axes as device array
-        int num_reduction_axes = static_cast<int>(axis.size());
-        int* d_reduction_axes;
-        cudaMalloc(&d_reduction_axes, num_reduction_axes * sizeof(int));
-        cudaMemcpy(d_reduction_axes, axis.data(), num_reduction_axes * sizeof(int), cudaMemcpyHostToDevice);
-        
-        // Allocate device memory for shape and strides arrays (CRITICAL FIX!)
-        int* d_input_shape;
-        int* d_input_strides;
-        int* d_output_strides;
-        
-        cudaMalloc(&d_input_shape, input_desc.ndims * sizeof(int));
-        cudaMalloc(&d_input_strides, input_desc.ndims * sizeof(int));
-        cudaMalloc(&d_output_strides, output_desc.ndims * sizeof(int));
-        
-        cudaMemcpy(d_input_shape, input_desc.shape, input_desc.ndims * sizeof(int), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_input_strides, input_desc.strides, input_desc.ndims * sizeof(int), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_output_strides, output_desc.strides, output_desc.ndims * sizeof(int), cudaMemcpyHostToDevice);
-        
-        // Call the appropriate kernel based on operation and data type
-        if constexpr (std::is_same_v<T, float>) {
-            if (op_name == "sum") {
-                tensor_axis_sum_float32(result_tensor->data(), tensor_->data(),
-                                        d_input_strides, d_input_shape,
-                                        d_output_strides, d_reduction_axes,
-                                        num_reduction_axes, input_desc.ndims, result_tensor->size());
-                        } else if (op_name == "mean") {
-                tensor_axis_mean_float32(result_tensor->data(), tensor_->data(),
-                                         d_input_strides, d_input_shape,
-                                         d_output_strides, d_reduction_axes,
-                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "max") {
-                tensor_axis_max_float32(result_tensor->data(), tensor_->data(),
-                                         d_input_strides, d_input_shape,
-                                         d_output_strides, d_reduction_axes,
-                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "min") {
-                tensor_axis_min_float32(result_tensor->data(), tensor_->data(),
-                                         d_input_strides, d_input_shape,
-                                         d_output_strides, d_reduction_axes,
-                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "prod") {
-                tensor_axis_prod_float32(result_tensor->data(), tensor_->data(),
-                                          d_input_strides, d_input_shape,
-                                          d_output_strides, d_reduction_axes,
-                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "var") {
-                tensor_axis_var_float32(result_tensor->data(), tensor_->data(),
-                                         d_input_strides, d_input_shape,
-                                         d_output_strides, d_reduction_axes,
-                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else {
-                throw std::runtime_error("Unknown reduction operation: " + op_name);
-            }
-        } else if constexpr (std::is_same_v<T, double>) {
-                        if (op_name == "sum") {
-                tensor_axis_sum_float64(result_tensor->data(), tensor_->data(),
-                                         d_input_strides, d_input_shape,
-                                         d_output_strides, d_reduction_axes,
-                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "mean") {
-                tensor_axis_mean_float64(result_tensor->data(), tensor_->data(),
-                                          d_input_strides, d_input_shape,
-                                          d_output_strides, d_reduction_axes,
-                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "max") {
-                tensor_axis_max_float64(result_tensor->data(), tensor_->data(),
-                                         d_input_strides, d_input_shape,
-                                         d_output_strides, d_reduction_axes,
-                                         num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "min") {
-                tensor_axis_min_float64(result_tensor->data(), tensor_->data(),
-                                          d_input_strides, d_input_shape,
-                                          d_output_strides, d_reduction_axes,
-                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "prod") {
-                tensor_axis_prod_float64(result_tensor->data(), tensor_->data(),
-                                           d_input_strides, d_input_shape,
-                                           d_output_strides, d_reduction_axes,
-                                           num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else if (op_name == "var") {
-                tensor_axis_var_float64(result_tensor->data(), tensor_->data(),
-                                          d_input_strides, d_input_shape,
-                                          d_output_strides, d_reduction_axes,
-                                          num_reduction_axes, input_desc.ndims, result_tensor->size());
-            } else {
-                throw std::runtime_error("Unknown reduction operation: " + op_name);
-            }
-        } else {
-            // Fallback: compile for any T but raise at runtime if invoked.
-            throw std::runtime_error("Axis-aware reduction not implemented for this dtype: " + dtype_to_string(tensor_->dtype()));
-        }
-
-        // ------------------------------------------------------------
-        // NEW: free temporary device buffers (prevents memory leaks)
-        // ------------------------------------------------------------
-        cudaFree(d_reduction_axes);
-        cudaFree(d_input_shape);
-        cudaFree(d_input_strides);
-        cudaFree(d_output_strides);
-
-        return std::make_unique<TensorWrapper<T>>(result_tensor);
-    }
-    
-    // Helper to calculate output shape after reduction
-    Shape calculate_reduction_shape(const std::vector<int>& axis, bool keep_dims) const {
-        const Shape& input_shape = tensor_->shape();
-        std::vector<size_t> result_dims;
-        
-        // Create set for fast lookup
-        std::set<int> axis_set(axis.begin(), axis.end());
-        
-        for (int i = 0; i < static_cast<int>(input_shape.ndims()); ++i) {
-            if (axis_set.find(i) != axis_set.end()) {
-                // This dimension is being reduced
-                if (keep_dims) {
-                    result_dims.push_back(1);  // Keep as size 1
+        if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+            std::vector<T> host_data(tensor_->size());
+            tensor_->copy_to_host(host_data.data());
+            const Shape& shp = tensor_->shape();
+            size_t outer = 1;
+            for (int i=0;i<normalized_axis;++i) outer *= shp[i];
+            size_t dim   = shp[normalized_axis];
+            size_t inner = 1;
+            for (size_t i=normalized_axis+1;i<shp.ndims();++i) inner *= shp[i];
+            Shape res_shape = calculate_reduction_shape({normalized_axis}, keep_dims);
+            auto result_tensor = std::make_shared<gpuTensor<int64_t>>(res_shape);
+            std::vector<int64_t> host_idx(result_tensor->size());
+            size_t out_index = 0;
+            for (size_t o=0;o<outer;++o) {
+                for (size_t i=0;i<inner;++i) {
+                    size_t base = o*dim*inner + i;
+                    T best = host_data[base];
+                    int64_t best_j = 0;
+                    for (size_t j=1;j<dim;++j) {
+                        T val = host_data[base + j*inner];
+                        if (val < best) { best = val; best_j = j; }
+                    }
+                    host_idx[out_index++] = best_j;
                 }
-                // Otherwise, remove this dimension
-            } else {
-                // This dimension is not being reduced
-                result_dims.push_back(input_shape[i]);
             }
+            result_tensor->copy_from_host(host_idx.data());
+            if (keep_dims) {
+                Shape final_shape = calculate_reduction_shape({normalized_axis}, true);
+                auto view_tensor = result_tensor->reshape(final_shape);
+                return std::make_unique<TensorWrapper<int64_t>>( std::make_shared<gpuTensor<int64_t>>(std::move(view_tensor)) );
+            }
+            return std::make_unique<TensorWrapper<int64_t>>(result_tensor);
+        } else {
+            throw std::runtime_error("axis-aware argmin not implemented for this dtype");
         }
-        
-        // If all dimensions were reduced and keep_dims=false, return scalar (shape [1])
-        if (result_dims.empty()) {
-            result_dims.push_back(1);
-        }
-        
-        return Shape(result_dims);
     }
     
+    // Clone operation
     std::unique_ptr<TensorBase> clone() const override {
         return std::make_unique<TensorWrapper<T>>(*tensor_);
     }
     
+    // Get raw pointer (for type-specific operations)
     void* get_data_ptr() const override {
         return tensor_->data();
     }

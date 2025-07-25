@@ -1815,3 +1815,52 @@ tensor_info <- function(x) tensor_info_unified(x)
   class(result) <- c("gpuTensor", class(result))
   return(result)
 }
+
+# =========================================================================
+# ARGMAX / ARGMIN S3 METHODS (Phase 2.3)
+# =========================================================================
+
+#' Argmax for gpuTensor
+#'
+#' @param x gpuTensor
+#' @param axis NULL (global) or integer axis (1-based)
+#' @param keep.dims logical, keep reduced dims of size 1
+#' @export
+argmax.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
+  if (!inherits(x, "gpuTensor"))
+    stop("Object is not a gpuTensor")
+
+  if (is.null(axis)) {
+    res <- tensor_argmax_unified(x)
+  } else {
+    if (!is.numeric(axis) || length(axis) != 1 || axis < 1 || axis > length(shape(x)))
+      stop("axis must be within dimensions of tensor")
+    res <- tensor_argmax_axis(x, as.integer(axis - 1L), keep.dims)
+  }
+  class(res) <- c("gpuTensor", class(res))
+  return(res)
+}
+
+#' Argmin for gpuTensor
+#'
+#' @inheritParams argmax.gpuTensor
+#' @export
+argmin.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
+  if (!inherits(x, "gpuTensor"))
+    stop("Object is not a gpuTensor")
+
+  if (is.null(axis)) {
+    res <- tensor_argmin_unified(x)
+  } else {
+    if (!is.numeric(axis) || length(axis) != 1 || axis < 1 || axis > length(shape(x)))
+      stop("axis must be within dimensions of tensor")
+    res <- tensor_argmin_axis(x, as.integer(axis - 1L), keep.dims)
+  }
+  class(res) <- c("gpuTensor", class(res))
+  return(res)
+}
+
+#' @export
+argmax <- function(x, ...) UseMethod("argmax")
+#' @export
+argmin <- function(x, ...) UseMethod("argmin")
