@@ -1199,46 +1199,38 @@ size.gpuTensor <- function(x) {
 #' Performs element-wise comparison a > b and returns a tensor of 0/1.
 #'
 #' @param a First gpuTensor
-#' @param b Second gpuTensor
+#' @param b Second gpuTensor or a scalar
 #' @return gpuTensor with numeric 0/1 values
 #' @export
 `>.gpuTensor` <- function(a, b) {
-  if (missing(b) || !inherits(b, "gpuTensor")) {
-    stop("Both operands must be gpuTensor objects")
-  }
-  if (!identical(shape(a), shape(b))) {
-    stop("Comparison currently requires tensors with identical shapes")
-  }
   result <- tensor_gt_unified(a, b)
   class(result) <- c("gpuTensor", class(result))
   return(result)
 }
 
 #' Less Than Comparison
-#' @rdname greater_than_gpuTensor
+#'
+#' Performs element-wise comparison a < b and returns a tensor of 0/1.
+#'
+#' @param a First gpuTensor
+#' @param b Second gpuTensor or a scalar
+#' @return gpuTensor with numeric 0/1 values
 #' @export
 `<.gpuTensor` <- function(a, b) {
-  if (missing(b) || !inherits(b, "gpuTensor")) {
-    stop("Both operands must be gpuTensor objects")
-  }
-  if (!identical(shape(a), shape(b))) {
-    stop("Comparison currently requires tensors with identical shapes")
-  }
   result <- tensor_lt_unified(a, b)
   class(result) <- c("gpuTensor", class(result))
   return(result)
 }
 
 #' Equality Comparison
-#' @rdname greater_than_gpuTensor
+#'
+#' Performs element-wise comparison a == b and returns a tensor of 0/1.
+#'
+#' @param a First gpuTensor
+#' @param b Second gpuTensor or a scalar
+#' @return gpuTensor with numeric 0/1 values
 #' @export
 `==.gpuTensor` <- function(a, b) {
-  if (missing(b) || !inherits(b, "gpuTensor")) {
-    stop("Both operands must be gpuTensor objects")
-  }
-  if (!identical(shape(a), shape(b))) {
-    stop("Comparison currently requires tensors with identical shapes")
-  }
   result <- tensor_eq_unified(a, b)
   class(result) <- c("gpuTensor", class(result))
   return(result)
