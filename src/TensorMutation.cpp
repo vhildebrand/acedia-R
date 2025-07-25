@@ -57,6 +57,33 @@ extern "C" {
         double* data, double scalar,
         const int* start, const int* slice_shape,
         const int* strides, int ndims, size_t total_elements);
+    
+    // New slice assignment functions
+    void tensor_slice_set_scalar_float32(
+        float* data, double scalar,
+        const int* start, const int* slice_shape,
+        const int* strides, int ndims, size_t total_elements);
+    void tensor_slice_set_scalar_float64(
+        double* data, double scalar,
+        const int* start, const int* slice_shape,
+        const int* strides, int ndims, size_t total_elements);
+    
+    void tensor_slice_set_tensor_float32(
+        float* dest_data, const float* src_data,
+        const int* start, const int* slice_shape,
+        const int* dest_strides, const int* src_strides,
+        int ndims, size_t total_elements);
+    void tensor_slice_set_tensor_float64(
+        double* dest_data, const double* src_data,
+        const int* start, const int* slice_shape,
+        const int* dest_strides, const int* src_strides,
+        int ndims, size_t total_elements);
+    
+    // Boolean mask assignment functions
+    void tensor_mask_set_scalar_float32(
+        float* data, const bool* mask, float value, size_t total_elements);
+    void tensor_mask_set_scalar_float64(
+        double* data, const bool* mask, double value, size_t total_elements);
 }
 
 // Utility: convert Shape to std::vector<int> strides (column-major for R compatibility)
@@ -405,4 +432,193 @@ SEXP tensor_pad_unified(SEXP tensor_ptr, IntegerMatrix pad_width, std::string mo
         ptr.attr("class")="gpuTensor"; ptr.attr("dtype")="double"; return ptr;
     }
     stop("pad currently supports float/double only");
+}
+
+// ======================= GENERAL SLICE ASSIGNMENT ======================= //
+
+// [[Rcpp::export]]
+void tensor_slice_set_scalar_unified(SEXP tensor_ptr,
+                                     IntegerVector start_indices,
+                                     IntegerVector slice_shape,
+                                     double scalar) {
+    if (start_indices.size() != slice_shape.size()) {
+        stop("start_indices and slice_shape must have the same length");
+    }
+    int ndims = start_indices.size();
+
+    // Copy start and shape to std::vector<int>
+    std::vector<int> start(ndims);
+    std::vector<int> slice(ndims);
+    size_t total_elements = 1;
+    for (int i = 0; i < ndims; ++i) {
+        // convert R 1-based to 0-based
+        start[i]  = static_cast<int>(start_indices[i] - 1);
+        slice[i]  = static_cast<int>(slice_shape[i]);
+        if (slice[i] <= 0) {
+            stop("slice_shape entries must be positive");
+        }
+        total_elements *= static_cast<size_t>(slice[i]);
+    }
+
+    try {
+        XPtr<TensorBase> base_ptr(tensor_ptr);
+        if (!base_ptr) {
+            stop("Invalid tensor pointer");
+        }
+
+        // Derive strides
+        auto strides_int = shape_to_strides_int(base_ptr->shape());
+
+        if (base_ptr->dtype() == DType::FLOAT32) {
+            auto* typed = dynamic_cast<TensorWrapper<float>*>(base_ptr.get());
+            if (!typed) stop("Type cast failed for float32 tensor");
+            FloatTensor& tensor = typed->tensor();
+            tensor_slice_set_scalar_float32(
+                tensor.data(), scalar,
+                start.data(), slice.data(), strides_int.data(), ndims, total_elements);
+        } else if (base_ptr->dtype() == DType::FLOAT64) {
+            auto* typed = dynamic_cast<TensorWrapper<double>*>(base_ptr.get());
+            if (!typed) stop("Type cast failed for float64 tensor");
+            DoubleTensor& tensor = typed->tensor();
+            tensor_slice_set_scalar_float64(
+                tensor.data(), scalar,
+                start.data(), slice.data(), strides_int.data(), ndims, total_elements);
+        } else {
+            stop("tensor_slice_set_scalar_unified currently supports float32 and float64 tensors only");
+        }
+    } catch (const std::exception& e) {
+        stop(std::string("Error in tensor_slice_set_scalar_unified: ") + e.what());
+    }
+}
+
+// [[Rcpp::export]]
+void tensor_slice_set_tensor_unified(SEXP dest_tensor_ptr,
+                                     IntegerVector start_indices,
+                                     IntegerVector slice_shape,
+                                     SEXP src_tensor_ptr) {
+    if (start_indices.size() != slice_shape.size()) {
+        stop("start_indices and slice_shape must have the same length");
+    }
+    int ndims = start_indices.size();
+
+    // Copy start and shape to std::vector<int>
+    std::vector<int> start(ndims);
+    std::vector<int> slice(ndims);
+    size_t total_elements = 1;
+    for (int i = 0; i < ndims; ++i) {
+        // convert R 1-based to 0-based
+        start[i]  = static_cast<int>(start_indices[i] - 1);
+        slice[i]  = static_cast<int>(slice_shape[i]);
+        if (slice[i] <= 0) {
+            stop("slice_shape entries must be positive");
+        }
+        total_elements *= static_cast<size_t>(slice[i]);
+    }
+
+    try {
+        XPtr<TensorBase> dest_ptr(dest_tensor_ptr);
+        XPtr<TensorBase> src_ptr(src_tensor_ptr);
+        if (!dest_ptr || !src_ptr) {
+            stop("Invalid tensor pointer");
+        }
+
+        if (dest_ptr->dtype() != src_ptr->dtype()) {
+            stop("Source and destination tensors must have the same dtype");
+        }
+
+        // Verify source tensor shape matches slice shape
+        if (src_ptr->ndims() != ndims) {
+            stop("Source tensor dimensions must match slice dimensions");
+        }
+        for (int i = 0; i < ndims; ++i) {
+            if (src_ptr->shape()[i] != static_cast<size_t>(slice[i])) {
+                stop("Source tensor shape must match slice shape");
+            }
+        }
+
+        // Derive strides
+        auto dest_strides_int = shape_to_strides_int(dest_ptr->shape());
+        auto src_strides_int = shape_to_strides_int(src_ptr->shape());
+
+        if (dest_ptr->dtype() == DType::FLOAT32) {
+            auto* dest_typed = dynamic_cast<TensorWrapper<float>*>(dest_ptr.get());
+            auto* src_typed = dynamic_cast<const TensorWrapper<float>*>(src_ptr.get());
+            if (!dest_typed || !src_typed) stop("Type cast failed for float32 tensors");
+            
+            FloatTensor& dest_tensor = dest_typed->tensor();
+            const FloatTensor& src_tensor = src_typed->tensor();
+            
+            tensor_slice_set_tensor_float32(
+                dest_tensor.data(), src_tensor.data(),
+                start.data(), slice.data(), 
+                dest_strides_int.data(), src_strides_int.data(), 
+                ndims, total_elements);
+        } else if (dest_ptr->dtype() == DType::FLOAT64) {
+            auto* dest_typed = dynamic_cast<TensorWrapper<double>*>(dest_ptr.get());
+            auto* src_typed = dynamic_cast<const TensorWrapper<double>*>(src_ptr.get());
+            if (!dest_typed || !src_typed) stop("Type cast failed for float64 tensors");
+            
+            DoubleTensor& dest_tensor = dest_typed->tensor();
+            const DoubleTensor& src_tensor = src_typed->tensor();
+            
+            tensor_slice_set_tensor_float64(
+                dest_tensor.data(), src_tensor.data(),
+                start.data(), slice.data(), 
+                dest_strides_int.data(), src_strides_int.data(), 
+                ndims, total_elements);
+        } else {
+            stop("tensor_slice_set_tensor_unified currently supports float32 and float64 tensors only");
+        }
+    } catch (const std::exception& e) {
+        stop(std::string("Error in tensor_slice_set_tensor_unified: ") + e.what());
+    }
+}
+
+// [[Rcpp::export]]
+void tensor_mask_set_scalar_unified(SEXP tensor_ptr, SEXP mask_ptr, double scalar) {
+    try {
+        XPtr<TensorBase> tensor_base(tensor_ptr);
+        XPtr<TensorBase> mask_base(mask_ptr);
+        if (!tensor_base || !mask_base) {
+            stop("Invalid tensor pointer");
+        }
+
+        // Verify tensors have same shape
+        if (tensor_base->shape() != mask_base->shape()) {
+            stop("Tensor and mask must have the same shape");
+        }
+
+        // Verify mask is boolean type
+        if (mask_base->dtype() != DType::BOOL) {
+            stop("Mask tensor must be boolean type");
+        }
+
+        size_t total_elements = tensor_base->size();
+
+        if (tensor_base->dtype() == DType::FLOAT32) {
+            auto* tensor_typed = dynamic_cast<TensorWrapper<float>*>(tensor_base.get());
+            auto* mask_typed = dynamic_cast<const TensorWrapper<bool>*>(mask_base.get());
+            if (!tensor_typed || !mask_typed) stop("Type cast failed");
+            
+            FloatTensor& tensor = tensor_typed->tensor();
+            const BoolTensor& mask = mask_typed->tensor();
+            
+            tensor_mask_set_scalar_float32(
+                tensor.data(), mask.data(), static_cast<float>(scalar), total_elements);
+        } else if (tensor_base->dtype() == DType::FLOAT64) {
+            auto* tensor_typed = dynamic_cast<TensorWrapper<double>*>(tensor_base.get());
+            auto* mask_typed = dynamic_cast<const TensorWrapper<bool>*>(mask_base.get());
+            if (!tensor_typed || !mask_typed) stop("Type cast failed");
+            
+            DoubleTensor& tensor = tensor_typed->tensor();
+            const BoolTensor& mask = mask_typed->tensor();
+            
+            tensor_mask_set_scalar_float64(
+                tensor.data(), mask.data(), scalar, total_elements);
+        } else {
+            stop("tensor_mask_set_scalar_unified currently supports float32 and float64 tensors only");
+        }
+    } catch (const std::exception& e) {
+        stop(std::string("Error in tensor_mask_set_scalar_unified: ") + e.what());
+    }
 } 

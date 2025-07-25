@@ -4,16 +4,20 @@
 \alias{mean.gpuTensor}
 \title{Mean (Average) Function}
 \usage{
-\method{mean}{gpuTensor}(x, ...)
+\method{mean}{gpuTensor}(x, axis = NULL, keep.dims = FALSE, ...)
 }
 \arguments{
 \item{x}{A gpuTensor object}
 
+\item{axis}{Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.}
+
+\item{keep.dims}{Logical. If TRUE, reduced dimensions are retained with size 1.}
+
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-The mean value of all tensor elements
+A tensor with reduced dimensions, or a scalar if all axes are reduced
 }
 \description{
-Computes the arithmetic mean of all elements in the tensor.
+Computes the arithmetic mean of tensor elements along specified axes.
 }

@@ -598,6 +598,78 @@ void tensor_cos_float64(double* result, const double* input, size_t n) {
     cudaDeviceSynchronize();
 }
 
+// New math functions for Phase 3.1
+void tensor_floor_float32(float* result, const float* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, FloorOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_floor_float64(double* result, const double* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, FloorOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_ceil_float32(float* result, const float* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, CeilOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_ceil_float64(double* result, const double* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, CeilOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_round_float32(float* result, const float* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, RoundOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_round_float64(double* result, const double* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, RoundOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_erf_float32(float* result, const float* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, ErfOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_erf_float64(double* result, const double* input, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_unary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, n, ErfOp());
+    cudaDeviceSynchronize();
+}
+
+// Scalar power operation
+void tensor_pow_scalar_float32(float* result, const float* input, float exponent, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, exponent, n, PowScalarOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_scalar_float64(double* result, const double* input, double exponent, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, exponent, n, PowScalarOp());
+    cudaDeviceSynchronize();
+}
+
 void tensor_abs_float32(float* result, const float* input, size_t n) {
     int threadsPerBlock = 256;
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
@@ -1507,4 +1579,339 @@ void tensor_scalar_mul_strided_float64(const cuda_utils::TensorDescriptor& out_d
     cudaDeviceSynchronize();
 }
 
-} // extern "C" 
+// New strided math functions for Phase 3.1
+void tensor_floor_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                  const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, FloorOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_floor_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                  const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, FloorOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_ceil_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                 const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, CeilOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_ceil_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                 const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, CeilOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_round_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                  const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, RoundOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_round_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                  const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, RoundOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_erf_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
+                                const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<float, ErfOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_erf_strided_float64(const cuda_utils::TensorDescriptor& out_desc, 
+                                const cuda_utils::TensorDescriptor& in_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_unary_kernel<double, ErfOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_scalar_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       float exponent) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<float, float, PowScalarOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, exponent, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_scalar_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       double exponent) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<double, double, PowScalarOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, exponent, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+// New binary element-wise operations for Phase 3.2
+void tensor_max_elemwise_float32(float* result, const float* a, const float* b, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MaxOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_max_elemwise_float64(double* result, const double* a, const double* b, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MaxOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_min_elemwise_float32(float* result, const float* a, const float* b, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MinOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_min_elemwise_float64(double* result, const double* a, const double* b, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, MinOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_elemwise_float32(float* result, const float* a, const float* b, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, PowOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_elemwise_float64(double* result, const double* a, const double* b, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_binary_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, a, b, n, PowOp());
+    cudaDeviceSynchronize();
+}
+
+// New strided binary element-wise operations for Phase 3.2
+void tensor_max_elemwise_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                         const cuda_utils::TensorDescriptor& a_desc,
+                                         const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, MaxOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_max_elemwise_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                         const cuda_utils::TensorDescriptor& a_desc,
+                                         const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, MaxOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_min_elemwise_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                         const cuda_utils::TensorDescriptor& a_desc,
+                                         const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, MinOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_min_elemwise_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                         const cuda_utils::TensorDescriptor& a_desc,
+                                         const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, MinOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_elemwise_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                         const cuda_utils::TensorDescriptor& a_desc,
+                                         const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<float, PowOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_pow_elemwise_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                         const cuda_utils::TensorDescriptor& a_desc,
+                                         const cuda_utils::TensorDescriptor& b_desc) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_binary_kernel<double, PowOp><<<grid_size, block_size>>>(
+        out_desc, a_desc, b_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+// Product reductions
+
+// ... existing code ...
+
+// New scalar operations for Phase 3.2
+void tensor_scalar_sub_float32(float* result, const float* input, float scalar, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, -scalar, n, AddOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_sub_float64(double* result, const double* input, double scalar, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, -scalar, n, AddOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_div_float32(float* result, const float* input, float scalar, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, 1.0f / scalar, n, MulOp());
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_div_float64(double* result, const double* input, double scalar, size_t n) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+    elementwise_scalar_kernel<<<blocksPerGrid, threadsPerBlock>>>(result, input, 1.0 / scalar, n, MulOp());
+    cudaDeviceSynchronize();
+}
+
+// New strided scalar operations for Phase 3.2
+void tensor_scalar_sub_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       float scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<float, float, AddOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, -scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_sub_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       double scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<double, double, AddOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, -scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_div_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       float scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<float, float, MulOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, 1.0f / scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_div_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       double scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<double, double, MulOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, 1.0 / scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+// New scalar operations for Phase 3.2
+
+// ... existing code ...
+
+} // extern "C"

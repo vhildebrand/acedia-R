@@ -5,3 +5,5 @@
 *.rds
 *.rdx
 *.rdb
+*.Rcheck/
+*..Rcheck/

@@ -4,14 +4,20 @@
 \alias{sum.gpuTensor}
 \title{Tensor Sum}
 \usage{
-\method{sum}{gpuTensor}(tensor, ...)
+\method{sum}{gpuTensor}(x, axis = NULL, keep.dims = FALSE, ...)
 }
 \arguments{
-\item{tensor}{A gpuTensor object}
+\item{x}{A gpuTensor object}
+
+\item{axis}{Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.}
+
+\item{keep.dims}{Logical. If TRUE, reduced dimensions are retained with size 1.}
+
+\item{...}{Additional arguments (ignored)}
 }
 \value{
-Scalar sum of all elements
+A tensor with reduced dimensions, or a scalar if all axes are reduced
 }
 \description{
-Computes the sum of all elements in a tensor.
+Computes the sum of tensor elements along specified axes.
 }

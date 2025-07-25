@@ -1013,6 +1013,9 @@ Math.gpuTensor <- function(x, ...) {
     "log" = tensor_log_unified(x), 
     "sqrt" = tensor_sqrt_unified(x),
     "abs" = tensor_abs_unified(x),
+    "floor" = tensor_floor_unified(x),
+    "ceiling" = tensor_ceil_unified(x),
+    "round" = tensor_round_unified(x),
     # Fall back to base R for unsupported functions
     {
       warning(paste("Math function", func_name, "not implemented for gpuTensor, converting to R"))
@@ -1207,8 +1210,7 @@ size.gpuTensor <- function(x) {
 
 #' Slice assignment for gpuTensor (in-place update on GPU)
 #'
-#' Currently supports assigning a numeric scalar to a rectangular (contiguous) slice.
-#' More complex assignment (tensor-to-slice) can be added later.
+#' Supports assigning scalars or tensors to rectangular slices, and boolean mask assignment.
 #' @export
 `[<-.gpuTensor` <- function(x, ..., value) {
   tensor_dims <- shape(x)
@@ -1220,7 +1222,31 @@ size.gpuTensor <- function(x) {
     stop("No value provided for slice assignment")
   }
 
-  # Build start & end indices (similar logic to `[.gpuTensor` reader)
+  # Check if this is boolean mask assignment
+  if (n_args == 1) {
+    idx <- eval(args[[1]], parent.frame())
+    if (is.logical(idx) || (inherits(idx, "gpuTensor") && dtype(idx) == "bool")) {
+      # Boolean mask assignment: x[mask] <- value
+      if (is.logical(idx)) {
+        # Convert R logical vector to gpuTensor
+        if (length(idx) != size(x)) {
+          stop("Logical mask must have same length as tensor")
+        }
+        mask_tensor <- gpu_tensor(idx, shape(x))
+      } else {
+        mask_tensor <- idx
+      }
+      
+      if (is.numeric(value) && length(value) == 1) {
+        tensor_mask_set_scalar_unified(x, mask_tensor, value)
+        return(x)
+      } else {
+        stop("Currently only scalar assignment to boolean mask is supported")
+      }
+    }
+  }
+
+  # Regular slice assignment - build start & end indices
   indices <- vector("list", n_dims)
   for (i in 1:n_dims) {
     if (i <= n_args) {
@@ -1258,11 +1284,23 @@ size.gpuTensor <- function(x) {
   slice_shape <- end_indices - start_indices + 1L
 
   if (is.numeric(value) && length(value) == 1) {
-    # In-place scalar add/assign: for now we implement add-scalar (+=)
-    tensor_slice_add_scalar_unified(x, start_indices, slice_shape, value)
-    return(x)  # modified in-place (external pointer)
+    # Scalar assignment
+    tensor_slice_set_scalar_unified(x, start_indices, slice_shape, value)
+    return(x)
+  } else if (inherits(value, "gpuTensor")) {
+    # Tensor assignment
+    if (!all(shape(value) == slice_shape)) {
+      stop("Value tensor shape must match slice shape")
+    }
+    tensor_slice_set_tensor_unified(x, start_indices, slice_shape, value)
+    return(x)
+  } else if (is.numeric(value)) {
+    # Convert numeric vector to tensor and assign
+    value_tensor <- gpu_tensor(value, slice_shape)
+    tensor_slice_set_tensor_unified(x, start_indices, slice_shape, value_tensor)
+    return(x)
   } else {
-    stop("Currently only scalar numeric assignment to slice is supported")
+    stop("Unsupported value type for slice assignment: ", class(value))
   }
 }
 
@@ -1864,3 +1902,114 @@ argmin.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
 argmax <- function(x, ...) UseMethod("argmax")
 #' @export
 argmin <- function(x, ...) UseMethod("argmin")
+
+# New S3 methods for Phase 3.1 math functions
+
+#' Floor function for gpuTensor
+#' @export
+floor.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  result <- tensor_floor_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Ceiling function for gpuTensor
+#' @export
+ceiling.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  result <- tensor_ceil_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Round function for gpuTensor
+#' @export
+round.gpuTensor <- function(x, digits = 0) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  if (digits != 0) {
+    warning("digits parameter not supported for gpuTensor round, using digits=0")
+  }
+  result <- tensor_round_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Error function for gpuTensor
+#' @export
+erf.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  result <- tensor_erf_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Power operator for gpuTensor (scalar exponent)
+#' @export
+`^.gpuTensor` <- function(x, y) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  if (!is.numeric(y) || length(y) != 1) {
+    stop("Exponent must be a single numeric value")
+  }
+  result <- tensor_pow_scalar_unified(x, y)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Generic erf function
+#' @export
+erf <- function(x) UseMethod("erf")
+
+# New binary element-wise operations for Phase 3.2
+
+#' Element-wise maximum of two tensors
+#' @param a A gpuTensor object
+#' @param b A gpuTensor object
+#' @return A gpuTensor with the element-wise maximum values
+#' @export
+pmax.gpuTensor <- function(a, b, ...) {
+  if (!inherits(a, "gpuTensor") || !inherits(b, "gpuTensor")) {
+    stop("Both arguments must be gpuTensor objects")
+  }
+  result <- tensor_max_elemwise_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Element-wise minimum of two tensors
+#' @param a A gpuTensor object
+#' @param b A gpuTensor object
+#' @return A gpuTensor with the element-wise minimum values
+#' @export
+pmin.gpuTensor <- function(a, b, ...) {
+  if (!inherits(a, "gpuTensor") || !inherits(b, "gpuTensor")) {
+    stop("Both arguments must be gpuTensor objects")
+  }
+  result <- tensor_min_elemwise_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Element-wise power of two tensors (a^b)
+#' @param a A gpuTensor object (base)
+#' @param b A gpuTensor object (exponent)
+#' @return A gpuTensor with a raised to the power of b element-wise
+#' @export
+tensor_pow <- function(a, b) {
+  if (!inherits(a, "gpuTensor") || !inherits(b, "gpuTensor")) {
+    stop("Both arguments must be gpuTensor objects")
+  }
+  result <- tensor_pow_elemwise_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}

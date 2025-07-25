@@ -1430,6 +1430,16 @@ template __global__ void elementwise_binary_kernel<double, LessOp>(double*, cons
 template __global__ void elementwise_binary_kernel<float, EqualOp>(float*, const float*, const float*, size_t, EqualOp);
 template __global__ void elementwise_binary_kernel<double, EqualOp>(double*, const double*, const double*, size_t, EqualOp);
 
+// New binary operations for Phase 3.2
+template __global__ void elementwise_binary_kernel<float, MaxOp>(float*, const float*, const float*, size_t, MaxOp);
+template __global__ void elementwise_binary_kernel<double, MaxOp>(double*, const double*, const double*, size_t, MaxOp);
+
+template __global__ void elementwise_binary_kernel<float, MinOp>(float*, const float*, const float*, size_t, MinOp);
+template __global__ void elementwise_binary_kernel<double, MinOp>(double*, const double*, const double*, size_t, MinOp);
+
+template __global__ void elementwise_binary_kernel<float, PowOp>(float*, const float*, const float*, size_t, PowOp);
+template __global__ void elementwise_binary_kernel<double, PowOp>(double*, const double*, const double*, size_t, PowOp);
+
 // Elementwise unary kernels
 template __global__ void elementwise_unary_kernel<float, ExpOp>(float*, const float*, size_t, ExpOp);
 template __global__ void elementwise_unary_kernel<double, ExpOp>(double*, const double*, size_t, ExpOp);
@@ -1461,6 +1471,19 @@ template __global__ void elementwise_unary_kernel<double, AbsOp>(double*, const 
 template __global__ void elementwise_unary_kernel<float, SquareOp>(float*, const float*, size_t, SquareOp);
 template __global__ void elementwise_unary_kernel<double, SquareOp>(double*, const double*, size_t, SquareOp);
 
+// New unary operations for Phase 3.1
+template __global__ void elementwise_unary_kernel<float, FloorOp>(float*, const float*, size_t, FloorOp);
+template __global__ void elementwise_unary_kernel<double, FloorOp>(double*, const double*, size_t, FloorOp);
+
+template __global__ void elementwise_unary_kernel<float, CeilOp>(float*, const float*, size_t, CeilOp);
+template __global__ void elementwise_unary_kernel<double, CeilOp>(double*, const double*, size_t, CeilOp);
+
+template __global__ void elementwise_unary_kernel<float, RoundOp>(float*, const float*, size_t, RoundOp);
+template __global__ void elementwise_unary_kernel<double, RoundOp>(double*, const double*, size_t, RoundOp);
+
+template __global__ void elementwise_unary_kernel<float, ErfOp>(float*, const float*, size_t, ErfOp);
+template __global__ void elementwise_unary_kernel<double, ErfOp>(double*, const double*, size_t, ErfOp);
+
 // Elementwise scalar kernels
 template __global__ void elementwise_scalar_kernel<float, float, AddOp>(float*, const float*, float, size_t, AddOp);
 template __global__ void elementwise_scalar_kernel<double, double, AddOp>(double*, const double*, double, size_t, AddOp);
@@ -1469,6 +1492,10 @@ template __global__ void elementwise_scalar_kernel<half, float, AddOp>(half*, co
 template __global__ void elementwise_scalar_kernel<float, float, MulOp>(float*, const float*, float, size_t, MulOp);
 template __global__ void elementwise_scalar_kernel<double, double, MulOp>(double*, const double*, double, size_t, MulOp);
 template __global__ void elementwise_scalar_kernel<half, float, MulOp>(half*, const half*, float, size_t, MulOp);
+
+// New scalar operations for Phase 3.1
+template __global__ void elementwise_scalar_kernel<float, float, PowScalarOp>(float*, const float*, float, size_t, PowScalarOp);
+template __global__ void elementwise_scalar_kernel<double, double, PowScalarOp>(double*, const double*, double, size_t, PowScalarOp);
 
 // Other template instantiations for completeness
 template __global__ void fill_kernel<float>(float*, float, size_t);

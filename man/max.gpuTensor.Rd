@@ -4,16 +4,20 @@
 \alias{max.gpuTensor}
 \title{Maximum Function}
 \usage{
-\method{max}{gpuTensor}(x, ...)
+\method{max}{gpuTensor}(x, axis = NULL, keep.dims = FALSE, ...)
 }
 \arguments{
 \item{x}{A gpuTensor object}
 
+\item{axis}{Integer vector specifying which axes to reduce (1-based indexing). If NULL, reduces all axes.}
+
+\item{keep.dims}{Logical. If TRUE, reduced dimensions are retained with size 1.}
+
 \item{...}{Additional arguments (ignored)}
 }
 \value{
-The maximum value in the tensor
+A tensor with reduced dimensions, or a scalar if all axes are reduced
 }
 \description{
-Finds the maximum element in the tensor.
+Finds the maximum element in the tensor along specified axes.
 }

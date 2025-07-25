@@ -2,15 +2,18 @@
 % Please edit documentation in R/gpuTensor.R
 \name{<.gpuTensor}
 \alias{<.gpuTensor}
-\alias{==.gpuTensor}
 \title{Less Than Comparison}
 \usage{
 \method{<}{gpuTensor}(a, b)
+}
+\arguments{
+\item{a}{First gpuTensor}
 
-\method{==}{gpuTensor}(a, b)
+\item{b}{Second gpuTensor or a scalar}
+}
+\value{
+gpuTensor with numeric 0/1 values
 }
 \description{
-Less Than Comparison
-
-Equality Comparison
+Performs element-wise comparison a < b and returns a tensor of 0/1.
 }

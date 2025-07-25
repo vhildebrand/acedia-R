@@ -61,6 +61,26 @@ tensor_scalar_add_unified <- function(tensor_ptr, scalar) {
     .Call(`_acediaR_tensor_scalar_add_unified`, tensor_ptr, scalar)
 }
 
+tensor_max_elemwise_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_max_elemwise_unified`, a_ptr, b_ptr)
+}
+
+tensor_min_elemwise_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_min_elemwise_unified`, a_ptr, b_ptr)
+}
+
+tensor_pow_elemwise_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_pow_elemwise_unified`, a_ptr, b_ptr)
+}
+
+tensor_scalar_sub_unified <- function(tensor_ptr, scalar) {
+    .Call(`_acediaR_tensor_scalar_sub_unified`, tensor_ptr, scalar)
+}
+
+tensor_scalar_div_unified <- function(tensor_ptr, scalar) {
+    .Call(`_acediaR_tensor_scalar_div_unified`, tensor_ptr, scalar)
+}
+
 tensor_gt_unified <- function(a_ptr, b_ptr) {
     .Call(`_acediaR_tensor_gt_unified`, a_ptr, b_ptr)
 }
@@ -145,6 +165,26 @@ tensor_abs_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_abs_unified`, tensor_ptr)
 }
 
+tensor_floor_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_floor_unified`, tensor_ptr)
+}
+
+tensor_ceil_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_ceil_unified`, tensor_ptr)
+}
+
+tensor_round_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_round_unified`, tensor_ptr)
+}
+
+tensor_erf_unified <- function(tensor_ptr) {
+    .Call(`_acediaR_tensor_erf_unified`, tensor_ptr)
+}
+
+tensor_pow_scalar_unified <- function(tensor_ptr, exponent) {
+    .Call(`_acediaR_tensor_pow_scalar_unified`, tensor_ptr, exponent)
+}
+
 tensor_slice_add_scalar_unified <- function(tensor_ptr, start_indices, slice_shape, scalar) {
     invisible(.Call(`_acediaR_tensor_slice_add_scalar_unified`, tensor_ptr, start_indices, slice_shape, scalar))
 }
@@ -163,6 +203,18 @@ tensor_repeat_unified <- function(tensor_ptr, repeats) {
 
 tensor_pad_unified <- function(tensor_ptr, pad_width, mode = "constant", value = 0) {
     .Call(`_acediaR_tensor_pad_unified`, tensor_ptr, pad_width, mode, value)
+}
+
+tensor_slice_set_scalar_unified <- function(tensor_ptr, start_indices, slice_shape, scalar) {
+    invisible(.Call(`_acediaR_tensor_slice_set_scalar_unified`, tensor_ptr, start_indices, slice_shape, scalar))
+}
+
+tensor_slice_set_tensor_unified <- function(dest_tensor_ptr, start_indices, slice_shape, src_tensor_ptr) {
+    invisible(.Call(`_acediaR_tensor_slice_set_tensor_unified`, dest_tensor_ptr, start_indices, slice_shape, src_tensor_ptr))
+}
+
+tensor_mask_set_scalar_unified <- function(tensor_ptr, mask_ptr, scalar) {
+    invisible(.Call(`_acediaR_tensor_mask_set_scalar_unified`, tensor_ptr, mask_ptr, scalar))
 }
 
 tensor_sum_unified <- function(tensor_ptr) {

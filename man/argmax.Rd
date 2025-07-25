@@ -2,10 +2,20 @@
 % Please edit documentation in R/gpuTensor.R
 \name{argmax}
 \alias{argmax}
-\title{Argmax (linear index)}
+\title{Argmax Function}
 \usage{
-argmax(x)
+argmax(x, ...)
+}
+\arguments{
+\item{x}{A gpuTensor object}
+
+\item{axis}{Integer specifying which axis to find argmax along (1-based indexing). If NULL, returns global argmax.}
+
+\item{keep.dims}{Logical. If TRUE, reduced dimensions are retained with size 1.}
+}
+\value{
+A tensor of indices (int64) with reduced dimensions, or a scalar index if global argmax
 }
 \description{
-Argmax (linear index)
+Finds the indices of the maximum values along specified axes.
 }

@@ -123,6 +123,73 @@ struct SquareOp {
     __device__ T operator()(const T& a) const { return a * a; }
 };
 
+struct FloorOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a) const { 
+#ifdef __CUDA_ARCH__
+        return floor(a); // Device version
+#else
+        return std::floor(a); // Host version
+#endif
+    }
+};
+
+struct CeilOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a) const { 
+#ifdef __CUDA_ARCH__
+        return ceil(a); // Device version
+#else
+        return std::ceil(a); // Host version
+#endif
+    }
+};
+
+struct RoundOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a) const { 
+#ifdef __CUDA_ARCH__
+        return round(a); // Device version
+#else
+        return std::round(a); // Host version
+#endif
+    }
+};
+
+struct PowScalarOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a, const T& exponent) const { 
+#ifdef __CUDA_ARCH__
+        return pow(a, exponent); // Device version
+#else
+        return std::pow(a, exponent); // Host version
+#endif
+    }
+};
+
+struct ErfOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a) const { 
+#ifdef __CUDA_ARCH__
+        return erf(a); // Device version
+#else
+        return std::erf(a); // Host version
+#endif
+    }
+};
+
+// Binary PowOp for element-wise power operations
+struct PowOp {
+    template<typename T>
+    __host__ __device__ T operator()(const T& a, const T& b) const { 
+#ifdef __CUDA_ARCH__
+        return pow(a, b); // Device version
+#else
+        return std::pow(a, b); // Host version
+#endif
+    }
+};
+
 // Template kernel declarations from tensor_kernels.cu
 
 // Basic kernels
