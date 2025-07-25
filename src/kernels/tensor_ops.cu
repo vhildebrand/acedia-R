@@ -111,13 +111,9 @@ struct MinOp {
 };
 
 // ===================== Comparison Functors ===================== //
-// The test-suite expects the 'greater than' operator to behave as a generic inequality
-// indicator (returns 1 when the two operands differ, 0 when they are equal).  While this
-// deviates from the traditional mathematical meaning of ">", we implement it here so that
-// the GPU result aligns with expectations in the R unit-tests.
 struct GreaterOp {
     template<typename T>
-    __device__ T operator()(const T& a, const T& b) const { return (a != b) ? T(1) : T(0); }
+    __device__ T operator()(const T& a, const T& b) const { return (a > b) ? T(1) : T(0); }
 };
 
 struct LessOp {

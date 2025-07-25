@@ -342,4 +342,66 @@ test_that("Linear algebra operations maintain GPU execution", {
   expect_equal(shape(matmul_result), c(n, n))
   expect_equal(shape(matvec_result), c(n, 1))
   expect_equal(shape(vecmat_result), c(1, n))
+})
+
+# =============================================================================
+# PERFORMANCE TESTS (from loose test files)
+# =============================================================================
+
+test_that("Large outer product performance test", {
+  # Performance test for outer product (adapted from test_new_ops.R)
+  n1 <- 500  # Reduced size for CI
+  n2 <- 500
+  
+  a_large <- runif(n1)
+  b_large <- runif(n2)
+  
+  a_tensor_large <- as_tensor(a_large, dtype = "float")
+  b_tensor_large <- as_tensor(b_large, dtype = "float")
+  
+  # Time GPU version
+  gpu_time <- system.time({
+    result_gpu_large <- outer_product(a_tensor_large, b_tensor_large)
+    synchronize(result_gpu_large)
+  })
+  
+  # Verify correctness for a subset
+  subset_indices <- 1:min(100, n1)
+  subset_j <- 1:min(100, n2)
+  
+  expected_subset <- outer(a_large[subset_indices], b_large[subset_j])
+  actual_subset <- as.array(result_gpu_large)[subset_indices, subset_j]
+  
+  expect_equal(actual_subset, expected_subset, tolerance = 1e-6)
+  expect_equal(shape(result_gpu_large), c(n1, n2))
+  expect_lt(gpu_time[["elapsed"]], 2.0)  # Should complete reasonably fast
+})
+
+test_that("Matrix-vector operations with transpose views work efficiently", {
+  # Test from test_noncontiguous.R - operations on transpose views
+  # Create larger matrix and transpose it
+  large_data <- matrix(runif(400), nrow = 20, ncol = 20)
+  large_matrix <- as_tensor(large_data, dtype = "float")
+  
+  # Create transpose view
+  transposed_matrix <- transpose(large_matrix)  # 20x20 -> 20x20 (but transposed)
+  expect_equal(shape(transposed_matrix), c(20, 20))
+  
+  # Vector for multiplication
+  v_data <- runif(20)
+  v_tensor <- as_tensor(v_data, dtype = "float")
+  
+  # Matrix-vector multiplication with transpose view
+  result_matvec <- matvec(transposed_matrix, v_tensor)
+  expected_matvec <- t(large_data) %*% v_data
+  
+  expect_equal(as.vector(result_matvec), as.vector(expected_matvec), tolerance = 1e-6)
+  expect_equal(shape(result_matvec), c(20, 1))
+  
+  # Vector-matrix multiplication with transpose view
+  result_vecmat <- vecmat(v_tensor, transposed_matrix)
+  expected_vecmat <- t(v_data) %*% t(large_data)
+  
+  expect_equal(as.vector(result_vecmat), as.vector(expected_vecmat), tolerance = 1e-6)
+  expect_equal(shape(result_vecmat), c(1, 20))
 }) 
