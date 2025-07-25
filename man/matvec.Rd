@@ -5,6 +5,8 @@
 \title{Matrix-Vector Multiplication}
 \usage{
 matvec(A, v)
+
+matvec(A, v)
 }
 \arguments{
 \item{A}{Matrix tensor (2D)}

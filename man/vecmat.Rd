@@ -5,6 +5,8 @@
 \title{Vector-Matrix Multiplication}
 \usage{
 vecmat(v, A)
+
+vecmat(v, A)
 }
 \arguments{
 \item{v}{Vector tensor (1D)}

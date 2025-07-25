@@ -419,6 +419,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tensor_abs_unified
+SEXP tensor_abs_unified(SEXP tensor_ptr);
+RcppExport SEXP _acediaR_tensor_abs_unified(SEXP tensor_ptrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type tensor_ptr(tensor_ptrSEXP);
+    rcpp_result_gen = Rcpp::wrap(tensor_abs_unified(tensor_ptr));
+    return rcpp_result_gen;
+END_RCPP
+}
 // tensor_slice_add_scalar_unified
 void tensor_slice_add_scalar_unified(SEXP tensor_ptr, IntegerVector start_indices, IntegerVector slice_shape, double scalar);
 RcppExport SEXP _acediaR_tensor_slice_add_scalar_unified(SEXP tensor_ptrSEXP, SEXP start_indicesSEXP, SEXP slice_shapeSEXP, SEXP scalarSEXP) {
@@ -633,6 +644,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_tensor_exp_unified", (DL_FUNC) &_acediaR_tensor_exp_unified, 1},
     {"_acediaR_tensor_log_unified", (DL_FUNC) &_acediaR_tensor_log_unified, 1},
     {"_acediaR_tensor_sqrt_unified", (DL_FUNC) &_acediaR_tensor_sqrt_unified, 1},
+    {"_acediaR_tensor_abs_unified", (DL_FUNC) &_acediaR_tensor_abs_unified, 1},
     {"_acediaR_tensor_slice_add_scalar_unified", (DL_FUNC) &_acediaR_tensor_slice_add_scalar_unified, 4},
     {"_acediaR_tensor_concat_unified", (DL_FUNC) &_acediaR_tensor_concat_unified, 2},
     {"_acediaR_tensor_stack_unified", (DL_FUNC) &_acediaR_tensor_stack_unified, 2},

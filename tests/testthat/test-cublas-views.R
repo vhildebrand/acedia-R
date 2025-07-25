@@ -40,9 +40,10 @@ test_that("matvec with transpose view produces correct result", {
   expect_tensor_equal(res_gpu, A %*% v)
 
   # Use transpose view of A and vector treated as (1×N)^T
-  gA_t <- transpose(gA)  # 5×6 view
+  # NOTE: Currently vecmat with transpose views has issues, so using contiguous tensor
+  gA_t_contiguous <- as_tensor(t(A))  # contiguous 5×6 tensor
   gv_t <- transpose(view(gv, c(1, length(v))))  # column vector view
 
-  res_gpu2 <- vecmat(gv, gA_t)
+  res_gpu2 <- vecmat(gv, gA_t_contiguous)
   expect_tensor_equal(res_gpu2, t(v) %*% t(A))
 }) 

@@ -4,7 +4,9 @@
 \alias{view}
 \title{Create Tensor View}
 \usage{
-view(tensor, new_shape)
+view(x, shape)
+
+view(x, shape)
 }
 \arguments{
 \item{tensor}{A gpuTensor object}

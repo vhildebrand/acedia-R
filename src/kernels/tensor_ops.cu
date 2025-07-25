@@ -82,6 +82,11 @@ struct CosOp {
     __device__ T operator()(const T& a) const { return cos(a); }
 };
 
+struct AbsOp {
+    template<typename T>
+    __device__ T operator()(const T& a) const { return fabs(a); }
+};
+
 // Reduction operation functors - with both __host__ and __device__ support
 struct MaxOp {
     template<typename T>
@@ -576,6 +581,32 @@ __global__ void strided_binary_kernel(
     out_ptr[out_offset] = Op{}(a_ptr[a_offset], b_ptr[b_offset]);
 }
 
+// Strided scalar operation kernel
+template<typename T, typename U, typename Op>
+__global__ void strided_scalar_kernel(
+    cuda_utils::TensorDescriptor out_desc,
+    cuda_utils::TensorDescriptor in_desc,
+    U scalar,
+    size_t total_elements
+) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= total_elements) return;
+    
+    // Convert linear index to coordinates
+    int coords[8];
+    out_desc.linear_to_coords(idx, coords);
+    
+    // Compute offsets using strides
+    size_t in_offset = in_desc.compute_offset(coords);
+    size_t out_offset = out_desc.compute_offset(coords);
+    
+    // Perform operation
+    T* out_ptr = static_cast<T*>(out_desc.data);
+    const T* in_ptr = static_cast<const T*>(in_desc.data);
+    
+    out_ptr[out_offset] = Op{}(in_ptr[in_offset], static_cast<T>(scalar));
+}
+
 // BEGIN NEW WRAPPER FUNCTIONS (Sprint 1 enhancements)
 extern "C" {
 
@@ -644,6 +675,14 @@ void tensor_cos_float32(float* result, const float* input, size_t n) {
 
 void tensor_cos_float64(double* result, const double* input, size_t n) {
     launch_elementwise_unary<double>(result, input, n, CosOp());
+}
+
+void tensor_abs_float32(float* result, const float* input, size_t n) {
+    launch_elementwise_unary<float>(result, input, n, AbsOp());
+}
+
+void tensor_abs_float64(double* result, const double* input, size_t n) {
+    launch_elementwise_unary<double>(result, input, n, AbsOp());
 }
 
 // ===================== Reductions ===================== //
@@ -1291,6 +1330,59 @@ void tensor_sqrt_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
     
     strided_unary_kernel<double, SqrtOp><<<grid_size, block_size>>>(
         out_desc, in_desc, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+// Strided scalar operations - the key missing piece for view efficiency!
+void tensor_scalar_add_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       float scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<float, float, AddOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       double scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<double, double, AddOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_mul_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       float scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<float, float, MulOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, scalar, total_elements
+    );
+    cudaDeviceSynchronize();
+}
+
+void tensor_scalar_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                       const cuda_utils::TensorDescriptor& in_desc,
+                                       double scalar) {
+    size_t total_elements = out_desc.total_size;
+    int block_size = 256;
+    int grid_size = (total_elements + block_size - 1) / block_size;
+    
+    strided_scalar_kernel<double, double, MulOp><<<grid_size, block_size>>>(
+        out_desc, in_desc, scalar, total_elements
     );
     cudaDeviceSynchronize();
 }

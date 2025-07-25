@@ -54,6 +54,20 @@ extern "C" {
                                     const cuda_utils::TensorDescriptor& a_desc,
                                     const cuda_utils::TensorDescriptor& b_desc);
 
+    // Strided scalar operations for non-contiguous tensors
+    void tensor_scalar_add_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                           const cuda_utils::TensorDescriptor& in_desc,
+                                           float scalar);
+    void tensor_scalar_add_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                           const cuda_utils::TensorDescriptor& in_desc,
+                                           double scalar);
+    void tensor_scalar_mul_strided_float32(const cuda_utils::TensorDescriptor& out_desc,
+                                           const cuda_utils::TensorDescriptor& in_desc,
+                                           float scalar);
+    void tensor_scalar_mul_strided_float64(const cuda_utils::TensorDescriptor& out_desc,
+                                           const cuda_utils::TensorDescriptor& in_desc,
+                                           double scalar);
+
     // Broadcast operations
     void tensor_add_broadcast_float32(
         float* result, const float* a, const float* b,
@@ -615,9 +629,21 @@ SEXP tensor_scalar_mul_unified(SEXP tensor_ptr, double scalar) {
                 if (!tensor_wrapper) {
                     throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
                 }
-                auto result = std::make_shared<gpuTensor<float>>(tensor_wrapper->tensor().shape());
-                tensor_scalar_mul_float32(result->data(), tensor_wrapper->tensor().data(), 
-                                        static_cast<float>(scalar), result->size());
+                
+                const gpuTensor<float>& input_tensor = tensor_wrapper->tensor();
+                auto result = std::make_shared<gpuTensor<float>>(input_tensor.shape());
+                
+                // Use stride-aware kernels for efficiency - NO contiguous forcing!
+                if (input_tensor.is_contiguous()) {
+                    tensor_scalar_mul_float32(result->data(), input_tensor.data(), 
+                                            static_cast<float>(scalar), result->size());
+                } else {
+                    // Use strided kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_scalar_mul_strided_float32(out_desc, in_desc, static_cast<float>(scalar));
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
@@ -626,9 +652,20 @@ SEXP tensor_scalar_mul_unified(SEXP tensor_ptr, double scalar) {
                 if (!tensor_wrapper) {
                     throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
                 }
-                auto result = std::make_shared<gpuTensor<double>>(tensor_wrapper->tensor().shape());
-                tensor_scalar_mul_float64(result->data(), tensor_wrapper->tensor().data(), 
-                                        scalar, result->size());
+                
+                const gpuTensor<double>& input_tensor = tensor_wrapper->tensor();
+                auto result = std::make_shared<gpuTensor<double>>(input_tensor.shape());
+                
+                // Use stride-aware kernels for efficiency - NO contiguous forcing!
+                if (input_tensor.is_contiguous()) {
+                    tensor_scalar_mul_float64(result->data(), input_tensor.data(), scalar, result->size());
+                } else {
+                    // Use strided kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_scalar_mul_strided_float64(out_desc, in_desc, scalar);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }
@@ -671,16 +708,40 @@ SEXP tensor_scalar_add_unified(SEXP tensor_ptr, double scalar) {
             case DType::FLOAT32: {
                 auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
                 if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
-                auto result = std::make_shared<gpuTensor<float>>(tw->tensor().shape());
-                tensor_scalar_add_float32(result->data(), tw->tensor().data(), static_cast<float>(scalar), result->size());
+                
+                const gpuTensor<float>& input_tensor = tw->tensor();
+                auto result = std::make_shared<gpuTensor<float>>(input_tensor.shape());
+                
+                // Use stride-aware kernels for efficiency - NO contiguous forcing!
+                if (input_tensor.is_contiguous()) {
+                    tensor_scalar_add_float32(result->data(), input_tensor.data(), static_cast<float>(scalar), result->size());
+                } else {
+                    // Use strided kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_scalar_add_strided_float32(out_desc, in_desc, static_cast<float>(scalar));
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<float>>(result);
                 break;
             }
             case DType::FLOAT64: {
                 auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
                 if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
-                auto result = std::make_shared<gpuTensor<double>>(tw->tensor().shape());
-                tensor_scalar_add_float64(result->data(), tw->tensor().data(), scalar, result->size());
+                
+                const gpuTensor<double>& input_tensor = tw->tensor();
+                auto result = std::make_shared<gpuTensor<double>>(input_tensor.shape());
+                
+                // Use stride-aware kernels for efficiency - NO contiguous forcing!
+                if (input_tensor.is_contiguous()) {
+                    tensor_scalar_add_float64(result->data(), input_tensor.data(), scalar, result->size());
+                } else {
+                    // Use strided kernel for non-contiguous tensors
+                    auto out_desc = result->descriptor();
+                    auto in_desc = input_tensor.descriptor();
+                    tensor_scalar_add_strided_float64(out_desc, in_desc, scalar);
+                }
+                
                 result_tensor = std::make_unique<TensorWrapper<double>>(result);
                 break;
             }

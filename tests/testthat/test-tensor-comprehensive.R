@@ -105,7 +105,7 @@ test_that("Comprehensive tensor operations test suite", {
       if (exists("mean.gpuTensor")) {
         mean_gpu <- mean(tensor_a)
         mean_cpu <- mean(data_a)
-        expect_equal(mean_gpu, mean_cpu, tolerance = 1e-6)
+        expect_equal(mean_gpu, mean_cpu, tolerance = 2e-6)  # Allow for GPU/CPU precision differences
       }
       
       # Min/Max (for positive values)

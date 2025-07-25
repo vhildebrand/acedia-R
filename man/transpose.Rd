@@ -4,7 +4,9 @@
 \alias{transpose}
 \title{Transpose Tensor}
 \usage{
-transpose(tensor)
+transpose(x)
+
+transpose(x)
 }
 \arguments{
 \item{tensor}{A 2D gpuTensor object}

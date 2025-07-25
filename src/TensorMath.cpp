@@ -15,6 +15,8 @@ extern "C" {
     void tensor_log_float64(double* result, const double* input, size_t n);
     void tensor_sqrt_float32(float* result, const float* input, size_t n);
     void tensor_sqrt_float64(double* result, const double* input, size_t n);
+    void tensor_abs_float32(float* result, const float* input, size_t n);
+    void tensor_abs_float64(double* result, const double* input, size_t n);
     
     // Strided unary operations (for non-contiguous tensors)
     void tensor_exp_strided_float32(const cuda_utils::TensorDescriptor& out_desc, 
@@ -281,5 +283,74 @@ SEXP tensor_sqrt_unified(SEXP tensor_ptr) {
         return ptr;
     } catch (const std::exception& e) {
         stop("Error in unified tensor sqrt: " + std::string(e.what()));
+    }
+}
+
+// [[Rcpp::export]]
+SEXP tensor_abs_unified(SEXP tensor_ptr) {
+    try {
+        XPtr<TensorBase> tensor(tensor_ptr);
+        
+        if (!tensor) {
+            stop("Invalid tensor pointer");
+        }
+        
+        DType dtype = tensor->dtype();
+        std::unique_ptr<TensorBase> result_tensor;
+        
+        switch (dtype) {
+            case DType::FLOAT32: {
+                auto tw = dynamic_cast<const TensorWrapper<float>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT32");
+                
+                const gpuTensor<float>& input_tensor = tw->tensor();
+                auto result_gpu = gpuTensor<float>(input_tensor.shape(), input_tensor.device());
+
+                if (input_tensor.is_contiguous()) {
+                    tensor_abs_float32(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                } else {
+                    // For non-contiguous tensors, first make them contiguous
+                    auto contiguous_input = input_tensor.contiguous();
+                    tensor_abs_float32(result_gpu.data(), contiguous_input.data(), contiguous_input.size());
+                }
+                
+                result_tensor = std::make_unique<TensorWrapper<float>>(
+                    std::make_shared<gpuTensor<float>>(std::move(result_gpu))
+                );
+                break;
+            }
+            case DType::FLOAT64: {
+                auto tw = dynamic_cast<const TensorWrapper<double>*>(tensor.get());
+                if (!tw) throw std::runtime_error("Invalid tensor wrapper for FLOAT64");
+                
+                const gpuTensor<double>& input_tensor = tw->tensor();
+                auto result_gpu = gpuTensor<double>(input_tensor.shape(), input_tensor.device());
+
+                if (input_tensor.is_contiguous()) {
+                    tensor_abs_float64(result_gpu.data(), input_tensor.data(), input_tensor.size());
+                } else {
+                    // For non-contiguous tensors, first make them contiguous
+                    auto contiguous_input = input_tensor.contiguous();
+                    tensor_abs_float64(result_gpu.data(), contiguous_input.data(), contiguous_input.size());
+                }
+                
+                result_tensor = std::make_unique<TensorWrapper<double>>(
+                    std::make_shared<gpuTensor<double>>(std::move(result_gpu))
+                );
+                break;
+            }
+            default:
+                stop("Abs not yet implemented for dtype: " + dtype_to_string(dtype));
+        }
+        
+        auto tensor_unique = std::unique_ptr<TensorBase>(result_tensor.release());
+        XPtr<TensorBase> ptr(tensor_unique.release(), true);
+        
+        ptr.attr("class") = "gpuTensor";
+        ptr.attr("dtype") = tensor_dtype_unified(tensor_ptr);
+        
+        return ptr;
+    } catch (const std::exception& e) {
+        stop("Error in unified tensor abs: " + std::string(e.what()));
     }
 } 

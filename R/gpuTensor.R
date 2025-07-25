@@ -498,7 +498,8 @@ vecmat <- function(v, A) {
 #' @return Scalar sum of all elements
 #' @export
 sum.gpuTensor <- function(tensor, ...) {
-  return(tensor_sum_unified(tensor))
+  val <- tensor_sum_unified(tensor)
+  return(as.numeric(as.array(val)))
 }
 
 #' Create Tensor View
@@ -986,6 +987,7 @@ Math.gpuTensor <- function(x, ...) {
     "exp" = tensor_exp_unified(x),
     "log" = tensor_log_unified(x), 
     "sqrt" = tensor_sqrt_unified(x),
+    "abs" = tensor_abs_unified(x),
     # Fall back to base R for unsupported functions
     {
       warning(paste("Math function", func_name, "not implemented for gpuTensor, converting to R"))
@@ -1257,10 +1259,7 @@ softmax <- function(tensor) {
   return(result)
 }
 
-argmax <- function(tensor) {
-  if (!inherits(tensor, "gpuTensor")) stop("tensor must be gpuTensor")
-  tensor_argmax_unified(tensor) + 1  # convert to 1-based index for R
-}
+
 
 #' Variance (Population)
 #'
@@ -1274,13 +1273,7 @@ var <- function(x, ...) {
   UseMethod("var")
 }
 
-#' @export
-var.gpuTensor <- function(x, ...) {
-  if (!inherits(x, "gpuTensor")) {
-    stop("Object is not a gpuTensor")
-  }
-  tensor_var_unified(x)
-}
+
 
 #' @export
 var.default <- function(x, ...) {
@@ -1441,14 +1434,64 @@ vecmat <- function(v, A) {
   }
 }
 
-# Scalar reductions return numeric for convenience
+#' Tensor sum reduction
 #' @export
 tensor_sum <- function(x) {
   if (inherits(x, "gpuTensor")) {
     val <- tensor_sum_unified(x)
-    return(as.numeric(val))
+    return(as.numeric(as.array(val)))
   }
   sum(x)
+}
+
+#' Tensor mean reduction
+#' @export
+tensor_mean <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    val <- tensor_mean_unified(x)
+    return(as.numeric(as.array(val)))
+  }
+  mean(x)
+}
+
+#' Tensor product reduction
+#' @export
+tensor_prod <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    val <- tensor_prod_unified(x)
+    return(as.numeric(as.array(val)))
+  }
+  prod(x)
+}
+
+#' Tensor max reduction
+#' @export
+tensor_max <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    val <- tensor_max_unified(x)
+    return(as.numeric(as.array(val)))
+  }
+  max(x)
+}
+
+#' Tensor min reduction
+#' @export
+tensor_min <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    val <- tensor_min_unified(x)
+    return(as.numeric(as.array(val)))
+  }
+  min(x)
+}
+
+#' Tensor variance reduction
+#' @export
+tensor_var <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    val <- tensor_var_unified(x)
+    return(as.numeric(as.array(val)))
+  }
+  var(x)
 }
 
 #' View / reshape without copy (returns gpuTensor)
@@ -1467,15 +1510,19 @@ softmax <- function(x) tensor_softmax_unified(x)
 
 #' Argmax (linear index)
 #' @export
-argmax <- function(x) tensor_argmax_unified(x)
+argmax <- function(x) tensor_argmax_unified(x) + 1
 
 #' Concat list of tensors
 #' @export
-concat <- function(lst, axis = 1L) tensor_concat_unified(lst, as.integer(axis))
+concat_tensor <- function(lst, axis = 1L) tensor_concat_unified(lst, as.integer(axis))
 
 #' Stack list of tensors along new axis
 #' @export
-stack <- function(lst, axis = 1L) tensor_stack_unified(lst, as.integer(axis))
+stack_tensor <- function(lst, axis = 1L) tensor_stack_unified(lst, as.integer(axis))
+
+#' Stack alias for backward compatibility
+#' @export
+stack <- stack_tensor
 
 #' Repeat tensor along each dimension
 #' @export
@@ -1509,17 +1556,5 @@ tensor_info <- function(x) tensor_info_unified(x)
          var        = function()  tensor_var(x),
          stop(sprintf("Unknown method '%s' for gpuTensor", name)))
 }
-
-# Scalar helpers (numeric)
-#' @export
-tensor_mean <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_mean_unified(x)) else mean(x) }
-#' @export
-tensor_prod <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_prod_unified(x)) else prod(x) }
-#' @export
-tensor_max <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_max_unified(x)) else max(x) }
-#' @export
-tensor_min <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_min_unified(x)) else min(x) }
-#' @export
-tensor_var <- function(x) { if (inherits(x, "gpuTensor")) as.numeric(tensor_var_unified(x)) else var(x) }
 
 # ---------------------------------------------------------------------------

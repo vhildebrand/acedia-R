@@ -39,13 +39,25 @@ if (gpu_available()) {
   cat("Using CPU-only mode\n")
 }
 }
+Get GPU Information
+
+Returns detailed information about available CUDA GPUs.
+
 \dontrun{
 cat(gpu_info())
 }
+Get Available GPU Memory
+
+Returns the amount of free GPU memory in bytes.
+
 \dontrun{
 mem_gb <- gpu_memory_available() / 1e9
 cat("Available GPU memory:", round(mem_gb, 1), "GB\n")
 }
+Comprehensive GPU Status
+
+Returns comprehensive information about GPU availability and status.
+
 \dontrun{
 status <- gpu_status()
 print(status)

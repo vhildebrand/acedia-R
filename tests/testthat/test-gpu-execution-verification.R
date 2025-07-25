@@ -244,7 +244,7 @@ test_that("GPU memory operations are efficient", {
     tensor_b <- gpu_tensor(b_data, length(b_data))
     tensor_result1 <- tensor_a * tensor_b
     tensor_result2 <- tensor_result1 * 2.0
-    tensor_final <- sum(tensor_result2)
+    tensor_final <- tensor_sum(tensor_result2)
   })[["elapsed"]]
   
   cat("High-level functions time: ", sprintf("%.6f", high_level_time), "s\n")

@@ -5,6 +5,8 @@
 \title{Matrix Multiplication}
 \usage{
 matmul(a, b)
+
+matmul(a, b)
 }
 \arguments{
 \item{a}{First tensor (2D)}

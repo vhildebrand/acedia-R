@@ -4,7 +4,9 @@
 \alias{tensor_info}
 \title{Get Tensor Memory Layout Info}
 \usage{
-tensor_info(tensor)
+tensor_info(x)
+
+tensor_info(x)
 }
 \arguments{
 \item{tensor}{A gpuTensor object}

@@ -12,7 +12,7 @@ verify_gpu_tensor <- function(tensor, operation_name = "operation") {
   # Additional check: verify data is actually on GPU by attempting a GPU-specific operation
   tryCatch({
     # Try to get tensor info - this should work for GPU tensors and show CUDA device
-    info <- tensor_info_unified(tensor)
+    info <- tensor_info(tensor)
     if (grepl("CUDA", info, ignore.case = TRUE)) {
       cat(paste("✅ GPU VERIFIED:", operation_name, "on CUDA device\n"))
       return(TRUE)
@@ -59,13 +59,13 @@ test_that("Concat and Stack produce correct results", {
   b <- gpu_tensor(7:12, c(2,3))
   verify_gpu_tensor(a, "concat a"); verify_gpu_tensor(b, "concat b")
   # Concat along 1st dim
-  c_gpu <- concat(list(a,b), axis = 1)
+  c_gpu <- concat_tensor(list(a,b), axis = 1)
   verify_gpu_tensor(c_gpu, "concat result")
   c_cpu <- abind::abind(as.array(a), as.array(b), along = 1)
   dimnames(c_cpu) <- NULL  # Remove dimnames to match GPU result
   expect_equal(as.array(c_gpu), c_cpu)
   # Stack along new dim 3
-  s_gpu <- stack(list(a,b), axis = 3)
+  s_gpu <- stack_tensor(list(a,b), axis = 3)
   verify_gpu_tensor(s_gpu, "stack result")
   s_cpu <- abind::abind(as.array(a), as.array(b), along = 3)
   dimnames(s_cpu) <- NULL  # Remove dimnames to match GPU result
@@ -153,13 +153,13 @@ test_that("All operations confirmed to use CUDA kernels", {
   }
   
   # 2. Concat operation
-  concat_result <- concat(list(t1, t2), axis = 1)
+  concat_result <- concat_tensor(list(t1, t2), axis = 1)
   if (verify_gpu_tensor(concat_result, "concat operation")) {
     operations_verified <- operations_verified + 1
   }
   
   # 3. Stack operation  
-  stack_result <- stack(list(t1, t2), axis = 3)
+  stack_result <- stack_tensor(list(t1, t2), axis = 3)
   if (verify_gpu_tensor(stack_result, "stack operation")) {
     operations_verified <- operations_verified + 1
   }
