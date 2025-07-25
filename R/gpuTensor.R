@@ -658,16 +658,20 @@ requires_grad <- function(tensor, requires_grad = TRUE) {
 #' @export
 `-.gpuTensor` <- function(a, b = NULL) {
   if (is.null(b)) {
-    # Unary negative
-    return(a * (-1))
+    # Unary negation: -a is equivalent to a * -1
+    result <- tensor_scalar_mul_unified(a, -1.0)
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
   }
-
+  
+  # Binary subtraction
   dtype_a <- attr(a, "dtype", exact=TRUE) %||% "double"
   if (inherits(b, "gpuTensor")) {
     dtype_b <- attr(b, "dtype", exact=TRUE) %||% "double"
     if (dtype_a != dtype_b) stop("Cannot subtract tensors with different dtypes")
     result <- tensor_sub_unified(a, b)
   } else if (is.numeric(b) && length(b) == 1) {
+    # Scalar subtraction: a - b is equivalent to a + (-b)
     result <- tensor_scalar_add_unified(a, -b)
   } else {
     stop("Cannot subtract gpuTensor with object of type: ", class(b))
@@ -685,8 +689,8 @@ requires_grad <- function(tensor, requires_grad = TRUE) {
     if (dtype_a != dtype_b) stop("Cannot divide tensors with different dtypes")
     result <- tensor_div_unified(a, b)
   } else if (is.numeric(b) && length(b) == 1) {
-    inv <- 1.0 / b
-    result <- tensor_scalar_mul_unified(a, inv)
+    # Scalar division: a / b is equivalent to a * (1/b)
+    result <- tensor_scalar_mul_unified(a, 1.0 / b)
   } else {
     stop("Cannot divide gpuTensor with object of type: ", class(b))
   }
