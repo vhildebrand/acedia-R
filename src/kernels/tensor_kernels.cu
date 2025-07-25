@@ -678,6 +678,115 @@ __global__ void axis_reduction_kernel(
 }
 
 // Variance kernel (needs special handling for two-pass algorithm)
+
+/**
+ * @brief Axis-aware argmax/argmin kernel that finds extreme values and their indices
+ * 
+ * This kernel computes argmax or argmin along specified reduction axes.
+ * Each thread block handles one output element.
+ * 
+ * @param indices_out Output tensor for indices (int64_t)
+ * @param values_out Output tensor for values (can be nullptr if only indices needed)
+ * @param input Input tensor
+ * @param in_strides Input tensor strides
+ * @param in_shape Input tensor shape
+ * @param out_strides Output tensor strides (unused but kept for consistency)
+ * @param red_axes Array of axes to reduce over
+ * @param n_red_axes Number of axes being reduced
+ * @param ndims Number of dimensions in input tensor
+ * @param out_elems Total number of elements in output tensor
+ * @param op Operation type (0=argmax, 1=argmin)
+ */
+template<typename T, typename AccumType>
+__global__ void axis_arg_extreme_kernel(
+    int64_t* indices_out, T* values_out,
+    const T* input,
+    const int* in_strides, const int* in_shape,
+    const int* out_strides,
+    const int* red_axes, int n_red_axes,
+    int ndims, size_t out_elems,
+    int op  // 0=argmax, 1=argmin
+) {
+    size_t out_idx = blockIdx.x;
+    if (out_idx >= out_elems) return;
+    
+    // Convert linear output index to coordinates for non-reduced dimensions
+    int coords[8] = {0};
+    size_t tmp = out_idx;
+    
+    // Build coordinate array for input tensor, leaving reduced dims as 0
+    int out_dim_idx = 0;
+    for (int d = 0; d < ndims; ++d) {
+        bool is_reduced = false;
+        for (int j = 0; j < n_red_axes; ++j) {
+            if (red_axes[j] == d) {
+                is_reduced = true;
+                break;
+            }
+        }
+        
+        if (!is_reduced) {
+            // This dimension appears in output - extract coordinate
+            coords[d] = tmp % in_shape[d];
+            tmp /= in_shape[d];
+        }
+        // else: coords[d] remains 0 (will be iterated over in reduction loop)
+    }
+    
+    // Walk through reduction space to find extreme value
+    int64_t best_idx = 0;
+    AccumType best_val;
+    bool first = true;
+    
+    // Calculate base linear index for non-reduced coordinates
+    size_t base_linear = 0;
+    for (int d = 0; d < ndims; ++d) {
+        base_linear += coords[d] * in_strides[d];
+    }
+    
+    // Calculate total elements in reduction space
+    size_t red_total = 1;
+    for (int j = 0; j < n_red_axes; ++j) {
+        red_total *= in_shape[red_axes[j]];
+    }
+    
+    // Iterate through all combinations in reduction space
+    for (size_t r = 0; r < red_total; ++r) {
+        // Convert r to reduction coordinates
+        size_t tmp_r = r;
+        size_t linear_idx = base_linear;
+        
+        for (int j = n_red_axes - 1; j >= 0; --j) {
+            int axis = red_axes[j];
+            int dim_size = in_shape[axis];
+            int coord_val = tmp_r % dim_size;
+            tmp_r /= dim_size;
+            linear_idx += coord_val * in_strides[axis];
+        }
+        
+        AccumType val = convert_type<AccumType>(input[linear_idx]);
+        
+        if (first) {
+            first = false;
+            best_val = val;
+            best_idx = r;
+        } else {
+            bool better = (op == 0) ? (val > best_val) : (val < best_val);
+            if (better) {
+                best_val = val;
+                best_idx = r;
+            }
+        }
+    }
+    
+    // Store results
+    indices_out[out_idx] = best_idx;
+    if (values_out) {
+        values_out[out_idx] = convert_type<T>(best_val);
+    }
+}
+
+// Variance kernel (needs special handling for two-pass algorithm)
 template<typename T>
 __global__ void axis_variance_kernel(
     T* result,
@@ -1117,9 +1226,178 @@ int64_t tensor_argmin_float64(const double* input, size_t n) {
     return h_idx;
 }
 
+// ------------------------------------------------------------
+// NEW: Axis-aware argmax / argmin wrappers
+// ------------------------------------------------------------
+
+// Axis-aware ARGMAX wrappers
+void tensor_axis_argmax_float32(
+    int64_t* idx_out, const float* input,
+    const int* in_strides, const int* in_shape, 
+    const int* out_strides, const int* axes, 
+    int n_axes, int ndims, size_t out_elems
+) {
+    cudaError_t err;
+    
+    // Pre-launch checks
+    if (!idx_out || !input || !in_strides || !in_shape || !axes) {
+        throw std::runtime_error("Null pointer passed to tensor_axis_argmax_float32");
+    }
+    if (out_elems == 0) {
+        throw std::runtime_error("Zero output size in tensor_axis_argmax_float32");
+    }
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Pre-existing CUDA error: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    if (out_elems > INT_MAX) {
+        throw std::runtime_error("Output size too large for grid dimensions");
+    }
+    
+    int blockSize = 256;
+    axis_arg_extreme_kernel<float, float><<<out_elems, blockSize>>>(
+        idx_out, nullptr, input, in_strides, in_shape,
+        out_strides, axes, n_axes, ndims, out_elems, 0  // 0 = argmax
+    );
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel launch failed in tensor_axis_argmax_float32: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel execution failed in tensor_axis_argmax_float32: " + std::string(cudaGetErrorString(err)));
+    }
+}
+
+void tensor_axis_argmax_float64(
+    int64_t* idx_out, const double* input,
+    const int* in_strides, const int* in_shape, 
+    const int* out_strides, const int* axes, 
+    int n_axes, int ndims, size_t out_elems
+) {
+    cudaError_t err;
+    
+    if (!idx_out || !input || !in_strides || !in_shape || !axes) {
+        throw std::runtime_error("Null pointer passed to tensor_axis_argmax_float64");
+    }
+    if (out_elems == 0) {
+        throw std::runtime_error("Zero output size in tensor_axis_argmax_float64");
+    }
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Pre-existing CUDA error: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    if (out_elems > INT_MAX) {
+        throw std::runtime_error("Output size too large for grid dimensions");
+    }
+    
+    int blockSize = 256;
+    axis_arg_extreme_kernel<double, double><<<out_elems, blockSize>>>(
+        idx_out, nullptr, input, in_strides, in_shape,
+        out_strides, axes, n_axes, ndims, out_elems, 0  // 0 = argmax
+    );
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel launch failed in tensor_axis_argmax_float64: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel execution failed in tensor_axis_argmax_float64: " + std::string(cudaGetErrorString(err)));
+    }
+}
+
+// Axis-aware ARGMIN wrappers
+void tensor_axis_argmin_float32(
+    int64_t* idx_out, const float* input,
+    const int* in_strides, const int* in_shape, 
+    const int* out_strides, const int* axes, 
+    int n_axes, int ndims, size_t out_elems
+) {
+    cudaError_t err;
+    
+    if (!idx_out || !input || !in_strides || !in_shape || !axes) {
+        throw std::runtime_error("Null pointer passed to tensor_axis_argmin_float32");
+    }
+    if (out_elems == 0) {
+        throw std::runtime_error("Zero output size in tensor_axis_argmin_float32");
+    }
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Pre-existing CUDA error: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    if (out_elems > INT_MAX) {
+        throw std::runtime_error("Output size too large for grid dimensions");
+    }
+    
+    int blockSize = 256;
+    axis_arg_extreme_kernel<float, float><<<out_elems, blockSize>>>(
+        idx_out, nullptr, input, in_strides, in_shape,
+        out_strides, axes, n_axes, ndims, out_elems, 1  // 1 = argmin
+    );
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel launch failed in tensor_axis_argmin_float32: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel execution failed in tensor_axis_argmin_float32: " + std::string(cudaGetErrorString(err)));
+    }
+}
+
+void tensor_axis_argmin_float64(
+    int64_t* idx_out, const double* input,
+    const int* in_strides, const int* in_shape, 
+    const int* out_strides, const int* axes, 
+    int n_axes, int ndims, size_t out_elems
+) {
+    cudaError_t err;
+    
+    if (!idx_out || !input || !in_strides || !in_shape || !axes) {
+        throw std::runtime_error("Null pointer passed to tensor_axis_argmin_float64");
+    }
+    if (out_elems == 0) {
+        throw std::runtime_error("Zero output size in tensor_axis_argmin_float64");
+    }
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Pre-existing CUDA error: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    if (out_elems > INT_MAX) {
+        throw std::runtime_error("Output size too large for grid dimensions");
+    }
+    
+    int blockSize = 256;
+    axis_arg_extreme_kernel<double, double><<<out_elems, blockSize>>>(
+        idx_out, nullptr, input, in_strides, in_shape,
+        out_strides, axes, n_axes, ndims, out_elems, 1  // 1 = argmin
+    );
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel launch failed in tensor_axis_argmin_float64: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        throw std::runtime_error("CUDA kernel execution failed in tensor_axis_argmin_float64: " + std::string(cudaGetErrorString(err)));
+    }
+}
 
 } // extern "C"
-
 // Explicit template instantiations for kernels used by tensor_ops.cu
 // This ensures the linker can find all the template specializations
 
@@ -1261,6 +1539,15 @@ template __global__ void repeat_kernel<half>(half*, const half*, const int*, con
 template __global__ void pad_kernel<float>(float*, const float*, const int*, const int*, const int*, const int*, const int*, int, float, int, size_t);
 template __global__ void pad_kernel<double>(double*, const double*, const int*, const int*, const int*, const int*, const int*, int, double, int, size_t);
 template __global__ void pad_kernel<half>(half*, const half*, const int*, const int*, const int*, const int*, const int*, int, half, int, size_t);
+
+// NEW: Axis-aware argmax/argmin kernel instantiations
+template __global__ void axis_arg_extreme_kernel<float, float>(
+    int64_t*, float*, const float*, const int*, const int*, const int*, 
+    const int*, int, int, size_t, int);
+
+template __global__ void axis_arg_extreme_kernel<double, double>(
+    int64_t*, double*, const double*, const int*, const int*, const int*, 
+    const int*, int, int, size_t, int);
 
 // Axis-aware reduction kernels (explicit instantiations)
 template __global__ void axis_reduction_kernel<float, float>(float*, const float*, const int*, const int*, const int*, const int*, int, int, size_t, int);
