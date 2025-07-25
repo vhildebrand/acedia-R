@@ -1391,3 +1391,97 @@ tensor_info <- function(tensor) {
     dtype = attr(tensor, "dtype", exact = TRUE) %||% "unknown"
   ))
 }
+
+# ---------------------------------------------------------------------------
+# Compatibility helpers and S3 methods (testing & user convenience)
+# ---------------------------------------------------------------------------
+
+#' @export
+gpuTensor <- gpu_tensor   # legacy alias, soft-deprecated
+
+#' @export
+all.equal.gpuTensor <- function(target, current, ...) {
+  target_arr  <- as.array(target)
+  current_arr <- if (inherits(current, "gpuTensor")) as.array(current) else current
+  base::all.equal(target_arr, current_arr, ...)
+}
+
+#' @export
+is.finite.gpuTensor <- function(x) {
+  all(is.finite(as.array(x)))
+}
+
+# Helper for testthat: convert gpuTensor → host
+# Not exported intentionally; tests can call via ::: or rely on expect_tensor_equal helper
+.as_host <- function(x) if (inherits(x, "gpuTensor")) as.array(x) else x
+
+# ---------------------------------------------------------------------------
+# High-level functional API – preferred over $-methods
+# ---------------------------------------------------------------------------
+
+#' Transpose tensor (2-D) or matrix
+#' @export
+transpose <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    tensor_transpose_unified(x)
+  } else {
+    base::t(x)
+  }
+}
+
+#' Matrix multiplication
+#' @export
+matmul <- function(a, b) {
+  if (inherits(a, "gpuTensor") && inherits(b, "gpuTensor")) {
+    tensor_matmul_unified(a, b)
+  } else {
+    a %*% b
+  }
+}
+
+#' Matrix-vector multiply (A %*% v)
+#' @export
+matvec <- function(A, v) {
+  if (inherits(A, "gpuTensor") && inherits(v, "gpuTensor")) {
+    tensor_matvec_unified(A, v)
+  } else {
+    A %*% v
+  }
+}
+
+#' Vector-matrix multiply (v^T %*% A)
+#' @export
+vecmat <- function(v, A) {
+  if (inherits(A, "gpuTensor") && inherits(v, "gpuTensor")) {
+    tensor_vecmat_unified(v, A)
+  } else {
+    t(v) %*% A
+  }
+}
+
+# Scalar reductions return numeric for convenience
+#' @export
+tensor_sum <- function(x) {
+  if (inherits(x, "gpuTensor")) {
+    val <- tensor_sum_unified(x)
+    return(as.numeric(val))
+  }
+  sum(x)
+}
+
+# ---------------------------------------------------------------------------
+# $ operator for backward compatibility (soft-deprecated)
+# ---------------------------------------------------------------------------
+
+#' @export
+`$.gpuTensor` <- function(x, name) {
+  switch(name,
+         matmul = function(y) matmul(x, y),
+         matvec = function(v) matvec(x, v),
+         vecmat = function(v) vecmat(x, v),
+         sum    = function() tensor_sum(x),
+         transpose = function() transpose(x),
+         stop(sprintf("Unknown method '%s' for gpuTensor", name)))
+}
+
+# ---------------------------------------------------------------------------

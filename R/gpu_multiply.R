@@ -221,7 +221,7 @@ gpu_dot <- function(a, b, force_cpu = FALSE, warn_fallback = TRUE) {
       # Create gpuTensor objects and perform dot product
       tensor_a <- gpu_tensor(a, length(a))
       tensor_b <- gpu_tensor(b, length(b))
-      sum(tensor_a * tensor_b)
+      tensor_sum(tensor_a * tensor_b)
     }, error = function(e) {
       # GPU failed, fall back to CPU
       if (warn_fallback) {

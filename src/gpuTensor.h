@@ -48,6 +48,13 @@ enum class Device {
     CUDA
 };
 
+// BEGIN Column-major layout enforcement
+enum class MemoryLayout { ColumnMajor, RowMajor };
+static constexpr MemoryLayout kDefaultMemoryLayout = MemoryLayout::ColumnMajor;
+static_assert(kDefaultMemoryLayout == MemoryLayout::ColumnMajor,
+              "acediaR currently supports only column-major tensor layout; compile-time enforcement triggered.");
+// END Column-major layout enforcement
+
 /**
  * @brief Comprehensive data type enumeration for tensors
  */

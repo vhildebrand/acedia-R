@@ -9,6 +9,8 @@
 #include <vector>
 #include "kernel_utils.cuh"
 #include "tensor_kernels.cu"
+#include "../cuda_utils.h"
+#include <cublas_v2.h>
 
 // Function objects for operations - with both __host__ and __device__ support
 struct AddOp {
@@ -1009,15 +1011,61 @@ void tensor_mul_broadcast_float64(double* result, const double* a, const double*
 
 // Matrix multiplication operations
 void tensor_matmul_float16(half* C, const half* A, const half* B, size_t M, size_t N, size_t K) {
-    launch_matmul<half>(C, A, B, M, N, K);
+    const float alpha = 1.0f;
+    const float beta  = 0.0f;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    cublasStatus_t stat = cublasGemmEx(
+        handle,
+        CUBLAS_OP_N, CUBLAS_OP_N,
+        static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
+        &alpha,
+        A, CUDA_R_16F, static_cast<int>(M),
+        B, CUDA_R_16F, static_cast<int>(K),
+        &beta,
+        C, CUDA_R_16F, static_cast<int>(M),
+        CUDA_R_32F,
+        CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasGemmEx failed in tensor_matmul_float16");
+    }
 }
 
 void tensor_matmul_float32(float* C, const float* A, const float* B, size_t M, size_t N, size_t K) {
-    launch_matmul<float>(C, A, B, M, N, K);
+    const float alpha = 1.0f;
+    const float beta  = 0.0f;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    cublasStatus_t stat = cublasGemmEx(
+        handle,
+        CUBLAS_OP_N, CUBLAS_OP_N,
+        static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
+        &alpha,
+        A, CUDA_R_32F, static_cast<int>(M),
+        B, CUDA_R_32F, static_cast<int>(K),
+        &beta,
+        C, CUDA_R_32F, static_cast<int>(M),
+        CUDA_R_32F,
+        CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasGemmEx failed in tensor_matmul_float32");
+    }
 }
 
 void tensor_matmul_float64(double* C, const double* A, const double* B, size_t M, size_t N, size_t K) {
-    launch_matmul<double>(C, A, B, M, N, K);
+    const double alpha = 1.0;
+    const double beta  = 0.0;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    cublasStatus_t stat = cublasDgemm(
+        handle,
+        CUBLAS_OP_N, CUBLAS_OP_N,
+        static_cast<int>(M), static_cast<int>(N), static_cast<int>(K),
+        &alpha,
+        A, static_cast<int>(M),
+        B, static_cast<int>(K),
+        &beta,
+        C, static_cast<int>(M));
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasDgemm failed in tensor_matmul_float64");
+    }
 }
 
 // Outer product operations
@@ -1034,29 +1082,78 @@ void tensor_outer_product_float64(double* result, const double* a, const double*
 }
 
 // Matrix-vector multiplication operations
-void tensor_matvec_float16(half* result, const half* A, const half* v, size_t M, size_t N) {
-    launch_matvec<half>(result, A, v, M, N);
-}
-
 void tensor_matvec_float32(float* result, const float* A, const float* v, size_t M, size_t N) {
-    launch_matvec<float>(result, A, v, M, N);
+    const float alpha = 1.0f;
+    const float beta  = 0.0f;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    cublasStatus_t stat = cublasSgemv(
+        handle,
+        CUBLAS_OP_N,
+        static_cast<int>(M), static_cast<int>(N),
+        &alpha,
+        A, static_cast<int>(M),
+        v, 1,
+        &beta,
+        result, 1);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasSgemv failed in tensor_matvec_float32");
+    }
 }
 
 void tensor_matvec_float64(double* result, const double* A, const double* v, size_t M, size_t N) {
-    launch_matvec<double>(result, A, v, M, N);
+    const double alpha = 1.0;
+    const double beta  = 0.0;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    cublasStatus_t stat = cublasDgemv(
+        handle,
+        CUBLAS_OP_N,
+        static_cast<int>(M), static_cast<int>(N),
+        &alpha,
+        A, static_cast<int>(M),
+        v, 1,
+        &beta,
+        result, 1);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasDgemv failed in tensor_matvec_float64");
+    }
 }
 
 // Vector-matrix multiplication operations
-void tensor_vecmat_float16(half* result, const half* v, const half* A, size_t M, size_t N) {
-    launch_vecmat<half>(result, v, A, M, N);
-}
-
 void tensor_vecmat_float32(float* result, const float* v, const float* A, size_t M, size_t N) {
-    launch_vecmat<float>(result, v, A, M, N);
+    const float alpha = 1.0f;
+    const float beta  = 0.0f;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    // v^T (1×M) * A (M×N) = result (1×N)
+    cublasStatus_t stat = cublasSgemv(
+        handle,
+        CUBLAS_OP_T,
+        static_cast<int>(M), static_cast<int>(N),
+        &alpha,
+        A, static_cast<int>(M),
+        v, 1,
+        &beta,
+        result, 1);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasSgemv (vecmat) failed in tensor_vecmat_float32");
+    }
 }
 
 void tensor_vecmat_float64(double* result, const double* v, const double* A, size_t M, size_t N) {
-    launch_vecmat<double>(result, v, A, M, N);
+    const double alpha = 1.0;
+    const double beta  = 0.0;
+    cublasHandle_t handle = cuda_utils::get_cublas_handle();
+    cublasStatus_t stat = cublasDgemv(
+        handle,
+        CUBLAS_OP_T,
+        static_cast<int>(M), static_cast<int>(N),
+        &alpha,
+        A, static_cast<int>(M),
+        v, 1,
+        &beta,
+        result, 1);
+    if (stat != CUBLAS_STATUS_SUCCESS) {
+        throw std::runtime_error("cublasDgemv (vecmat) failed in tensor_vecmat_float64");
+    }
 }
 
 // Strided copy operations
