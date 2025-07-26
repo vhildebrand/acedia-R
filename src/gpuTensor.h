@@ -246,32 +246,97 @@ public:
     bool operator!=(const Shape& other) const { return dims != other.dims; }
     
     bool broadcastable_with(const Shape& other) const {
-        size_t max_dims = std::max(ndims(), other.ndims());
-        for (size_t i = 0; i < max_dims; ++i) {
-            size_t dim1 = (i < ndims()) ? dims[ndims() - 1 - i] : 1;
-            size_t dim2 = (i < other.ndims()) ? other.dims[other.ndims() - 1 - i] : 1;
-            if (dim1 != dim2 && dim1 != 1 && dim2 != 1) {
-                return false;
+        const Shape& a = *this;
+        const Shape& b = other;
+
+        size_t len_a = a.ndims();
+        size_t len_b = b.ndims();
+        size_t max_len = std::max(len_a, len_b);
+
+        // Helper lambda that checks compatibility given an offset for the shorter tensor
+        auto is_compatible = [&](const Shape& shorter, const Shape& longer, size_t offset) {
+            for (size_t i = 0; i < max_len; ++i) {
+                size_t dim_short = 1;
+                if (i >= offset && i < offset + shorter.ndims()) {
+                    dim_short = shorter.dims[i - offset];
+                }
+                size_t dim_long = longer.dims[i];
+
+                if (dim_short != dim_long && dim_short != 1 && dim_long != 1) return false;
             }
+            return true;
+        };
+
+        // If equal length, simple element-wise check
+        if (len_a == len_b) {
+            return is_compatible(a, b, 0); // either order works
         }
-        return true;
+
+        // Identify shorter and longer
+        const Shape& shorter = (len_a < len_b) ? a : b;
+        const Shape& longer  = (len_a < len_b) ? b : a;
+        size_t len_short = shorter.ndims();
+
+        // Try every possible offset where the shorter shape could align inside longer
+        for (size_t offset = 0; offset <= max_len - len_short; ++offset) {
+            if (is_compatible(shorter, longer, offset)) return true;
+        }
+
+        return false;
     }
-    
+ 
     Shape broadcast_with(const Shape& other) const {
         if (!broadcastable_with(other)) {
             throw std::runtime_error("Shapes are not broadcastable");
         }
-        
-        size_t max_dims = std::max(ndims(), other.ndims());
-        std::vector<size_t> result_dims(max_dims);
-        
-        for (size_t i = 0; i < max_dims; ++i) {
-            size_t dim1 = (i < ndims()) ? dims[ndims() - 1 - i] : 1;
-            size_t dim2 = (i < other.ndims()) ? other.dims[other.ndims() - 1 - i] : 1;
-            result_dims[max_dims - 1 - i] = std::max(dim1, dim2);
+
+        size_t max_len = std::max(ndims(), other.ndims());
+        std::vector<size_t> out_dims(max_len, 1);
+
+        // We'll compute using the offset that works (prefer the first that matches)
+        const Shape& a = *this;
+        const Shape& b = other;
+
+        size_t len_a = a.ndims();
+        size_t len_b = b.ndims();
+
+        auto fill_dims = [&](const Shape& shorter, const Shape& longer, size_t offset) {
+            for (size_t i = 0; i < max_len; ++i) {
+                size_t dim_short = 1;
+                if (i >= offset && i < offset + shorter.ndims()) {
+                    dim_short = shorter.dims[i - offset];
+                }
+                size_t dim_long = longer.dims[i];
+                out_dims[i] = std::max(dim_short, dim_long);
+            }
+        };
+
+        if (len_a == len_b) {
+            fill_dims(a, b, 0);
+        } else if (len_a < len_b) {
+            // Sweep offsets for a inside b
+            for (size_t off = 0; off <= max_len - len_a; ++off) {
+                bool ok = true;
+                for (size_t i = 0; i < max_len; ++i) {
+                    size_t dim_a = (i >= off && i < off + len_a) ? a.dims[i - off] : 1;
+                    size_t dim_b = b.dims[i];
+                    if (dim_a != dim_b && dim_a != 1 && dim_b != 1) { ok = false; break; }
+                }
+                if (ok) { fill_dims(a, b, off); break; }
+            }
+        } else { // len_b < len_a
+            for (size_t off = 0; off <= max_len - len_b; ++off) {
+                bool ok = true;
+                for (size_t i = 0; i < max_len; ++i) {
+                    size_t dim_b = (i >= off && i < off + len_b) ? b.dims[i - off] : 1;
+                    size_t dim_a = a.dims[i];
+                    if (dim_a != dim_b && dim_a != 1 && dim_b != 1) { ok = false; break; }
+                }
+                if (ok) { fill_dims(b, a, off); break; }
+            }
         }
-        
-        return Shape(result_dims);
+
+        return Shape(out_dims);
     }
 
 #ifndef __CUDA_ARCH__

@@ -1969,4 +1969,69 @@ void tensor_scalar_div_strided_float64(const cuda_utils::TensorDescriptor& out_d
 
 // ... existing code ...
 
+// Broadcast subtraction operations
+void tensor_sub_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, SubOp());
+}
+
+void tensor_sub_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, SubOp());
+}
+
+// Broadcast division operations
+void tensor_div_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, DivOp());
+}
+
+void tensor_div_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, DivOp());
+}
+
+// Broadcast element-wise max operations
+void tensor_max_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MaxOp());
+}
+
+void tensor_max_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MaxOp());
+}
+
+// Broadcast element-wise pow operations
+void tensor_pow_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, PowOp());
+}
+
+void tensor_pow_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, PowOp());
+}
+
+// Broadcast element-wise min operations
+void tensor_min_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MinOp());
+}
+
+void tensor_min_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                                  const int* b_strides, const int* result_strides,
+                                  const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MinOp());
+}
+
 } // extern "C"

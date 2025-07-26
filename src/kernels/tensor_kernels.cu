@@ -1630,6 +1630,18 @@ template __global__ void broadcast_binary_kernel<double, LessOp>(double*, const 
 template __global__ void broadcast_binary_kernel<float, EqualOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
 template __global__ void broadcast_binary_kernel<double, EqualOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
 
+// Additional broadcast arithmetic operations  
+template __global__ void broadcast_binary_kernel<float, SubOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, SubOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<float, DivOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, DivOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<float, MaxOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, MaxOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<float, PowOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, PowOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<float, MinOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, MinOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+
 template __global__ void strided_copy_kernel<float>(float*, const float*, const int*, const int*, int, size_t);
 template __global__ void strided_copy_kernel<double>(double*, const double*, const int*, const int*, int, size_t);
 template __global__ void strided_copy_kernel<half>(half*, const half*, const int*, const int*, int, size_t);
@@ -1682,6 +1694,8 @@ template __global__ void argmin_kernel<double>(int64_t*, const double*, size_t);
 
 // Helper kernel instantiations
 template __global__ void copy_values_at_indices_kernel<float>(float*, const float*, const int64_t*, int, float);
-template __global__ void copy_values_at_indices_kernel<double>(double*, const double*, const int64_t*, int, double); 
+template __global__ void copy_values_at_indices_kernel<double>(double*, const double*, const int64_t*, int, double);
+
+
 
  

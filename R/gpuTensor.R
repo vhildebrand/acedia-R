@@ -212,24 +212,22 @@ to_numeric <- function(x) {
 #' @return A gpuTensor filled with ones
 #' @export
 create_ones_like <- function(tensor) {
+  # Validate input -----------------------------------------------------------
   if (!inherits(tensor, "gpuTensor")) {
     stop("Input must be a gpuTensor")
   }
-  
-  # Get tensor properties
+
+  # Extract the required metadata -----------------------------------------
   tensor_shape <- shape(tensor)
-  tensor_dtype <- attr(tensor, "dtype", exact=TRUE) %||% "double"
-  
-  # Create empty tensor with same properties
-  ones <- empty_tensor(tensor_shape, dtype = tensor_dtype)
-  
-  # Fill with ones using scalar addition: 0 + 1 = 1
-  zeros <- empty_tensor(tensor_shape, dtype = tensor_dtype)
-  # Use scalar addition to fill with ones
-  result <- tensor_scalar_add_unified(zeros, 1.0)
-  
-  class(result) <- c("gpuTensor", class(result))
-  return(result)
+  tensor_dtype <- dtype(tensor)  # uses S3 method, guarantees correct string
+
+  # Allocate a contiguous R vector of ones (host) and copy to GPU ----------
+  ones_host <- rep(1, prod(tensor_shape))
+
+  # gpu_tensor() handles the data-transfer + class assignment --------------
+  ones_gpu <- gpu_tensor(ones_host, shape = tensor_shape, dtype = tensor_dtype)
+
+  return(ones_gpu)
 }
 
 #' Get Tensor Shape
