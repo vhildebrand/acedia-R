@@ -191,7 +191,8 @@ as.vector.gpuTensor <- function(x, mode = "any") {
 as.numeric.gpuTensor <- function(x, ...) {
   # Convert to array first, then to numeric
   arr <- as.array(x)
-  return(as.numeric(arr))
+  # Use explicit base::as.numeric to avoid recursive calls
+  return(base::as.numeric(arr))
 }
 
 # Also add a direct conversion function as backup
@@ -201,6 +202,27 @@ to_numeric <- function(x) {
     return(as.numeric(as.array(x)))
   } else {
     return(as.numeric(x))
+  }
+}
+
+#' Convert single-element tensor to scalar numeric
+#' 
+#' Helper function to convert single-element gpuTensor to R numeric scalar.
+#' This is a workaround for primitive as.numeric dispatch issues.
+#' 
+#' @param x A gpuTensor object, preferably single-element
+#' @return A numeric scalar
+#' @export
+tensor_to_scalar <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("x must be a gpuTensor")
+  }
+  arr <- as.array(x)
+  if (length(arr) == 1) {
+    return(base::as.numeric(arr))
+  } else {
+    warning("Converting multi-element tensor to scalar, using first element")
+    return(base::as.numeric(arr[1]))
   }
 }
 
@@ -1176,6 +1198,12 @@ size.gpuTensor <- function(x) {
 # Package load hook to ensure proper method registration
 .onLoad <- function(libname, pkgname) {
   # Force registration of as.numeric method for primitives
+  registerS3method("as.numeric", "gpuTensor", as.numeric.gpuTensor)
+}
+
+# Workaround for primitive as.numeric dispatch issue
+.onAttach <- function(libname, pkgname) {
+  # Re-register the method when package is attached
   registerS3method("as.numeric", "gpuTensor", as.numeric.gpuTensor)
 }
 
@@ -2262,6 +2290,10 @@ rnorm <- function(x, ...) {
 #' Default method for rnorm generic
 #' @export
 rnorm.default <- function(x, mean = 0, sd = 1, ...) {
+  # Check if this looks like it should be a tensor operation
+  if (is.vector(x) || is.matrix(x) || is.array(x)) {
+    stop("rnorm() for non-gpuTensor objects should use stats::rnorm(n, mean, sd). Use stats::rnorm() directly for standard random generation.")
+  }
   stats::rnorm(x, mean = mean, sd = sd, ...)
 }
 
@@ -2278,6 +2310,17 @@ rnorm.default <- function(x, mean = 0, sd = 1, ...) {
 rnorm.gpuTensor <- function(x, mean = 0, sd = 1, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
+  }
+  
+  # Validate parameters
+  if (!is.numeric(mean) || !is.numeric(sd)) {
+    stop("mean and sd must be numeric")
+  }
+  if (length(mean) != 1 || length(sd) != 1) {
+    stop("mean and sd must be single values")
+  }
+  if (sd <= 0) {
+    stop("sd must be positive")
   }
   
   # Use the tensor's shape and dtype
@@ -2302,6 +2345,10 @@ runif <- function(x, ...) {
 #' Default method for runif generic
 #' @export
 runif.default <- function(x, min = 0, max = 1, ...) {
+  # Check if this looks like it should be a tensor operation
+  if (is.vector(x) || is.matrix(x) || is.array(x)) {
+    stop("runif() for non-gpuTensor objects should use stats::runif(n, min, max). Use stats::runif() directly for standard random generation.")
+  }
   stats::runif(x, min = min, max = max, ...)
 }
 
@@ -2318,6 +2365,17 @@ runif.default <- function(x, min = 0, max = 1, ...) {
 runif.gpuTensor <- function(x, min = 0, max = 1, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
+  }
+  
+  # Validate parameters
+  if (!is.numeric(min) || !is.numeric(max)) {
+    stop("min and max must be numeric")
+  }
+  if (length(min) != 1 || length(max) != 1) {
+    stop("min and max must be single values")
+  }
+  if (min >= max) {
+    stop("min must be less than max")
   }
   
   # Use the tensor's shape and dtype
@@ -2344,6 +2402,17 @@ runif.gpuTensor <- function(x, min = 0, max = 1, ...) {
 #' @return A gpuTensor filled with random uniform values
 #' @export
 rand_tensor_uniform <- function(shape, dtype = "float", min = 0, max = 1) {
+  # Validate parameters
+  if (!is.numeric(min) || !is.numeric(max)) {
+    stop("min and max must be numeric")
+  }
+  if (length(min) != 1 || length(max) != 1) {
+    stop("min and max must be single values")
+  }
+  if (min >= max) {
+    stop("min must be less than max")
+  }
+  
   # Generate base random tensor [0,1)
   result <- rand_tensor(shape, dtype = dtype)
   
@@ -2365,5 +2434,16 @@ rand_tensor_uniform <- function(shape, dtype = "float", min = 0, max = 1) {
 #' @return A gpuTensor filled with random normal values
 #' @export
 rand_tensor_normal <- function(shape, mean = 0, sd = 1, dtype = "float") {
+  # Validate parameters
+  if (!is.numeric(mean) || !is.numeric(sd)) {
+    stop("mean and sd must be numeric")
+  }
+  if (length(mean) != 1 || length(sd) != 1) {
+    stop("mean and sd must be single values")
+  }
+  if (sd <= 0) {
+    stop("sd must be positive")
+  }
+  
   return(rnorm_tensor(shape, mean = mean, sd = sd, dtype = dtype))
 }

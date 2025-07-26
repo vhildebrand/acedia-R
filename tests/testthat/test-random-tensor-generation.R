@@ -521,11 +521,11 @@ test_that("random tensor generation handles edge cases", {
   expect_equal(size(tiny_normal), 1)
   
   # Check single values are in expected ranges
-  uniform_val <- as.numeric(tiny_uniform)
+  uniform_val <- tensor_to_scalar(tiny_uniform)
   expect_true(uniform_val >= 0.0 && uniform_val < 1.0)
   
   # Normal value should be finite
-  normal_val <- as.numeric(tiny_normal)
+  normal_val <- tensor_to_scalar(tiny_normal)
   expect_true(is.finite(normal_val))
   
   # Test with extreme parameters (but still valid)
