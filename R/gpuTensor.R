@@ -1817,7 +1817,24 @@ repeat_tensor <- function(x, reps) tensor_repeat_unified(x, as.integer(reps))
 
 #' Pad tensor
 #' @export
-pad_tensor <- function(x, pad_width, mode="constant", value=0) tensor_pad_unified(x, pad_width, mode, value)
+pad_tensor <- function(x, pad_width, mode="constant", value=0) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Convert pad_width vector to required matrix format
+  # pad_width should be c(pad_before_dim1, pad_after_dim1, pad_before_dim2, pad_after_dim2, ...)
+  ndims <- length(shape(x))
+  
+  if (length(pad_width) != ndims * 2) {
+    stop("pad_width must have length ndims * 2")
+  }
+  
+  # Reshape to matrix: each row is [pad_before, pad_after] for that dimension
+  pad_matrix <- matrix(pad_width, nrow = ndims, ncol = 2, byrow = TRUE)
+  
+  tensor_pad_unified(x, pad_matrix, mode, value)
+}
 
 #' Tensor info (list)
 #' @export

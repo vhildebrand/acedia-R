@@ -158,7 +158,7 @@ test_that("Mean reduction works correctly", {
   vec_data <- c(1, 2, 3, 4, 5)
   vec_tensor <- as_tensor(vec_data, dtype = "float")
   
-  if (exists("mean.gpuTensor")) {
+  if ("mean.gpuTensor" %in% methods("mean")) {
     mean_result <- mean(vec_tensor)
     # Handle both scalar returns and tensor returns
     if (inherits(mean_result, "gpuTensor")) {
@@ -537,7 +537,7 @@ test_that("Repeat and Pad operations work correctly", {
     tryCatch({
       p_gpu <- pad_tensor(t, c(1, 1, 1, 1))  # pad 1 on each side
       expect_s3_class(p_gpu, "gpuTensor")
-      expect_equal(shape(p_gpu), c(4, 4))  # 2+1+1, 2+1+1
+      expect_equal(shape(p_gpu), c(4L, 4L))  # 2+1+1, 2+1+1
     }, error = function(e) {
       skip(paste("pad_tensor not working:", e$message))
     })

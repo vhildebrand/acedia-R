@@ -254,15 +254,14 @@ test_that("Slice mutation updates parent tensor in-place (GPU verified)", {
   expect_equal(shape(slice1), c(5, 6))
   
   # Modify slice (if slice assignment is supported)
-  if (exists("[<-.gpuTensor")) {
+  # Test if slice assignment works by trying it  
+  if (TRUE) {  # Slice assignment is implemented, just test it
     parent[1, , ] <- parent[1, , ] + 100
     
     # Check that parent was modified
     modified_slice <- parent[1, , ]
     original_plus_100 <- as.array(slice1) + 100
     expect_equal(as.array(modified_slice), original_plus_100, tolerance = 1e-6)
-  } else {
-    skip("Slice assignment not available")
   }
 })
 
@@ -272,7 +271,8 @@ test_that("Slice mutation with different slice patterns (GPU verified)", {
   expect_true(verify_gpu_tensor(mat, "2D matrix creation"))
   
   # Test different slice patterns (if supported)
-  if (exists("[.gpuTensor")) {
+  # Test if slicing works by trying it
+  if (TRUE) {  # Slicing is implemented, just test it
     # Row slice
     row_slice <- mat[2, ]
     expect_equal(length(shape(row_slice)), 1)
@@ -286,8 +286,6 @@ test_that("Slice mutation with different slice patterns (GPU verified)", {
     # Submatrix slice
     sub_slice <- mat[1:2, 2:4]
     expect_equal(shape(sub_slice), c(2, 3))
-  } else {
-    skip("Tensor slicing not available")
   }
 })
 
