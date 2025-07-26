@@ -4,7 +4,7 @@
 \alias{which.min.gpuTensor}
 \title{Which Min}
 \usage{
-which.min.gpuTensor(x, ...)
+\method{which.min}{gpuTensor}(x, ...)
 }
 \arguments{
 \item{x}{A gpuTensor object}

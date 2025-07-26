@@ -4,7 +4,7 @@
 \alias{which.max.gpuTensor}
 \title{Which Max}
 \usage{
-which.max.gpuTensor(x, ...)
+\method{which.max}{gpuTensor}(x, ...)
 }
 \arguments{
 \item{x}{A gpuTensor object}

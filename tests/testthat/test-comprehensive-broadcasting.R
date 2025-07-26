@@ -416,8 +416,8 @@ test_that("broadcasting error handling works correctly", {
 
 test_that("broadcasting maintains GPU execution with large tensors", {
   # Test broadcasting with larger tensors to ensure GPU execution
-  large_mat <- as_tensor(matrix(runif(10000), nrow = 100, ncol = 100), dtype = "float")
-  vec_broadcast <- as_tensor(runif(100), dtype = "float")
+  large_mat <- as_tensor(matrix(stats::runif(10000), nrow = 100, ncol = 100), dtype = "float")
+  vec_broadcast <- as_tensor(stats::runif(100), dtype = "float")
   
   # Time broadcasting operation
   broadcast_time <- system.time({
@@ -435,7 +435,8 @@ test_that("broadcasting maintains GPU execution with large tensors", {
   large_mat_subset <- as.array(large_mat)[1:5, 1:5]
   vec_subset <- as.vector(vec_broadcast)[1:5]
   result_subset <- as.array(result)[1:5, 1:5]
-  expected_subset <- sweep(large_mat_subset, 2, vec_subset, "+")
+  # Use R's native broadcasting behavior (row-wise), not sweep column-wise
+  expected_subset <- large_mat_subset + vec_subset
   
   expect_equal(result_subset, expected_subset, tolerance = 1e-6)
 })
@@ -453,9 +454,9 @@ test_that("broadcasting works in complex expression chains", {
   # Chain: (a + b) * c
   result <- (a + b) * c
   
-  # Compute expected step by step
-  step1 <- sweep(as.array(a), 2, as.vector(b), "+")  # a + b
-  step2 <- sweep(step1, 2, as.vector(c), "*")        # result * c
+  # Compute expected step by step using R's native broadcasting (row-wise)
+  step1 <- as.array(a) + as.vector(b)  # a + b
+  step2 <- step1 * as.vector(c)        # result * c
   
   expect_tensor_equal(result, step2)
   expect_equal(shape(result), c(2, 2))

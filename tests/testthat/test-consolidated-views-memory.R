@@ -413,7 +413,7 @@ test_that("Phase 3.3 error handling for invalid assignments", {
 test_that("Views share memory efficiently", {
   # Create large tensor
   n <- 1000
-  large_data <- matrix(runif(n*n), nrow = n, ncol = n)
+  large_data <- matrix(stats::runif(n*n), nrow = n, ncol = n)
   large_tensor <- as_tensor(large_data, dtype = "float")
   
   # Create transpose view

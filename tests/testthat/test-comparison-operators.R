@@ -480,7 +480,7 @@ test_that("comparison results can be used for indexing and masking", {
 test_that("comparison operators maintain GPU execution", {
   # Test with larger tensors to ensure GPU path
   n <- 10000
-  data_large <- runif(n, -10, 10)
+  data_large <- stats::runif(n, -10, 10)
   tensor_large <- as_tensor(data_large, dtype = "float")
   
   # Test various comparison operations

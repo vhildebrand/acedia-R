@@ -321,9 +321,9 @@ test_that("Linear algebra operations can be chained", {
 test_that("Linear algebra operations maintain GPU execution", {
   # Test with larger tensors to ensure GPU path
   n <- 100
-  A_large <- matrix(runif(n*n), nrow = n, ncol = n)
-  B_large <- matrix(runif(n*n), nrow = n, ncol = n)
-  v_large <- runif(n)
+  A_large <- matrix(stats::runif(n*n), nrow = n, ncol = n)
+  B_large <- matrix(stats::runif(n*n), nrow = n, ncol = n)
+  v_large <- stats::runif(n)
   
   A_tensor <- as_tensor(A_large, dtype = "float")
   B_tensor <- as_tensor(B_large, dtype = "float")
@@ -353,8 +353,8 @@ test_that("Large outer product performance test", {
   n1 <- 500  # Reduced size for CI
   n2 <- 500
   
-  a_large <- runif(n1)
-  b_large <- runif(n2)
+  a_large <- stats::runif(n1)
+  b_large <- stats::runif(n2)
   
   a_tensor_large <- as_tensor(a_large, dtype = "float")
   b_tensor_large <- as_tensor(b_large, dtype = "float")
@@ -380,7 +380,7 @@ test_that("Large outer product performance test", {
 test_that("Matrix-vector operations with transpose views work efficiently", {
   # Test from test_noncontiguous.R - operations on transpose views
   # Create larger matrix and transpose it
-  large_data <- matrix(runif(400), nrow = 20, ncol = 20)
+  large_data <- matrix(stats::runif(400), nrow = 20, ncol = 20)
   large_matrix <- as_tensor(large_data, dtype = "float")
   
   # Create transpose view
@@ -388,7 +388,7 @@ test_that("Matrix-vector operations with transpose views work efficiently", {
   expect_equal(shape(transposed_matrix), c(20, 20))
   
   # Vector for multiplication
-  v_data <- runif(20)
+  v_data <- stats::runif(20)
   v_tensor <- as_tensor(v_data, dtype = "float")
   
   # Matrix-vector multiplication with transpose view

@@ -445,8 +445,8 @@ test_that("dtype precision differences are respected", {
   tensor_f64 <- as_tensor(c(precise_value), dtype = "double")
   
   # Extract values
-  val_f32 <- as.numeric(tensor_f32)
-  val_f64 <- as.numeric(tensor_f64)
+  val_f32 <- as.numeric(as.array(tensor_f32))
+  val_f64 <- as.numeric(as.array(tensor_f64))
   
   # Float64 should be closer to the original precise value
   expect_true(abs(val_f64 - precise_value) <= abs(val_f32 - precise_value))
@@ -455,8 +455,8 @@ test_that("dtype precision differences are respected", {
   small_increment <- 1e-10
   
   # This increment might be lost in float32 but preserved in float64
-  result_f32 <- as.numeric(tensor_f32 + small_increment)
-  result_f64 <- as.numeric(tensor_f64 + small_increment)
+  result_f32 <- as.numeric(as.array(tensor_f32 + small_increment))
+  result_f64 <- as.numeric(as.array(tensor_f64 + small_increment))
   
   # Float64 should show the increment more accurately
   diff_f32 <- abs((result_f32 - val_f32) - small_increment)
@@ -473,7 +473,7 @@ test_that("complex operations work correctly with both dtypes", {
   # Test a complex chain of operations with both dtypes
   test_complex_chain <- function(dtype) {
     # Create test data
-    A <- as_tensor(matrix(runif(9, 0.5, 2.0), nrow = 3, ncol = 3), dtype = dtype)
+    A <- as_tensor(matrix(stats::runif(9, 0.5, 2.0), nrow = 3, ncol = 3), dtype = dtype)
     v <- as_tensor(c(1.5, 2.5, 3.5), dtype = dtype)
     
     # Complex operation chain

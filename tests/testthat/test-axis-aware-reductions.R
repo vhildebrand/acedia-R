@@ -170,8 +170,8 @@ test_that("argmax() and argmin() work correctly", {
   # Global argmax and argmin
   global_argmax <- argmax(tensor_2d)
   global_argmin <- argmin(tensor_2d)
-  expected_global_argmax <- which.max(as.vector(data_2d))  # R uses 1-based indexing
-  expected_global_argmin <- which.min(as.vector(data_2d))
+  expected_global_argmax <- base::which.max(as.vector(data_2d))  # R uses 1-based indexing
+  expected_global_argmin <- base::which.min(as.vector(data_2d))
   expect_equal(global_argmax, expected_global_argmax)
   expect_equal(global_argmin, expected_global_argmin)
   

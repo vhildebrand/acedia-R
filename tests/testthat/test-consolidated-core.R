@@ -454,8 +454,8 @@ test_that("Basic error handling works", {
 test_that("Operations maintain GPU execution", {
   # Test with moderately large tensors
   n <- 1000
-  a_data <- runif(n)
-  b_data <- runif(n)
+  a_data <- stats::runif(n)
+  b_data <- stats::runif(n)
   
   a_tensor <- as_tensor(a_data, dtype = "float")
   b_tensor <- as_tensor(b_data, dtype = "float")
@@ -478,7 +478,7 @@ test_that("Softmax and Argmax work correctly on GPU", {
   }
   
   set.seed(123)
-  x <- runif(10, -3, 3)
+  x <- stats::runif(10, -3, 3)
   tensor_x <- as_tensor(x, dtype = "float")
   
   # Softmax
@@ -490,7 +490,7 @@ test_that("Softmax and Argmax work correctly on GPU", {
   
   # Argmax
   am_gpu <- argmax(tensor_x)
-  am_cpu <- which.max(x)
+  am_cpu <- base::which.max(x)
   expect_equal(am_gpu, am_cpu)
 })
 

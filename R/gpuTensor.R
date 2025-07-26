@@ -2333,8 +2333,17 @@ rnorm <- function(x, ...) {
 #' Default method for rnorm generic
 #' @export
 rnorm.default <- function(x, mean = 0, sd = 1, ...) {
-  # Use base stats::rnorm for all non-gpuTensor objects
-  stats::rnorm(x, mean = mean, sd = sd, ...)
+  # Check if x is a valid count (numeric scalar) or gpuTensor
+  if (inherits(x, "gpuTensor")) {
+    # This should dispatch to rnorm.gpuTensor, but fallback
+    stop("This should have dispatched to rnorm.gpuTensor")
+  } else if (is.numeric(x) && length(x) == 1 && x >= 0) {
+    # Valid count - use base stats::rnorm
+    stats::rnorm(x, mean = mean, sd = sd, ...)
+  } else {
+    # Invalid input - should be either a gpuTensor or numeric count
+    stop("rnorm method requires a gpuTensor object or numeric count")
+  }
 }
 
 #' Random Normal Tensor Method
@@ -2385,8 +2394,17 @@ runif <- function(x, ...) {
 #' Default method for runif generic
 #' @export
 runif.default <- function(x, min = 0, max = 1, ...) {
-  # Use base stats::runif for all non-gpuTensor objects
-  stats::runif(x, min = min, max = max, ...)
+  # Check if x is a valid count (numeric scalar) or gpuTensor
+  if (inherits(x, "gpuTensor")) {
+    # This should dispatch to runif.gpuTensor, but fallback
+    stop("This should have dispatched to runif.gpuTensor")
+  } else if (is.numeric(x) && length(x) == 1 && x >= 0) {
+    # Valid count - use base stats::runif
+    stats::runif(x, min = min, max = max, ...)
+  } else {
+    # Invalid input - should be either a gpuTensor or numeric count
+    stop("runif method requires a gpuTensor object or numeric count")
+  }
 }
 
 #' Random Uniform Tensor Method  

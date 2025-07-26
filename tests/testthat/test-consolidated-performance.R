@@ -34,8 +34,8 @@ test_that("GPU operations actually run on GPU with parallel execution", {
     if (n > 1e6) next  # Skip very large tests in CI
     
     # Create test data
-    data_a <- runif(n, -1, 1)
-    data_b <- runif(n, -1, 1)
+    data_a <- stats::runif(n, -1, 1)
+    data_b <- stats::runif(n, -1, 1)
     
     # Create GPU tensors
     tensor_a <- as_tensor(data_a, dtype = "float32")
@@ -68,8 +68,8 @@ test_that("GPU tensor operations use parallel CUDA kernels", {
   n <- 1e4
   
   # Test data
-  data_pos <- abs(runif(n, 0.1, 5))  # Positive values for sqrt, log
-  data_exp <- runif(n, -2, 2)        # Values for exp
+      data_pos <- abs(stats::runif(n, 0.1, 5))  # Positive values for sqrt, log
+    data_exp <- stats::runif(n, -2, 2)        # Values for exp
   
   tensor_pos <- as_tensor(data_pos, dtype = "float32")
   tensor_exp <- as_tensor(data_exp, dtype = "float32")
@@ -105,8 +105,8 @@ test_that("CUDA kernel launches are actually parallel", {
     if (n > 2e5) next  # Skip very large in CI
     
     # Create test tensors
-    a_data <- runif(n)
-    b_data <- runif(n)
+    a_data <- stats::runif(n)
+    b_data <- stats::runif(n)
     
     tensor_a <- as_tensor(a_data, dtype = "float32")
     tensor_b <- as_tensor(b_data, dtype = "float32")
@@ -149,8 +149,8 @@ test_that("GPU implementation is appreciably faster than CPU for large vectors",
     if (n > 2e5) next  # Skip very large in CI
     
     # Create test data
-    data_a <- runif(n)
-    data_b <- runif(n)
+    data_a <- stats::runif(n)
+    data_b <- stats::runif(n)
     
     # GPU computation
     tensor_a <- as_tensor(data_a, dtype = "float32")
@@ -188,8 +188,8 @@ test_that("GPU memory operations are efficient", {
   n <- 1e4
   
   # Create and manipulate tensors
-  tensor_a <- as_tensor(runif(n), dtype = "float32")
-  tensor_b <- as_tensor(runif(n), dtype = "float32")
+  tensor_a <- as_tensor(stats::runif(n), dtype = "float32")
+  tensor_b <- as_tensor(stats::runif(n), dtype = "float32")
   
   # Chain of operations that require memory bandwidth
   start_time <- Sys.time()
@@ -229,8 +229,8 @@ test_that("GPU tensor operations scale with parallel execution", {
     if (n > 1e5) next  # Skip very large
     
     # Create tensors
-    tensor_a <- as_tensor(runif(n), dtype = "float32")
-    tensor_b <- as_tensor(runif(n), dtype = "float32")
+    tensor_a <- as_tensor(stats::runif(n), dtype = "float32")
+    tensor_b <- as_tensor(stats::runif(n), dtype = "float32")
     
     # Time operation
     start_time <- Sys.time()
@@ -277,8 +277,8 @@ test_that("Matrix operations maintain GPU execution", {
     if (m * k * n > 1e6) next  # Skip very large
     
     # Create matrices
-    A_data <- matrix(runif(m * k), nrow = m, ncol = k)
-    B_data <- matrix(runif(k * n), nrow = k, ncol = n)
+    A_data <- matrix(stats::runif(m * k), nrow = m, ncol = k)
+    B_data <- matrix(stats::runif(k * n), nrow = k, ncol = n)
     
     A_tensor <- as_tensor(A_data, dtype = "float32")
     B_tensor <- as_tensor(B_data, dtype = "float32")
@@ -344,7 +344,7 @@ test_that("Advanced operations work with different dtypes", {
 test_that("Advanced operations maintain GPU execution with large tensors", {
   # Test advanced operations with larger tensors
   n <- 1e4
-  test_data <- runif(n, -5, 5)
+  test_data <- stats::runif(n, -5, 5)
   
   tensor <- as_tensor(test_data, dtype = "float32")
   expect_true(verify_gpu_tensor(tensor, "large tensor"))
@@ -391,8 +391,8 @@ test_that("Memory bandwidth utilization indicates parallel execution", {
     if (n > 2e5) next  # Skip very large
     
     # Create test data
-    data_a <- runif(n)
-    data_b <- runif(n)
+    data_a <- stats::runif(n)
+    data_b <- stats::runif(n)
     
     tensor_a <- as_tensor(data_a, dtype = "float32")
     tensor_b <- as_tensor(data_b, dtype = "float32")
@@ -456,7 +456,7 @@ test_that("GPU error handling and fallback work correctly", {
 test_that("Mixed operations maintain precision and performance", {
   # Test mixing different operation types
   n <- 1e4
-  data <- runif(n, 0.1, 5.0)  # Positive values
+  data <- stats::runif(n, 0.1, 5.0)  # Positive values
   
   tensor <- as_tensor(data, dtype = "float32")
   expect_true(verify_gpu_tensor(tensor, "mixed operations tensor"))
@@ -491,8 +491,8 @@ test_that("Comprehensive GPU vs CPU runtime comparison", {
     cat(sprintf("\n=== Size %e ===\n", n))
     
     # Create test data
-    data_a <- runif(n)
-    data_b <- runif(n)
+    data_a <- stats::runif(n)
+    data_b <- stats::runif(n)
     
     # GPU tensors
     tensor_a <- as_tensor(data_a, dtype = "float32")

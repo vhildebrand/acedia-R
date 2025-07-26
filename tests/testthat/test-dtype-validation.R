@@ -15,8 +15,8 @@ test_that("unsupported dtype errors are raised", {
 
 test_that("GPU implementation is appreciably faster than CPU for large vectors", {
   n <- 5e5  # 500k elements, large enough to benefit from GPU but quick for CI
-  a <- runif(n)
-  b <- runif(n)
+  a <- stats::runif(n)
+  b <- stats::runif(n)
 
   # CPU baseline
   cpu_time <- system.time({

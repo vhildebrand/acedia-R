@@ -4,12 +4,10 @@
 \alias{rnorm.gpuTensor}
 \title{Random Normal Tensor Method}
 \usage{
-rnorm.gpuTensor(x, n = NULL, mean = 0, sd = 1, ...)
+\method{rnorm}{gpuTensor}(x, mean = 0, sd = 1, ...)
 }
 \arguments{
 \item{x}{A gpuTensor object (used only for method dispatch)}
-
-\item{n}{Integer, number of samples (ignored, uses tensor size)}
 
 \item{mean}{Numeric, mean of normal distribution (default 0)}
 

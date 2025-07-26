@@ -4,12 +4,10 @@
 \alias{runif.gpuTensor}
 \title{Random Uniform Tensor Method}
 \usage{
-runif.gpuTensor(x, n = NULL, min = 0, max = 1, ...)
+\method{runif}{gpuTensor}(x, min = 0, max = 1, ...)
 }
 \arguments{
 \item{x}{A gpuTensor object (used only for method dispatch)}
-
-\item{n}{Integer, number of samples (ignored, uses tensor size)}
 
 \item{min}{Numeric, minimum value (default 0)}
 

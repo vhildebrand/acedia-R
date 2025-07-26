@@ -5,8 +5,8 @@ context("cuBLAS with contiguous and view tensors")
 set.seed(123)
 
 test_that("matmul handles contiguous and transpose views correctly", {
-  A <- matrix(rnorm(64), nrow = 8, ncol = 8)
-  B <- matrix(rnorm(48), nrow = 8, ncol = 6)
+  A <- matrix(stats::rnorm(64), nrow = 8, ncol = 8)
+  B <- matrix(stats::rnorm(48), nrow = 8, ncol = 6)
 
   gA <- gpu_tensor(A, shape = dim(A))
   gB <- gpu_tensor(B, shape = dim(B))
@@ -20,7 +20,7 @@ test_that("matmul handles contiguous and transpose views correctly", {
   gB_t <- transpose(gB)         # 6×8 view
 
   # Now dimensions: (8×8)^T is still 8×8, so use different dims for validity
-  D <- matrix(rnorm(40), nrow = 5, ncol = 8)
+  D <- matrix(stats::rnorm(40), nrow = 5, ncol = 8)
   gD <- gpu_tensor(D, shape = dim(D))
   gD_t <- transpose(gD)          # 8×5 view
 
@@ -30,8 +30,8 @@ test_that("matmul handles contiguous and transpose views correctly", {
 
 
 test_that("matvec with transpose view produces correct result", {
-  A <- matrix(rnorm(30), nrow = 6, ncol = 5)
-  v <- rnorm(5)
+  A <- matrix(stats::rnorm(30), nrow = 6, ncol = 5)
+  v <- stats::rnorm(5)
 
   gA <- gpu_tensor(A, shape = dim(A))
   gv <- gpu_tensor(v, shape = length(v))
