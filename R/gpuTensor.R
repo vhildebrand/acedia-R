@@ -2129,8 +2129,10 @@ which.min.gpuTensor <- function(x, ...) {
     stop("Object is not a gpuTensor")
   }
   
-  # Use existing argmin function
-  return(argmin(x))
+  # Use argmin and convert to R integer
+  result <- .Call('_acediaR_tensor_argmin_unified', x)
+  # C++ already returns 1-based index for R compatibility
+  return(as.integer(as.array(result)))
 }
 
 #' Which Max
@@ -2146,8 +2148,10 @@ which.max.gpuTensor <- function(x, ...) {
     stop("Object is not a gpuTensor")
   }
   
-  # Use existing argmax function
-  return(argmax(x))
+  # Use argmax and convert to R integer
+  result <- .Call('_acediaR_tensor_argmax_unified', x)
+  # C++ already returns 1-based index for R compatibility
+  return(as.integer(as.array(result)))
 }
 
 #' Any
@@ -2290,10 +2294,7 @@ rnorm <- function(x, ...) {
 #' Default method for rnorm generic
 #' @export
 rnorm.default <- function(x, mean = 0, sd = 1, ...) {
-  # Check if this looks like it should be a tensor operation
-  if (is.vector(x) || is.matrix(x) || is.array(x)) {
-    stop("rnorm() for non-gpuTensor objects should use stats::rnorm(n, mean, sd). Use stats::rnorm() directly for standard random generation.")
-  }
+  # Use base stats::rnorm for all non-gpuTensor objects
   stats::rnorm(x, mean = mean, sd = sd, ...)
 }
 
@@ -2345,10 +2346,7 @@ runif <- function(x, ...) {
 #' Default method for runif generic
 #' @export
 runif.default <- function(x, min = 0, max = 1, ...) {
-  # Check if this looks like it should be a tensor operation
-  if (is.vector(x) || is.matrix(x) || is.array(x)) {
-    stop("runif() for non-gpuTensor objects should use stats::runif(n, min, max). Use stats::runif() directly for standard random generation.")
-  }
+  # Use base stats::runif for all non-gpuTensor objects
   stats::runif(x, min = min, max = max, ...)
 }
 
@@ -2446,4 +2444,38 @@ rand_tensor_normal <- function(shape, mean = 0, sd = 1, dtype = "float") {
   }
   
   return(rnorm_tensor(shape, mean = mean, sd = sd, dtype = dtype))
+}
+
+#' Which Max Generic Function
+#'
+#' Find the index of the maximum element.
+#'
+#' @param x Object to find maximum index for
+#' @param ... Additional arguments
+#' @export
+which.max <- function(x, ...) {
+  UseMethod("which.max")
+}
+
+#' Default method for which.max generic
+#' @export
+which.max.default <- function(x, ...) {
+  base::which.max(x, ...)
+}
+
+#' Which Min Generic Function
+#'
+#' Find the index of the minimum element.
+#'
+#' @param x Object to find minimum index for
+#' @param ... Additional arguments
+#' @export
+which.min <- function(x, ...) {
+  UseMethod("which.min")
+}
+
+#' Default method for which.min generic
+#' @export
+which.min.default <- function(x, ...) {
+  base::which.min(x, ...)
 }
