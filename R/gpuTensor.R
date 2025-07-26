@@ -2170,7 +2170,7 @@ any.gpuTensor <- function(x, ...) {
   # Convert to logical array and use base R any
   # TODO: Implement GPU kernel for this
   arr <- as.array(x)
-  return(any(arr))
+  return(any(as.logical(arr)))
 }
 
 #' All
@@ -2189,7 +2189,7 @@ all.gpuTensor <- function(x, ...) {
   # Convert to logical array and use base R all
   # TODO: Implement GPU kernel for this  
   arr <- as.array(x)
-  return(all(arr))
+  return(all(as.logical(arr)))
 }
 
 #' Range
