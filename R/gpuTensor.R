@@ -2248,18 +2248,34 @@ diff.gpuTensor <- function(x, lag = 1, differences = 1, ...) {
   return(as_tensor(result_arr, dtype = dtype(x)))
 }
 
+#' Random Normal Generic Function
+#'
+#' Generate random numbers from normal distribution.
+#'
+#' @param x Object to generate random numbers for
+#' @param ... Additional arguments
+#' @export
+rnorm <- function(x, ...) {
+  UseMethod("rnorm")
+}
+
+#' Default method for rnorm generic
+#' @export
+rnorm.default <- function(x, mean = 0, sd = 1, ...) {
+  stats::rnorm(x, mean = mean, sd = sd, ...)
+}
+
 #' Random Normal Tensor Method
 #'
 #' Generate random numbers from normal distribution for a gpuTensor.
 #'
 #' @param x A gpuTensor object (used only for method dispatch)
-#' @param n Integer, number of samples (ignored, uses tensor size)
 #' @param mean Numeric, mean of normal distribution (default 0)
 #' @param sd Numeric, standard deviation (default 1)
 #' @param ... Additional arguments (ignored)
 #' @return A gpuTensor filled with random normal values
 #' @export
-rnorm.gpuTensor <- function(x, n = NULL, mean = 0, sd = 1, ...) {
+rnorm.gpuTensor <- function(x, mean = 0, sd = 1, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }
@@ -2272,18 +2288,34 @@ rnorm.gpuTensor <- function(x, n = NULL, mean = 0, sd = 1, ...) {
   return(rnorm_tensor(tensor_shape, mean = mean, sd = sd, dtype = tensor_dtype))
 }
 
+#' Random Uniform Generic Function
+#'
+#' Generate random numbers from uniform distribution.
+#'
+#' @param x Object to generate random numbers for
+#' @param ... Additional arguments
+#' @export
+runif <- function(x, ...) {
+  UseMethod("runif")
+}
+
+#' Default method for runif generic
+#' @export
+runif.default <- function(x, min = 0, max = 1, ...) {
+  stats::runif(x, min = min, max = max, ...)
+}
+
 #' Random Uniform Tensor Method  
 #'
 #' Generate random numbers from uniform distribution for a gpuTensor.
 #'
 #' @param x A gpuTensor object (used only for method dispatch)
-#' @param n Integer, number of samples (ignored, uses tensor size)
 #' @param min Numeric, minimum value (default 0)
 #' @param max Numeric, maximum value (default 1)
 #' @param ... Additional arguments (ignored)
 #' @return A gpuTensor filled with random uniform values
 #' @export
-runif.gpuTensor <- function(x, n = NULL, min = 0, max = 1, ...) {
+runif.gpuTensor <- function(x, min = 0, max = 1, ...) {
   if (!inherits(x, "gpuTensor")) {
     stop("Object is not a gpuTensor")
   }

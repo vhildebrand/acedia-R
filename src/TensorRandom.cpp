@@ -53,8 +53,13 @@ SEXP rand_tensor(IntegerVector shape, std::string dtype = "float") {
         }
         
         if (dtype == "float") {
-            // Create tensor and get device pointer
-            auto tensor = std::make_shared<gpuTensor<float>>(Shape(shape_vec));
+            // Create tensor using factory
+            auto tensor_base = TensorFactory::create_empty_tensor<float>(Shape(shape_vec));
+            auto tensor_wrapper = dynamic_cast<TensorWrapper<float>*>(tensor_base.get());
+            if (!tensor_wrapper) {
+                stop("Failed to create tensor wrapper");
+            }
+            auto tensor = tensor_wrapper->tensor_ptr();
             
             // Generate uniform random numbers on GPU
             curandStatus_t status = curandGenerateUniform(global_generator, tensor->data(), total_size);
@@ -63,15 +68,19 @@ SEXP rand_tensor(IntegerVector shape, std::string dtype = "float") {
             }
             
             // Wrap and return
-            XPtr<TensorBase> result_ptr(tensor.get());
-            tensor.release(); // Transfer ownership to XPtr
+            XPtr<TensorBase> result_ptr(tensor_base.release(), true);
             result_ptr.attr("class") = "gpuTensor";
             result_ptr.attr("dtype") = "float";
             return result_ptr;
             
         } else if (dtype == "double") {
-            // Create tensor and get device pointer  
-            auto tensor = std::make_shared<gpuTensor<double>>(Shape(shape_vec));
+            // Create tensor using factory
+            auto tensor_base = TensorFactory::create_empty_tensor<double>(Shape(shape_vec));
+            auto tensor_wrapper = dynamic_cast<TensorWrapper<double>*>(tensor_base.get());
+            if (!tensor_wrapper) {
+                stop("Failed to create tensor wrapper");
+            }
+            auto tensor = tensor_wrapper->tensor_ptr();
             
             // Generate uniform random numbers on GPU
             curandStatus_t status = curandGenerateUniformDouble(global_generator, tensor->data(), total_size);
@@ -80,8 +89,7 @@ SEXP rand_tensor(IntegerVector shape, std::string dtype = "float") {
             }
             
             // Wrap and return
-            XPtr<TensorBase> result_ptr(tensor.get());
-            tensor.release(); // Transfer ownership to XPtr
+            XPtr<TensorBase> result_ptr(tensor_base.release(), true);
             result_ptr.attr("class") = "gpuTensor";
             result_ptr.attr("dtype") = "double";
             return result_ptr;
@@ -122,8 +130,13 @@ SEXP rnorm_tensor(IntegerVector shape, double mean = 0.0, double sd = 1.0, std::
         size_t padded_size = (total_size % 2 == 0) ? total_size : total_size + 1;
         
         if (dtype == "float") {
-            // Create tensor and get device pointer
-            auto tensor = std::make_shared<gpuTensor<float>>(Shape(shape_vec));
+            // Create tensor using factory
+            auto tensor_base = TensorFactory::create_empty_tensor<float>(Shape(shape_vec));
+            auto tensor_wrapper = dynamic_cast<TensorWrapper<float>*>(tensor_base.get());
+            if (!tensor_wrapper) {
+                stop("Failed to create tensor wrapper");
+            }
+            auto tensor = tensor_wrapper->tensor_ptr();
             
             // Allocate temporary buffer if padding is needed
             float* gen_ptr = tensor->data();
@@ -148,15 +161,19 @@ SEXP rnorm_tensor(IntegerVector shape, double mean = 0.0, double sd = 1.0, std::
             }
             
             // Wrap and return
-            XPtr<TensorBase> result_ptr(tensor.get());
-            tensor.release(); // Transfer ownership to XPtr
+            XPtr<TensorBase> result_ptr(tensor_base.release(), true);
             result_ptr.attr("class") = "gpuTensor";
             result_ptr.attr("dtype") = "float";
             return result_ptr;
             
         } else if (dtype == "double") {
-            // Create tensor and get device pointer  
-            auto tensor = std::make_shared<gpuTensor<double>>(Shape(shape_vec));
+            // Create tensor using factory
+            auto tensor_base = TensorFactory::create_empty_tensor<double>(Shape(shape_vec));
+            auto tensor_wrapper = dynamic_cast<TensorWrapper<double>*>(tensor_base.get());
+            if (!tensor_wrapper) {
+                stop("Failed to create tensor wrapper");
+            }
+            auto tensor = tensor_wrapper->tensor_ptr();
             
             // Allocate temporary buffer if padding is needed
             double* gen_ptr = tensor->data();
@@ -180,8 +197,7 @@ SEXP rnorm_tensor(IntegerVector shape, double mean = 0.0, double sd = 1.0, std::
             }
             
             // Wrap and return
-            XPtr<TensorBase> result_ptr(tensor.get());
-            tensor.release(); // Transfer ownership to XPtr
+            XPtr<TensorBase> result_ptr(tensor_base.release(), true);
             result_ptr.attr("class") = "gpuTensor";
             result_ptr.attr("dtype") = "double";
             return result_ptr;

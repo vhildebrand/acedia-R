@@ -636,6 +636,42 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// rand_tensor
+SEXP rand_tensor(IntegerVector shape, std::string dtype);
+RcppExport SEXP _acediaR_rand_tensor(SEXP shapeSEXP, SEXP dtypeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type shape(shapeSEXP);
+    Rcpp::traits::input_parameter< std::string >::type dtype(dtypeSEXP);
+    rcpp_result_gen = Rcpp::wrap(rand_tensor(shape, dtype));
+    return rcpp_result_gen;
+END_RCPP
+}
+// rnorm_tensor
+SEXP rnorm_tensor(IntegerVector shape, double mean, double sd, std::string dtype);
+RcppExport SEXP _acediaR_rnorm_tensor(SEXP shapeSEXP, SEXP meanSEXP, SEXP sdSEXP, SEXP dtypeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type shape(shapeSEXP);
+    Rcpp::traits::input_parameter< double >::type mean(meanSEXP);
+    Rcpp::traits::input_parameter< double >::type sd(sdSEXP);
+    Rcpp::traits::input_parameter< std::string >::type dtype(dtypeSEXP);
+    rcpp_result_gen = Rcpp::wrap(rnorm_tensor(shape, mean, sd, dtype));
+    return rcpp_result_gen;
+END_RCPP
+}
+// set_random_seed
+void set_random_seed(int seed);
+RcppExport SEXP _acediaR_set_random_seed(SEXP seedSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    set_random_seed(seed);
+    return R_NilValue;
+END_RCPP
+}
 // tensor_sum_unified
 SEXP tensor_sum_unified(SEXP tensor_ptr);
 RcppExport SEXP _acediaR_tensor_sum_unified(SEXP tensor_ptrSEXP) {
@@ -880,6 +916,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_acediaR_gpu_available", (DL_FUNC) &_acediaR_gpu_available, 0},
     {"_acediaR_gpu_info", (DL_FUNC) &_acediaR_gpu_info, 0},
     {"_acediaR_gpu_memory_available", (DL_FUNC) &_acediaR_gpu_memory_available, 0},
+    {"_acediaR_rand_tensor", (DL_FUNC) &_acediaR_rand_tensor, 2},
+    {"_acediaR_rnorm_tensor", (DL_FUNC) &_acediaR_rnorm_tensor, 4},
+    {"_acediaR_set_random_seed", (DL_FUNC) &_acediaR_set_random_seed, 1},
     {"_acediaR_tensor_softmax_unified", (DL_FUNC) &_acediaR_tensor_softmax_unified, 1},
     {"_acediaR_tensor_tanh_unified", (DL_FUNC) &_acediaR_tensor_tanh_unified, 1},
     {"_acediaR_tensor_sigmoid_unified", (DL_FUNC) &_acediaR_tensor_sigmoid_unified, 1},

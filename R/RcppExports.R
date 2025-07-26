@@ -217,6 +217,40 @@ tensor_mask_set_scalar_unified <- function(tensor_ptr, mask_ptr, scalar) {
     invisible(.Call(`_acediaR_tensor_mask_set_scalar_unified`, tensor_ptr, mask_ptr, scalar))
 }
 
+#' Create Random Tensor (Uniform Distribution)
+#' 
+#' Generate a tensor filled with random numbers from uniform distribution [0, 1).
+#' 
+#' @param shape Integer vector specifying tensor dimensions
+#' @param dtype String specifying data type ("float" or "double")
+#' @export
+rand_tensor <- function(shape, dtype = "float") {
+    .Call(`_acediaR_rand_tensor`, shape, dtype)
+}
+
+#' Create Random Normal Tensor
+#' 
+#' Generate a tensor filled with random numbers from normal distribution.
+#' 
+#' @param shape Integer vector specifying tensor dimensions
+#' @param mean Numeric mean of the normal distribution (default 0)
+#' @param sd Numeric standard deviation of the normal distribution (default 1)
+#' @param dtype String specifying data type ("float" or "double")
+#' @export
+rnorm_tensor <- function(shape, mean = 0.0, sd = 1.0, dtype = "float") {
+    .Call(`_acediaR_rnorm_tensor`, shape, mean, sd, dtype)
+}
+
+#' Set Random Seed
+#' 
+#' Set the seed for random number generation.
+#' 
+#' @param seed Integer seed value
+#' @export
+set_random_seed <- function(seed) {
+    invisible(.Call(`_acediaR_set_random_seed`, seed))
+}
+
 tensor_sum_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_sum_unified`, tensor_ptr)
 }
