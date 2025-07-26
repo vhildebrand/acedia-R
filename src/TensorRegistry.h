@@ -1218,6 +1218,8 @@ public:
         const std::vector<double>& data, const Shape& shape, DType dtype) {
         
         switch (dtype) {
+            case DType::BOOL:
+                return create_tensor<bool>(data, shape);
             case DType::FLOAT16:
                 return create_tensor<half>(data, shape);
             case DType::FLOAT32:
@@ -1248,6 +1250,8 @@ public:
         const Shape& shape, DType dtype) {
         
         switch (dtype) {
+            case DType::BOOL:
+                return create_empty_tensor<bool>(shape);
             case DType::FLOAT16:
                 return create_empty_tensor<half>(shape);
             case DType::FLOAT32:

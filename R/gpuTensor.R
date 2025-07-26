@@ -27,8 +27,8 @@
 #' 
 #' @export
 gpu_tensor <- function(data, shape, dtype = "double", device = "cuda") {
-  if (!is.numeric(data)) {
-    stop("Data must be numeric")
+  if (!is.numeric(data) && !is.logical(data)) {
+    stop("Data must be numeric or logical")
   }
   
   # Validate and normalize dtype 
@@ -38,8 +38,8 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda") {
     dtype <- "double"  # Map float64 to double for compatibility
   }
   
-  if (!dtype %in% c("double", "float")) {
-    stop("Unsupported dtype. Supported dtypes are 'double', 'float', 'float32', 'float64'")
+  if (!dtype %in% c("double", "float", "bool")) {
+    stop("Unsupported dtype. Supported dtypes are 'double', 'float', 'float32', 'float64', 'bool'")
   }
 
   if (!is.integer(shape)) {
@@ -59,7 +59,9 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda") {
   }
   
   # Create tensor using unified interface
-  tensor <- create_tensor_unified(as.numeric(data), shape, dtype)
+  # Convert logical data to numeric (TRUE->1, FALSE->0) for C++ interface
+  numeric_data <- if (is.logical(data)) as.numeric(data) else as.numeric(data)
+  tensor <- create_tensor_unified(numeric_data, shape, dtype)
   
 
   
@@ -97,8 +99,8 @@ empty_tensor <- function(shape, dtype = "double", device = "cuda") {
     dtype <- "double"  # Map float64 to double for compatibility
   }
   
-  if (!dtype %in% c("double", "float")) {
-    stop("Unsupported dtype. Supported dtypes are 'double', 'float', 'float32', 'float64'")
+  if (!dtype %in% c("double", "float", "bool")) {
+    stop("Unsupported dtype. Supported dtypes are 'double', 'float', 'float32', 'float64', 'bool'")
   }
 
   if (!is.integer(shape)) {
@@ -797,9 +799,9 @@ synchronize <- function(tensor) {
   
   # Create result tensor
   if (length(new_shape) == 0) {
-    # Scalar result
+    # Scalar result - extract directly as numeric
     result_data <- tensor_slice_extract(x, start_indices, end_indices)
-    return(as.numeric(result_data))
+    return(result_data[1])  # Extract first element as scalar
   } else {
     # Tensor result
     result_data <- tensor_slice_extract(x, start_indices, end_indices)
@@ -1227,18 +1229,12 @@ size.gpuTensor <- function(x) {
     if (is.logical(idx) || (inherits(idx, "gpuTensor") && dtype(idx) == "bool")) {
       # Boolean mask assignment: x[mask] <- value
       if (is.logical(idx)) {
-        # Convert R logical vector to gpuTensor
+        # Convert R logical mask to boolean gpuTensor
         if (length(idx) != size(x)) {
           stop("Logical mask must have same length as tensor")
         }
-        # Simple workaround: assign to each TRUE position individually
-        for (i in seq_along(idx)) {
-          if (idx[i]) {
-            # Use single element assignment
-            x[i] <- value
-          }
-        }
-        return(x)
+        # Convert logical mask to boolean tensor (required by C++ implementation)
+        mask_tensor <- as_tensor(idx, dtype = "bool", shape = shape(x))
       } else {
         mask_tensor <- idx
       }

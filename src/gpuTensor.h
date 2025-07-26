@@ -748,9 +748,16 @@ public:
             );
         } else {
             // Fallback to host round-trip for unsupported types
-            std::vector<T> host_buf(shape_.size());
-            copy_to_host(host_buf.data());
-            result.copy_from_host(host_buf.data());
+            if constexpr (std::is_same_v<T, bool>) {
+                // Special handling for bool since std::vector<bool> doesn't have .data()
+                std::vector<bool> host_buf(shape_.size());
+                copy_to_host_bool(host_buf);
+                result.copy_from_host_bool(host_buf);
+            } else {
+                std::vector<T> host_buf(shape_.size());
+                copy_to_host(host_buf.data());
+                result.copy_from_host(host_buf.data());
+            }
         }
         
         return result;
@@ -785,6 +792,54 @@ public:
         
         cudaError_t err = cudaMemcpy(data_, host_ptr, shape_.size() * sizeof(T), cudaMemcpyHostToDevice);
         cudaSafeCall(err, "Failed to copy data from host to GPU");
+    }
+    
+    // Special methods for bool handling (std::vector<bool> has no .data())
+    void copy_to_host_bool(std::vector<bool>& host_buf) const {
+        if constexpr (std::is_same_v<T, bool>) {
+            if (!data_ || shape_.size() == 0) return;
+            
+            // Create temporary buffer with regular bool array
+            auto* temp_buf = new bool[shape_.size()];
+            
+            if (is_contiguous()) {
+                cudaError_t err = cudaMemcpy(temp_buf, data_, shape_.size() * sizeof(bool), cudaMemcpyDeviceToHost);
+                cudaSafeCall(err, "Failed to copy bool data from GPU to host");
+            } else {
+                gpuTensor<bool> contiguous_copy = contiguous();
+                contiguous_copy.copy_to_host_bool(host_buf);
+                delete[] temp_buf;
+                return;
+            }
+            
+            // Copy to std::vector<bool>
+            for (size_t i = 0; i < shape_.size(); ++i) {
+                host_buf[i] = temp_buf[i];
+            }
+            
+            delete[] temp_buf;
+        }
+    }
+    
+    void copy_from_host_bool(const std::vector<bool>& host_buf) {
+        if constexpr (std::is_same_v<T, bool>) {
+            if (!data_ || shape_.size() == 0) return;
+            
+            if (!is_contiguous()) {
+                throw std::runtime_error("Cannot copy to non-contiguous bool tensor from host. Use contiguous() first.");
+            }
+            
+            // Create temporary buffer from std::vector<bool>
+            auto* temp_buf = new bool[shape_.size()];
+            for (size_t i = 0; i < shape_.size(); ++i) {
+                temp_buf[i] = host_buf[i];
+            }
+            
+            cudaError_t err = cudaMemcpy(data_, temp_buf, shape_.size() * sizeof(bool), cudaMemcpyHostToDevice);
+            cudaSafeCall(err, "Failed to copy bool data from host to GPU");
+            
+            delete[] temp_buf;
+        }
     }
     
     // Convert to host vector (host-only function)
