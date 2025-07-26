@@ -336,7 +336,7 @@ test_that("cumulative operations can be chained", {
 test_that("cumulative operations maintain GPU execution", {
   # Test with larger tensors
   n <- 1000
-  data_large <- runif(n, 0.5, 2.0)  # Positive values for cumprod
+  data_large <- stats::runif(n, 0.5, 2.0)  # Positive values for cumprod
   tensor_large <- as_tensor(data_large, dtype = "float")
   
   # All operations should return GPU tensors

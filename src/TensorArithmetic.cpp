@@ -216,18 +216,35 @@ extern "C" {
     );
 }
 
-// Helper to compute broadcast strides
-std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shape& broadcast_shape) {
-     // Column-major: stride of first (fastest) dimension is 1 ----------------
+// Helper function to extract actual strides from TensorBase objects
+std::vector<size_t> get_actual_strides(const TensorBase* tensor) {
+    DType dtype = tensor->dtype();
+    if (dtype == DType::FLOAT32) {
+        auto wrapper = dynamic_cast<const TensorWrapper<float>*>(tensor);
+        if (!wrapper) {
+            throw std::runtime_error("Invalid tensor wrapper for FLOAT32 in stride extraction");
+        }
+        return wrapper->tensor().strides();
+    } else if (dtype == DType::FLOAT64) {
+        auto wrapper = dynamic_cast<const TensorWrapper<double>*>(tensor);
+        if (!wrapper) {
+            throw std::runtime_error("Invalid tensor wrapper for FLOAT64 in stride extraction");
+        }
+        return wrapper->tensor().strides();
+    } else {
+        throw std::runtime_error("Unsupported dtype for stride extraction");
+    }
+}
+
+// Helper to compute broadcast strides using ACTUAL tensor strides (fixed for non-contiguous tensors)
+std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shape& broadcast_shape, const std::vector<size_t>& actual_strides) {
+     // Use actual tensor strides instead of computing fresh ones ----------------
     std::vector<int> strides(broadcast_shape.ndims(), 0);
  
-     // Compute base strides for the original tensor (column-major) -----------
+     // Convert actual strides from size_t to int -----------
      std::vector<int> tensor_strides(tensor_shape.ndims());
-     if (!tensor_strides.empty()) {
-         tensor_strides[0] = 1;
-         for (size_t i = 1; i < tensor_shape.ndims(); ++i) {
-             tensor_strides[i] = tensor_strides[i - 1] * static_cast<int>(tensor_shape[i - 1]);
-         }
+     for (size_t i = 0; i < tensor_shape.ndims(); ++i) {
+         tensor_strides[i] = static_cast<int>(actual_strides[i]);
      }
 
     size_t src_len = tensor_shape.ndims();
@@ -272,6 +289,19 @@ std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shap
     }
 
     return strides;
+}
+
+// Overloaded version for backward compatibility (computes from shape - use with caution for non-contiguous tensors)
+std::vector<int> compute_broadcast_strides(const Shape& tensor_shape, const Shape& broadcast_shape) {
+    // This version computes strides from shape (for contiguous tensors only!)
+    std::vector<size_t> computed_strides(tensor_shape.ndims());
+    if (!computed_strides.empty()) {
+        computed_strides[0] = 1;
+        for (size_t i = 1; i < tensor_shape.ndims(); ++i) {
+            computed_strides[i] = computed_strides[i - 1] * tensor_shape[i - 1];
+        }
+    }
+    return compute_broadcast_strides(tensor_shape, broadcast_shape, computed_strides);
 }
 
 // Forward declarations for functions defined later (needed for calls inside other functions)
@@ -393,8 +423,8 @@ SEXP tensor_sub_unified(SEXP a_ptr, SEXP b_ptr) {
             std::unique_ptr<TensorBase> result_tensor;
             
             // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, get_actual_strides(a_tensor.get()));
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, get_actual_strides(b_tensor.get()));
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
@@ -512,8 +542,8 @@ SEXP tensor_div_unified(SEXP a_ptr, SEXP b_ptr) {
             std::unique_ptr<TensorBase> result_tensor;
             
             // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, get_actual_strides(a_tensor.get()));
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, get_actual_strides(b_tensor.get()));
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
@@ -630,9 +660,29 @@ SEXP tensor_add_unified(SEXP a_ptr, SEXP b_ptr) {
             
             std::unique_ptr<TensorBase> result_tensor;
             
-            // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            // Get actual strides from tensors (CRITICAL fix for non-contiguous tensors)
+            std::vector<size_t> a_actual_strides, b_actual_strides;
+            if (dtype_a == DType::FLOAT32) {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
+                }
+                a_actual_strides = a_wrapper->tensor().strides();
+                b_actual_strides = b_wrapper->tensor().strides();
+            } else if (dtype_a == DType::FLOAT64) {
+                auto a_wrapper = dynamic_cast<const TensorWrapper<double>*>(a_tensor.get());
+                auto b_wrapper = dynamic_cast<const TensorWrapper<double>*>(b_tensor.get());
+                if (!a_wrapper || !b_wrapper) {
+                    throw std::runtime_error("Invalid tensor wrappers for FLOAT64");
+                }
+                a_actual_strides = a_wrapper->tensor().strides();
+                b_actual_strides = b_wrapper->tensor().strides();
+            }
+            
+            // Compute strides for broadcasting using ACTUAL tensor strides
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, a_actual_strides);
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, b_actual_strides);
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
@@ -644,11 +694,9 @@ SEXP tensor_add_unified(SEXP a_ptr, SEXP b_ptr) {
             std::vector<int> shape_int(broadcast_shape.dims.begin(), broadcast_shape.dims.end());
             
             if (dtype_a == DType::FLOAT32) {
+                // a_wrapper and b_wrapper already retrieved above for strides
                 auto a_wrapper = dynamic_cast<const TensorWrapper<float>*>(a_tensor.get());
                 auto b_wrapper = dynamic_cast<const TensorWrapper<float>*>(b_tensor.get());
-                if (!a_wrapper || !b_wrapper) {
-                    throw std::runtime_error("Invalid tensor wrappers for FLOAT32");
-                }
                 auto result = std::make_shared<gpuTensor<float>>(broadcast_shape);
                 tensor_add_broadcast_float32(
                     result->data(),
@@ -887,8 +935,8 @@ SEXP tensor_mul_unified(SEXP a_ptr, SEXP b_ptr) {
             std::unique_ptr<TensorBase> result_tensor;
             
             // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, get_actual_strides(a_tensor.get()));
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, get_actual_strides(b_tensor.get()));
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
@@ -1249,8 +1297,8 @@ SEXP tensor_max_elemwise_unified(SEXP a_ptr, SEXP b_ptr) {
             std::unique_ptr<TensorBase> result_tensor;
             
             // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, get_actual_strides(a_tensor.get()));
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, get_actual_strides(b_tensor.get()));
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
@@ -1401,8 +1449,8 @@ SEXP tensor_min_elemwise_unified(SEXP a_ptr, SEXP b_ptr) {
             std::unique_ptr<TensorBase> result_tensor;
             
             // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, get_actual_strides(a_tensor.get()));
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, get_actual_strides(b_tensor.get()));
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
@@ -1555,8 +1603,8 @@ SEXP tensor_pow_elemwise_unified(SEXP a_ptr, SEXP b_ptr) {
             std::unique_ptr<TensorBase> result_tensor;
             
             // Compute strides for broadcasting
-            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape);
-            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape);
+            auto a_strides = compute_broadcast_strides(a_tensor->shape(), broadcast_shape, get_actual_strides(a_tensor.get()));
+            auto b_strides = compute_broadcast_strides(b_tensor->shape(), broadcast_shape, get_actual_strides(b_tensor.get()));
             std::vector<int> result_strides(broadcast_shape.ndims());
             int stride = 1;
             for (int i = broadcast_shape.ndims() - 1; i >= 0; i--) {
