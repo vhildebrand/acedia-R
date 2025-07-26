@@ -4,7 +4,7 @@
 \alias{pmin.gpuTensor}
 \title{Element-wise minimum of two tensors}
 \usage{
-pmin.gpuTensor(a, b, ...)
+\method{pmin}{gpuTensor}(a, b, ...)
 }
 \arguments{
 \item{a}{A gpuTensor object}

@@ -64,7 +64,7 @@ gpu_tensor <- function(data, shape, dtype = "double", device = "cuda") {
 
   
   # Ensure proper class structure (avoid duplicates)
-  # Fix any= class duplication issues from C++ 
+  # Fix any= class duplication issues from C++ gh 
   current_class <- class(tensor)
   if (length(current_class) > 1 && all(current_class == "gpuTensor")) {
     class(tensor) <- "gpuTensor"
@@ -499,8 +499,8 @@ sum.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
     return(as.numeric(as.array(val)))
   } else {
     # Axis-aware reduction
-    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
-      stop("axis must be a vector of positive integers within tensor dimensions")
+    if (!is.numeric(axis) || any(axis != as.integer(axis)) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers")
     }
     
     # Convert to 0-based indexing for C++
@@ -1025,8 +1025,8 @@ mean.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
     return(as.numeric(as.array(val)))
   } else {
     # Axis-aware reduction
-    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
-      stop("axis must be a vector of positive integers within tensor dimensions")
+    if (!is.numeric(axis) || any(axis != as.integer(axis)) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers")
     }
     
     # Convert to 0-based indexing for C++
@@ -1058,8 +1058,8 @@ max.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
     return(as.numeric(as.array(val)))
   } else {
     # Axis-aware reduction
-    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
-      stop("axis must be a vector of positive integers within tensor dimensions")
+    if (!is.numeric(axis) || any(axis != as.integer(axis)) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers")
     }
     
     # Convert to 0-based indexing for C++
@@ -1091,8 +1091,8 @@ min.gpuTensor <- function(x, axis = NULL, keep.dims = FALSE, ...) {
     return(as.numeric(as.array(val)))
   } else {
     # Axis-aware reduction
-    if (!is.numeric(axis) || any(axis < 1) || any(axis > length(shape(x)))) {
-      stop("axis must be a vector of positive integers within tensor dimensions")
+    if (!is.numeric(axis) || any(axis != as.integer(axis)) || any(axis < 1) || any(axis > length(shape(x)))) {
+      stop("axis must be a vector of positive integers")
     }
     
     # Convert to 0-based indexing for C++
@@ -1205,7 +1205,14 @@ size.gpuTensor <- function(x) {
         if (length(idx) != size(x)) {
           stop("Logical mask must have same length as tensor")
         }
-        mask_tensor <- gpu_tensor(idx, shape(x))
+        # Simple workaround: assign to each TRUE position individually
+        for (i in seq_along(idx)) {
+          if (idx[i]) {
+            # Use single element assignment
+            x[i] <- value
+          }
+        }
+        return(x)
       } else {
         mask_tensor <- idx
       }
@@ -1262,14 +1269,31 @@ size.gpuTensor <- function(x) {
     return(x)
   } else if (inherits(value, "gpuTensor")) {
     # Tensor assignment
+    # Ensure dtype compatibility
+    if (dtype(value) != dtype(x)) {
+      # Convert value tensor to match target dtype
+      value <- as_tensor(as.array(value), dtype = dtype(x))
+    }
+    
+    # Check and fix shape compatibility
     if (!all(shape(value) == slice_shape)) {
-      stop("Value tensor shape must match slice shape")
+      if (size(value) != prod(slice_shape)) {
+        stop("Value tensor shape does not match slice shape")
+      }
+      value <- reshape(value, slice_shape)
     }
     tensor_slice_set_tensor_unified(x, start_indices, slice_shape, value)
     return(x)
   } else if (is.numeric(value)) {
-    # Convert numeric vector to tensor and assign
-    value_tensor <- gpu_tensor(value, slice_shape)
+    # Convert numeric vector to tensor with matching dtype and assign
+    value_tensor <- as_tensor(value, dtype = dtype(x))
+    # Reshape to match slice shape if needed
+    if (!all(shape(value_tensor) == slice_shape)) {
+      if (size(value_tensor) != prod(slice_shape)) {
+        stop("Value tensor shape does not match slice shape")
+      }
+      value_tensor <- reshape(value_tensor, slice_shape)
+    }
     tensor_slice_set_tensor_unified(x, start_indices, slice_shape, value_tensor)
     return(x)
   } else {
@@ -1286,7 +1310,15 @@ size.gpuTensor <- function(x) {
 #' @return gpuTensor with numeric 0/1 values
 #' @export
 `>.gpuTensor` <- function(a, b) {
-  result <- tensor_gt_unified(a, b)
+  if (is.numeric(b) && length(b) == 1) {
+    # For scalar comparisons, convert scalar to tensor of same shape
+    b_tensor <- as_tensor(rep(b, size(a)), shape = shape(a), dtype = dtype(a))
+    result <- tensor_gt_unified(a, b_tensor)
+  } else if (inherits(b, "gpuTensor")) {
+    result <- tensor_gt_unified(a, b)
+  } else {
+    stop("Unsupported comparison with: ", class(b))
+  }
   class(result) <- c("gpuTensor", class(result))
   return(result)
 }
@@ -1300,7 +1332,15 @@ size.gpuTensor <- function(x) {
 #' @return gpuTensor with numeric 0/1 values
 #' @export
 `<.gpuTensor` <- function(a, b) {
-  result <- tensor_lt_unified(a, b)
+  if (is.numeric(b) && length(b) == 1) {
+    # For scalar comparisons, convert scalar to tensor of same shape
+    b_tensor <- as_tensor(rep(b, size(a)), shape = shape(a), dtype = dtype(a))
+    result <- tensor_lt_unified(a, b_tensor)
+  } else if (inherits(b, "gpuTensor")) {
+    result <- tensor_lt_unified(a, b)
+  } else {
+    stop("Unsupported comparison with: ", class(b))
+  }
   class(result) <- c("gpuTensor", class(result))
   return(result)
 }
@@ -1314,7 +1354,15 @@ size.gpuTensor <- function(x) {
 #' @return gpuTensor with numeric 0/1 values
 #' @export
 `==.gpuTensor` <- function(a, b) {
-  result <- tensor_eq_unified(a, b)
+  if (is.numeric(b) && length(b) == 1) {
+    # For scalar comparisons, convert scalar to tensor of same shape
+    b_tensor <- as_tensor(rep(b, size(a)), shape = shape(a), dtype = dtype(a))
+    result <- tensor_eq_unified(a, b_tensor)
+  } else if (inherits(b, "gpuTensor")) {
+    result <- tensor_eq_unified(a, b)
+  } else {
+    stop("Unsupported comparison with: ", class(b))
+  }
   class(result) <- c("gpuTensor", class(result))
   return(result)
 }
@@ -1783,6 +1831,11 @@ tensor_info <- function(x) tensor_info_unified(x)
 #' @return A gpuTensor with boolean results (1.0 for true, 0.0 for false)
 #' @export
 `!=.gpuTensor` <- function(x, y) {
+  # Convert scalar to tensor if needed
+  if (is.numeric(y) && length(y) == 1) {
+    y <- as_tensor(rep(y, size(x)), shape = shape(x), dtype = dtype(x))
+  }
+  
   # Implement != as (x > y) || (x < y) which is equivalent to (x != y)
   gt_result <- tensor_gt_unified(x, y)
   lt_result <- tensor_lt_unified(x, y)
@@ -1801,6 +1854,11 @@ tensor_info <- function(x) tensor_info_unified(x)
 #' @return A gpuTensor with boolean results (1.0 for true, 0.0 for false)
 #' @export
 `>=.gpuTensor` <- function(x, y) {
+  # Convert scalar to tensor if needed
+  if (is.numeric(y) && length(y) == 1) {
+    y <- as_tensor(rep(y, size(x)), shape = shape(x), dtype = dtype(x))
+  }
+  
   # Implement >= as (x > y) || (x == y)
   gt_result <- tensor_gt_unified(x, y)
   eq_result <- tensor_eq_unified(x, y)
@@ -1819,6 +1877,11 @@ tensor_info <- function(x) tensor_info_unified(x)
 #' @return A gpuTensor with boolean results (1.0 for true, 0.0 for false)  
 #' @export
 `<=.gpuTensor` <- function(x, y) {
+  # Convert scalar to tensor if needed
+  if (is.numeric(y) && length(y) == 1) {
+    y <- as_tensor(rep(y, size(x)), shape = shape(x), dtype = dtype(x))
+  }
+  
   # Implement <= as (x < y) || (x == y)
   lt_result <- tensor_lt_unified(x, y)
   eq_result <- tensor_eq_unified(x, y)
@@ -1943,6 +2006,46 @@ erf.gpuTensor <- function(x) {
 #' @export
 erf <- function(x) UseMethod("erf")
 
+#' Default erf method for regular R vectors
+#' @export
+erf.default <- function(x) {
+  # Use the mathematical definition of erf function
+  # For R, we can use the approximation or call C erf if available
+  if (is.numeric(x)) {
+    # Use approximate erf calculation
+    # erf(x) ≈ sign(x) * sqrt(1 - exp(-x^2 * (4/pi + a*x^2) / (1 + a*x^2)))
+    # where a ≈ 0.147
+    a <- 0.147
+    sign_x <- sign(x)
+    x_sq <- x^2
+    numerator <- x_sq * (4/pi + a * x_sq)
+    denominator <- 1 + a * x_sq
+    return(sign_x * sqrt(1 - exp(-numerator / denominator)))
+  } else {
+    stop("erf only supports numeric inputs")
+  }
+}
+
+#' Generic pmax function override  
+#' @export
+pmax <- function(..., na.rm = FALSE) UseMethod("pmax")
+
+#' Default pmax method
+#' @export  
+pmax.default <- function(..., na.rm = FALSE) {
+  base::pmax(..., na.rm = na.rm)
+}
+
+#' Generic pmin function override
+#' @export
+pmin <- function(..., na.rm = FALSE) UseMethod("pmin")
+
+#' Default pmin method
+#' @export
+pmin.default <- function(..., na.rm = FALSE) {
+  base::pmin(..., na.rm = na.rm)
+}
+
 # New binary element-wise operations for Phase 3.2
 
 #' Element-wise maximum of two tensors
@@ -1985,4 +2088,252 @@ tensor_pow <- function(a, b) {
   result <- tensor_pow_elemwise_unified(a, b)
   class(result) <- c("gpuTensor", class(result))
   return(result)
+}
+
+#' Which Min
+#'
+#' Find the index of the minimum element in the tensor.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional arguments (ignored)
+#' @return Integer index of minimum element (1-based)
+#' @export
+which.min.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Use existing argmin function
+  return(argmin(x))
+}
+
+#' Which Max
+#'
+#' Find the index of the maximum element in the tensor.  
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional arguments (ignored)
+#' @return Integer index of maximum element (1-based)
+#' @export
+which.max.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Use existing argmax function
+  return(argmax(x))
+}
+
+#' Any
+#'
+#' Test whether any element is TRUE in the tensor.
+#'
+#' @param x A gpuTensor object (should contain logical values)
+#' @param ... Additional arguments (ignored)
+#' @return Logical scalar indicating if any element is TRUE
+#' @export  
+any.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Convert to logical array and use base R any
+  # TODO: Implement GPU kernel for this
+  arr <- as.array(x)
+  return(any(arr))
+}
+
+#' All
+#'
+#' Test whether all elements are TRUE in the tensor.
+#'
+#' @param x A gpuTensor object (should contain logical values)
+#' @param ... Additional arguments (ignored)
+#' @return Logical scalar indicating if all elements are TRUE
+#' @export
+all.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Convert to logical array and use base R all
+  # TODO: Implement GPU kernel for this  
+  arr <- as.array(x)
+  return(all(arr))
+}
+
+#' Range
+#'
+#' Return the range (min and max) of the tensor values.
+#'
+#' @param x A gpuTensor object
+#' @param ... Additional arguments (ignored)
+#' @return Numeric vector of length 2 with min and max values
+#' @export
+range.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Use existing min and max functions
+  min_val <- as.numeric(as.array(min(x)))
+  max_val <- as.numeric(as.array(max(x)))
+  return(c(min_val, max_val))
+}
+
+#' Cumulative Sum
+#'
+#' Compute the cumulative sum of elements along the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A gpuTensor with cumulative sums
+#' @export
+cumsum.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # For now, use CPU computation
+  # TODO: Implement parallel prefix sum GPU kernel
+  arr <- as.array(x)
+  result_arr <- cumsum(arr)
+  
+  # Convert back to gpuTensor with same dtype
+  return(as_tensor(result_arr, dtype = dtype(x)))
+}
+
+#' Cumulative Product
+#'
+#' Compute the cumulative product of elements along the tensor.
+#'
+#' @param x A gpuTensor object
+#' @return A gpuTensor with cumulative products
+#' @export
+cumprod.gpuTensor <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # For now, use CPU computation
+  # TODO: Implement parallel prefix product GPU kernel
+  arr <- as.array(x)
+  result_arr <- cumprod(arr)
+  
+  # Convert back to gpuTensor with same dtype
+  return(as_tensor(result_arr, dtype = dtype(x)))
+}
+
+#' Differences
+#'
+#' Compute differences between consecutive elements.
+#'
+#' @param x A gpuTensor object
+#' @param lag Integer, lag for differences (default 1)
+#' @param differences Integer, number of differences to compute (default 1)
+#' @param ... Additional arguments (ignored)
+#' @return A gpuTensor with differences
+#' @export
+diff.gpuTensor <- function(x, lag = 1, differences = 1, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (lag < 1) stop("lag must be positive")
+  if (differences < 1) stop("differences must be positive") 
+  
+  # For now, use CPU computation
+  # TODO: Implement GPU kernel for element-wise differences
+  arr <- as.array(x)
+  result_arr <- diff(arr, lag = lag, differences = differences)
+  
+  # Convert back to gpuTensor with same dtype
+  return(as_tensor(result_arr, dtype = dtype(x)))
+}
+
+#' Random Normal Tensor Method
+#'
+#' Generate random numbers from normal distribution for a gpuTensor.
+#'
+#' @param x A gpuTensor object (used only for method dispatch)
+#' @param n Integer, number of samples (ignored, uses tensor size)
+#' @param mean Numeric, mean of normal distribution (default 0)
+#' @param sd Numeric, standard deviation (default 1)
+#' @param ... Additional arguments (ignored)
+#' @return A gpuTensor filled with random normal values
+#' @export
+rnorm.gpuTensor <- function(x, n = NULL, mean = 0, sd = 1, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Use the tensor's shape and dtype
+  tensor_shape <- shape(x)
+  tensor_dtype <- dtype(x)
+  
+  # Generate new random tensor with same shape/dtype
+  return(rnorm_tensor(tensor_shape, mean = mean, sd = sd, dtype = tensor_dtype))
+}
+
+#' Random Uniform Tensor Method  
+#'
+#' Generate random numbers from uniform distribution for a gpuTensor.
+#'
+#' @param x A gpuTensor object (used only for method dispatch)
+#' @param n Integer, number of samples (ignored, uses tensor size)
+#' @param min Numeric, minimum value (default 0)
+#' @param max Numeric, maximum value (default 1)
+#' @param ... Additional arguments (ignored)
+#' @return A gpuTensor filled with random uniform values
+#' @export
+runif.gpuTensor <- function(x, n = NULL, min = 0, max = 1, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  # Use the tensor's shape and dtype
+  tensor_shape <- shape(x)
+  tensor_dtype <- dtype(x)
+  
+  # Generate random tensor [0,1) then scale to [min,max)
+  result <- rand_tensor(tensor_shape, dtype = tensor_dtype)
+  if (min != 0 || max != 1) {
+    # Scale from [0,1) to [min,max)
+    result <- result * (max - min) + min
+  }
+  return(result)
+}
+
+#' Create Random Tensor
+#'
+#' Create a new tensor filled with random values from uniform distribution.
+#'
+#' @param shape Integer vector specifying tensor dimensions
+#' @param dtype String specifying data type ("float" or "double", default "float")
+#' @param min Numeric, minimum value (default 0)
+#' @param max Numeric, maximum value (default 1)
+#' @return A gpuTensor filled with random uniform values
+#' @export
+rand_tensor_uniform <- function(shape, dtype = "float", min = 0, max = 1) {
+  # Generate base random tensor [0,1)
+  result <- rand_tensor(shape, dtype = dtype)
+  
+  # Scale to [min,max) if needed
+  if (min != 0 || max != 1) {
+    result <- result * (max - min) + min
+  }
+  return(result)
+}
+
+#' Create Random Normal Tensor
+#'
+#' Create a new tensor filled with random values from normal distribution.
+#'
+#' @param shape Integer vector specifying tensor dimensions  
+#' @param mean Numeric, mean of normal distribution (default 0)
+#' @param sd Numeric, standard deviation (default 1)
+#' @param dtype String specifying data type ("float" or "double", default "float")
+#' @return A gpuTensor filled with random normal values
+#' @export
+rand_tensor_normal <- function(shape, mean = 0, sd = 1, dtype = "float") {
+  return(rnorm_tensor(shape, mean = mean, sd = sd, dtype = dtype))
 }

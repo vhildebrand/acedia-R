@@ -389,38 +389,10 @@ SEXP tensor_argmin_unified(SEXP tensor_ptr) {
 
 // [[Rcpp::export]]
 SEXP tensor_argmax_axis(SEXP tensor_ptr, int axis, bool keep_dims = false) {
-    try {
-        XPtr<TensorBase> tensor(tensor_ptr);
-        if (!tensor) stop("Invalid tensor pointer");
-        
-        // Use the new axis-aware argmax method
-        auto result_tensor = tensor->argmax(axis, keep_dims);
-        
-        // Wrap the result and return as SEXP
-        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
-        result_ptr.attr("class") = "gpuTensor";
-        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
-        return result_ptr;
-    } catch (const std::exception& e) {
-        stop("Error in axis-aware tensor argmax: " + std::string(e.what()));
-    }
+    stop("Axis-aware argmax not yet implemented");
 }
 
 // [[Rcpp::export]]
 SEXP tensor_argmin_axis(SEXP tensor_ptr, int axis, bool keep_dims = false) {
-    try {
-        XPtr<TensorBase> tensor(tensor_ptr);
-        if (!tensor) stop("Invalid tensor pointer");
-        
-        // Use the new axis-aware argmin method
-        auto result_tensor = tensor->argmin(axis, keep_dims);
-        
-        // Wrap the result and return as SEXP
-        XPtr<TensorBase> result_ptr(result_tensor.release(), true);
-        result_ptr.attr("class") = "gpuTensor";
-        result_ptr.attr("dtype") = dtype_to_string(result_ptr->dtype());
-        return result_ptr;
-    } catch (const std::exception& e) {
-        stop("Error in axis-aware tensor argmin: " + std::string(e.what()));
-    }
+    stop("Axis-aware argmin not yet implemented");
 } 

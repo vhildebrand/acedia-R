@@ -306,13 +306,8 @@ test_that("Phase 3.1 unary math functions work correctly", {
   tensor_erf <- as_tensor(data_erf, dtype = "float")
   result_erf <- erf(tensor_erf)
   expect_s3_class(result_erf, "gpuTensor")
-  # Compare with R's built-in erf function if available, otherwise use approximation
-  if (exists("erf", where = "package:base")) {
-    expected_erf <- erf(data_erf)
-  } else {
-    # Use 2/sqrt(pi) * integral approximation for simple test cases
-    expected_erf <- 2/sqrt(pi) * data_erf  # Very rough approximation for small values
-  }
+  # Use correct mathematical erf values (our GPU function is correct)
+  expected_erf <- c(-0.9953222, -0.8427008, -0.5204999, 0, 0.5204999, 0.8427008, 0.9953222)
   expect_equal(as.vector(result_erf), expected_erf, tolerance = 1e-4)
   
   # Test power operator (tensor ^ scalar)

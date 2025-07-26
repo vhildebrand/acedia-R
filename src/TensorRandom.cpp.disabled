@@ -1,0 +1,228 @@
+#include <Rcpp.h>
+#include <curand.h>
+#include <cuda_runtime.h>
+#include "cuda_utils.h"
+#include "gpuTensor.h"
+#include "TensorRegistry.h"
+
+using namespace Rcpp;
+
+// Global cuRAND generator state (will be initialized once)
+static curandGenerator_t global_generator = nullptr;
+
+// Initialize cuRAND generator if not already initialized
+void init_curand_generator() {
+    if (global_generator == nullptr) {
+        curandStatus_t status = curandCreateGenerator(&global_generator, CURAND_RNG_PSEUDO_DEFAULT);
+        if (status != CURAND_STATUS_SUCCESS) {
+            throw std::runtime_error("Failed to create cuRAND generator");
+        }
+        
+        // Set random seed based on current time
+        curandSetPseudoRandomGeneratorSeed(global_generator, static_cast<unsigned long long>(time(nullptr)));
+    }
+}
+
+// Cleanup function for cuRAND generator
+void cleanup_curand_generator() {
+    if (global_generator != nullptr) {
+        curandDestroyGenerator(global_generator);
+        global_generator = nullptr;
+    }
+}
+
+//' Create Random Tensor (Uniform Distribution)
+//' 
+//' Generate a tensor filled with random numbers from uniform distribution [0, 1).
+//' 
+//' @param shape Integer vector specifying tensor dimensions
+//' @param dtype String specifying data type ("float" or "double")
+//' @export
+// [[Rcpp::export]]
+SEXP rand_tensor(IntegerVector shape, std::string dtype = "float") {
+    try {
+        init_curand_generator();
+        
+        // Convert shape to vector of size_t for Shape constructor
+        std::vector<size_t> shape_vec;
+        size_t total_size = 1;
+        for (int dim : shape) {
+            if (dim <= 0) stop("All shape dimensions must be positive");
+            shape_vec.push_back(static_cast<size_t>(dim));
+            total_size *= dim;
+        }
+        
+        if (dtype == "float") {
+            // Create tensor and get device pointer
+            auto tensor = std::make_shared<gpuTensor<float>>(Shape(shape_vec));
+            
+            // Generate uniform random numbers on GPU
+            curandStatus_t status = curandGenerateUniform(global_generator, tensor->data(), total_size);
+            if (status != CURAND_STATUS_SUCCESS) {
+                stop("cuRAND uniform generation failed");
+            }
+            
+            // Wrap and return
+            XPtr<TensorBase> result_ptr(tensor.get());
+            tensor.release(); // Transfer ownership to XPtr
+            result_ptr.attr("class") = "gpuTensor";
+            result_ptr.attr("dtype") = "float";
+            return result_ptr;
+            
+        } else if (dtype == "double") {
+            // Create tensor and get device pointer  
+            auto tensor = std::make_shared<gpuTensor<double>>(Shape(shape_vec));
+            
+            // Generate uniform random numbers on GPU
+            curandStatus_t status = curandGenerateUniformDouble(global_generator, tensor->data(), total_size);
+            if (status != CURAND_STATUS_SUCCESS) {
+                stop("cuRAND uniform double generation failed");
+            }
+            
+            // Wrap and return
+            XPtr<TensorBase> result_ptr(tensor.get());
+            tensor.release(); // Transfer ownership to XPtr
+            result_ptr.attr("class") = "gpuTensor";
+            result_ptr.attr("dtype") = "double";
+            return result_ptr;
+            
+        } else {
+            stop("Unsupported dtype for random tensor. Use 'float' or 'double'");
+        }
+        
+    } catch (const std::exception& e) {
+        stop("Error in rand_tensor: " + std::string(e.what()));
+    }
+}
+
+//' Create Random Normal Tensor
+//' 
+//' Generate a tensor filled with random numbers from normal distribution.
+//' 
+//' @param shape Integer vector specifying tensor dimensions
+//' @param mean Numeric mean of the normal distribution (default 0)
+//' @param sd Numeric standard deviation of the normal distribution (default 1)
+//' @param dtype String specifying data type ("float" or "double")
+//' @export
+// [[Rcpp::export]]
+SEXP rnorm_tensor(IntegerVector shape, double mean = 0.0, double sd = 1.0, std::string dtype = "float") {
+    try {
+        init_curand_generator();
+        
+        // Convert shape to vector of size_t for Shape constructor
+        std::vector<size_t> shape_vec;
+        size_t total_size = 1;
+        for (int dim : shape) {
+            if (dim <= 0) stop("All shape dimensions must be positive");
+            shape_vec.push_back(static_cast<size_t>(dim));
+            total_size *= dim;
+        }
+        
+        // Ensure even number of elements for cuRAND normal generation
+        size_t padded_size = (total_size % 2 == 0) ? total_size : total_size + 1;
+        
+        if (dtype == "float") {
+            // Create tensor and get device pointer
+            auto tensor = std::make_shared<gpuTensor<float>>(Shape(shape_vec));
+            
+            // Allocate temporary buffer if padding is needed
+            float* gen_ptr = tensor->data();
+            float* temp_ptr = nullptr;
+            if (padded_size > total_size) {
+                cudaMalloc(&temp_ptr, padded_size * sizeof(float));
+                gen_ptr = temp_ptr;
+            }
+            
+            // Generate normal random numbers on GPU
+            curandStatus_t status = curandGenerateNormal(global_generator, gen_ptr, padded_size, 
+                                                        static_cast<float>(mean), static_cast<float>(sd));
+            if (status != CURAND_STATUS_SUCCESS) {
+                if (temp_ptr) cudaFree(temp_ptr);
+                stop("cuRAND normal generation failed");
+            }
+            
+            // Copy back if we used temporary buffer
+            if (temp_ptr) {
+                cudaMemcpy(tensor->data(), temp_ptr, total_size * sizeof(float), cudaMemcpyDeviceToDevice);
+                cudaFree(temp_ptr);
+            }
+            
+            // Wrap and return
+            XPtr<TensorBase> result_ptr(tensor.get());
+            tensor.release(); // Transfer ownership to XPtr
+            result_ptr.attr("class") = "gpuTensor";
+            result_ptr.attr("dtype") = "float";
+            return result_ptr;
+            
+        } else if (dtype == "double") {
+            // Create tensor and get device pointer  
+            auto tensor = std::make_shared<gpuTensor<double>>(Shape(shape_vec));
+            
+            // Allocate temporary buffer if padding is needed
+            double* gen_ptr = tensor->data();
+            double* temp_ptr = nullptr;
+            if (padded_size > total_size) {
+                cudaMalloc(&temp_ptr, padded_size * sizeof(double));
+                gen_ptr = temp_ptr;
+            }
+            
+            // Generate normal random numbers on GPU
+            curandStatus_t status = curandGenerateNormalDouble(global_generator, gen_ptr, padded_size, mean, sd);
+            if (status != CURAND_STATUS_SUCCESS) {
+                if (temp_ptr) cudaFree(temp_ptr);
+                stop("cuRAND normal double generation failed");
+            }
+            
+            // Copy back if we used temporary buffer
+            if (temp_ptr) {
+                cudaMemcpy(tensor->data(), temp_ptr, total_size * sizeof(double), cudaMemcpyDeviceToDevice);
+                cudaFree(temp_ptr);
+            }
+            
+            // Wrap and return
+            XPtr<TensorBase> result_ptr(tensor.get());
+            tensor.release(); // Transfer ownership to XPtr
+            result_ptr.attr("class") = "gpuTensor";
+            result_ptr.attr("dtype") = "double";
+            return result_ptr;
+            
+        } else {
+            stop("Unsupported dtype for random normal tensor. Use 'float' or 'double'");
+        }
+        
+    } catch (const std::exception& e) {
+        stop("Error in rnorm_tensor: " + std::string(e.what()));
+    }
+}
+
+//' Set Random Seed
+//' 
+//' Set the seed for random number generation.
+//' 
+//' @param seed Integer seed value
+//' @export
+// [[Rcpp::export]]
+void set_random_seed(int seed) {
+    try {
+        init_curand_generator();
+        curandStatus_t status = curandSetPseudoRandomGeneratorSeed(global_generator, 
+                                                                  static_cast<unsigned long long>(seed));
+        if (status != CURAND_STATUS_SUCCESS) {
+            stop("Failed to set cuRAND seed");
+        }
+    } catch (const std::exception& e) {
+        stop("Error setting random seed: " + std::string(e.what()));
+    }
+}
+
+// Register cleanup function to be called when package is unloaded
+static void cleanup_on_exit() {
+    cleanup_curand_generator();
+}
+
+// This will be called when the package is loaded
+void R_init_acediaR_random(DllInfo *dll) {
+    R_RegisterCCallable("acediaR", "cleanup_curand_generator", (DL_FUNC) cleanup_curand_generator);
+    // Register cleanup function
+    atexit(cleanup_on_exit);
+} 

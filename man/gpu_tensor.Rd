@@ -4,13 +4,7 @@
 \alias{gpu_tensor}
 \title{Create a GPU Tensor}
 \usage{
-gpu_tensor(
-  data,
-  shape,
-  dtype = "double",
-  device = "cuda",
-  requires_grad = FALSE
-)
+gpu_tensor(data, shape, dtype = "double", device = "cuda")
 }
 \arguments{
 \item{data}{A numeric vector or array containing the data}
@@ -20,8 +14,6 @@ gpu_tensor(
 \item{dtype}{Data type: "double" or "float" (default: "double")}
 
 \item{device}{Device location: "cuda" or "cpu" (default: "cuda")}
-
-\item{requires_grad}{Whether to track gradients (default: FALSE)}
 }
 \value{
 A gpuTensor object
@@ -31,8 +23,7 @@ Creates a gpuTensor object from R data, transferring it to GPU memory with speci
 }
 \details{
 This function creates a multi-dimensional GPU tensor with the specified shape.
-The tensor supports views, broadcasting, async operations, and automatic differentiation
-when requires_grad=TRUE.
+The tensor supports views, broadcasting, and async operations.
 }
 \examples{
 \dontrun{
@@ -43,8 +34,8 @@ tensor <- gpu_tensor(data, shape = c(3, 4))
 # Create a 3D tensor
 tensor_3d <- gpu_tensor(runif(24), shape = c(2, 3, 4))
 
-# Create with gradient tracking
-tensor_grad <- gpu_tensor(1:6, shape = c(2, 3), requires_grad = TRUE)
+# Create float32 tensor
+tensor_f32 <- gpu_tensor(1:6, shape = c(2, 3), dtype = "float")
 }
 
 }

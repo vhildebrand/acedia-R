@@ -4,7 +4,7 @@
 \alias{pmax.gpuTensor}
 \title{Element-wise maximum of two tensors}
 \usage{
-pmax.gpuTensor(a, b, ...)
+\method{pmax}{gpuTensor}(a, b, ...)
 }
 \arguments{
 \item{a}{A gpuTensor object}

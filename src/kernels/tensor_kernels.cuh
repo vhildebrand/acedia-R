@@ -149,9 +149,10 @@ struct RoundOp {
     template<typename T>
     __host__ __device__ T operator()(const T& a) const { 
 #ifdef __CUDA_ARCH__
-        return round(a); // Device version
+        // Use rint() which implements banker's rounding (round half to even)
+        return rint(a);
 #else
-        return std::round(a); // Host version
+        return std::round(a); 
 #endif
     }
 };

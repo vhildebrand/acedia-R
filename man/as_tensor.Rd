@@ -7,7 +7,7 @@
 \usage{
 as_tensor(x, ...)
 
-\method{as_tensor}{default}(x, dtype = "double", requires_grad = FALSE, shape = NULL, ...)
+\method{as_tensor}{default}(x, dtype = "double", shape = NULL, ...)
 }
 \arguments{
 \item{x}{Input R object (vector, matrix, or array)}
@@ -15,8 +15,6 @@ as_tensor(x, ...)
 \item{...}{Additional arguments passed to methods}
 
 \item{dtype}{Data type for the tensor (default: "double")}
-
-\item{requires_grad}{Whether to track gradients (default: FALSE)}
 
 \item{shape}{Optional shape to reshape the data (default: NULL, uses input shape)}
 }

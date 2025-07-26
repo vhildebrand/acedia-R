@@ -1222,28 +1222,90 @@ static int64_t launch_and_fetch_index(void (*kernel)(int64_t*, const void*, size
 // tensor_argmax_* are provided in tensor_ops.cu; avoid duplicate definitions here.
 // float32 ARGMIN
 int64_t tensor_argmin_float32(const float* input, size_t n) {
+    if (!input || n == 0) {
+        throw std::runtime_error("Invalid input parameters for tensor_argmin_float32");
+    }
+    
     int64_t* d_idx;
-    cudaMalloc(&d_idx, sizeof(int64_t));
+    cudaError_t err = cudaMalloc(&d_idx, sizeof(int64_t));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to allocate device memory for argmin result: " + std::string(cudaGetErrorString(err)));
+    }
+    
     int blockSize = 256;
-    argmin_kernel<float><<<1, blockSize>>>(d_idx, input, n);
-    cudaDeviceSynchronize();
+    size_t shared_mem_size = blockSize * (sizeof(float) + sizeof(int64_t));
+    argmin_kernel<float><<<1, blockSize, shared_mem_size>>>(d_idx, input, n);
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        cudaFree(d_idx);
+        throw std::runtime_error("Kernel launch failed for argmin: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        cudaFree(d_idx);
+        throw std::runtime_error("Device synchronization failed for argmin: " + std::string(cudaGetErrorString(err)));
+    }
+    
     int64_t h_idx;
-    cudaMemcpy(&h_idx, d_idx, sizeof(int64_t), cudaMemcpyDeviceToHost);
-    cudaFree(d_idx);
-    return h_idx;
+    err = cudaMemcpy(&h_idx, d_idx, sizeof(int64_t), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        cudaFree(d_idx);
+        throw std::runtime_error("Failed to copy argmin result to host: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaFree(d_idx);
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to free device memory after argmin: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    // Convert from 0-based to 1-based indexing for R compatibility
+    return h_idx + 1;
 }
 
 // float64 ARGMIN
 int64_t tensor_argmin_float64(const double* input, size_t n) {
+    if (!input || n == 0) {
+        throw std::runtime_error("Invalid input parameters for tensor_argmin_float64");
+    }
+    
     int64_t* d_idx;
-    cudaMalloc(&d_idx, sizeof(int64_t));
+    cudaError_t err = cudaMalloc(&d_idx, sizeof(int64_t));
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to allocate device memory for argmin result: " + std::string(cudaGetErrorString(err)));
+    }
+    
     int blockSize = 256;
-    argmin_kernel<double><<<1, blockSize>>>(d_idx, input, n);
-    cudaDeviceSynchronize();
+    size_t shared_mem_size = blockSize * (sizeof(double) + sizeof(int64_t));
+    argmin_kernel<double><<<1, blockSize, shared_mem_size>>>(d_idx, input, n);
+    
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        cudaFree(d_idx);
+        throw std::runtime_error("Kernel launch failed for argmin: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaDeviceSynchronize();
+    if (err != cudaSuccess) {
+        cudaFree(d_idx);
+        throw std::runtime_error("Device synchronization failed for argmin: " + std::string(cudaGetErrorString(err)));
+    }
+    
     int64_t h_idx;
-    cudaMemcpy(&h_idx, d_idx, sizeof(int64_t), cudaMemcpyDeviceToHost);
-    cudaFree(d_idx);
-    return h_idx;
+    err = cudaMemcpy(&h_idx, d_idx, sizeof(int64_t), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        cudaFree(d_idx);
+        throw std::runtime_error("Failed to copy argmin result to host: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    err = cudaFree(d_idx);
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to free device memory after argmin: " + std::string(cudaGetErrorString(err)));
+    }
+    
+    // Convert from 0-based to 1-based indexing for R compatibility
+    return h_idx + 1;
 }
 
 // ------------------------------------------------------------
@@ -1559,6 +1621,14 @@ template __global__ void broadcast_binary_kernel<float, AddOp>(float*, const flo
 template __global__ void broadcast_binary_kernel<double, AddOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
 template __global__ void broadcast_binary_kernel<float, MulOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
 template __global__ void broadcast_binary_kernel<double, MulOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+
+// Broadcast comparison operations
+template __global__ void broadcast_binary_kernel<float, GreaterOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, GreaterOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<float, LessOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, LessOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<float, EqualOp>(float*, const float*, const float*, const int*, const int*, const int*, const int*, int, size_t);
+template __global__ void broadcast_binary_kernel<double, EqualOp>(double*, const double*, const double*, const int*, const int*, const int*, const int*, int, size_t);
 
 template __global__ void strided_copy_kernel<float>(float*, const float*, const int*, const int*, int, size_t);
 template __global__ void strided_copy_kernel<double>(double*, const double*, const int*, const int*, int, size_t);

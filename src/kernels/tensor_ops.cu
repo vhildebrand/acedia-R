@@ -848,17 +848,35 @@ void tensor_softmax_float64(double* output, const double* input, size_t n) {
 // ----------------- Argmax wrappers -----------------
 
 int64_t tensor_argmax_float32(const float* input, size_t n) {
+    if (!input || n == 0) {
+        throw std::runtime_error("Invalid input parameters for tensor_argmax_float32");
+    }
+    
     std::vector<float> host(n);
-    cudaMemcpy(host.data(), input, n*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaError_t err = cudaMemcpy(host.data(), input, n*sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to copy data for argmax: " + std::string(cudaGetErrorString(err)));
+    }
+    
     auto it = std::max_element(host.begin(), host.end());
-    return static_cast<int64_t>(std::distance(host.begin(), it));
+    // Convert from 0-based to 1-based indexing for R compatibility
+    return static_cast<int64_t>(std::distance(host.begin(), it)) + 1;
 }
 
 int64_t tensor_argmax_float64(const double* input, size_t n) {
+    if (!input || n == 0) {
+        throw std::runtime_error("Invalid input parameters for tensor_argmax_float64");
+    }
+    
     std::vector<double> host(n);
-    cudaMemcpy(host.data(), input, n*sizeof(double), cudaMemcpyDeviceToHost);
+    cudaError_t err = cudaMemcpy(host.data(), input, n*sizeof(double), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        throw std::runtime_error("Failed to copy data for argmax: " + std::string(cudaGetErrorString(err)));
+    }
+    
     auto it = std::max_element(host.begin(), host.end());
-    return static_cast<int64_t>(std::distance(host.begin(), it));
+    // Convert from 0-based to 1-based indexing for R compatibility
+    return static_cast<int64_t>(std::distance(host.begin(), it)) + 1;
 }
 
 // ===================== C Wrappers for TensorMutation.cpp ===================== //
@@ -1121,6 +1139,43 @@ void tensor_mul_broadcast_float64(double* result, const double* a, const double*
                                   const int* b_strides, const int* result_strides, const int* shape, 
                                   int ndims, size_t total_elements) {
     launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, MulOp());
+}
+
+// Broadcast comparison operations
+void tensor_gt_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                              const int* b_strides, const int* result_strides,
+                              const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, GreaterOp());
+}
+
+void tensor_gt_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                              const int* b_strides, const int* result_strides,
+                              const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, GreaterOp());
+}
+
+void tensor_lt_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                              const int* b_strides, const int* result_strides,
+                              const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, LessOp());
+}
+
+void tensor_lt_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                              const int* b_strides, const int* result_strides,
+                              const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, LessOp());
+}
+
+void tensor_eq_broadcast_float32(float* result, const float* a, const float* b, const int* a_strides,
+                              const int* b_strides, const int* result_strides,
+                              const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<float>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, EqualOp());
+}
+
+void tensor_eq_broadcast_float64(double* result, const double* a, const double* b, const int* a_strides,
+                              const int* b_strides, const int* result_strides,
+                              const int* shape, int ndims, size_t total_elements) {
+    launch_broadcast_binary<double>(result, a, b, a_strides, b_strides, result_strides, shape, ndims, total_elements, EqualOp());
 }
 
 // Matrix multiplication operations

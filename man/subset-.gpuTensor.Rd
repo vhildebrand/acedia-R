@@ -7,6 +7,5 @@
 \method{[}{gpuTensor}(x, ...) <- value
 }
 \description{
-Currently supports assigning a numeric scalar to a rectangular (contiguous) slice.
-More complex assignment (tensor-to-slice) can be added later.
+Supports assigning scalars or tensors to rectangular slices, and boolean mask assignment.
 }

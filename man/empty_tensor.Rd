@@ -4,7 +4,7 @@
 \alias{empty_tensor}
 \title{Create Empty GPU Tensor}
 \usage{
-empty_tensor(shape, dtype = "double", device = "cuda", requires_grad = FALSE)
+empty_tensor(shape, dtype = "double", device = "cuda")
 }
 \arguments{
 \item{shape}{An integer vector specifying the tensor dimensions}
@@ -12,8 +12,6 @@ empty_tensor(shape, dtype = "double", device = "cuda", requires_grad = FALSE)
 \item{dtype}{Data type: "double" or "float" (default: "double")}
 
 \item{device}{Device location: "cuda" or "cpu" (default: "cuda")}
-
-\item{requires_grad}{Whether to track gradients (default: FALSE)}
 }
 \value{
 An empty gpuTensor object
