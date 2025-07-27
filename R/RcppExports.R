@@ -149,6 +149,30 @@ tensor_vecmat_unified <- function(v_ptr, A_ptr) {
     .Call(`_acediaR_tensor_vecmat_unified`, v_ptr, A_ptr)
 }
 
+tensor_lu_decompose_unified <- function(a_ptr) {
+    .Call(`_acediaR_tensor_lu_decompose_unified`, a_ptr)
+}
+
+tensor_solve_unified <- function(a_ptr, b_ptr) {
+    .Call(`_acediaR_tensor_solve_unified`, a_ptr, b_ptr)
+}
+
+tensor_det_unified <- function(a_ptr) {
+    .Call(`_acediaR_tensor_det_unified`, a_ptr)
+}
+
+tensor_qr_unified <- function(a_ptr) {
+    .Call(`_acediaR_tensor_qr_unified`, a_ptr)
+}
+
+tensor_chol_unified <- function(a_ptr) {
+    .Call(`_acediaR_tensor_chol_unified`, a_ptr)
+}
+
+tensor_eigen_unified <- function(a_ptr, vectors = TRUE) {
+    .Call(`_acediaR_tensor_eigen_unified`, a_ptr, vectors)
+}
+
 tensor_exp_unified <- function(tensor_ptr) {
     .Call(`_acediaR_tensor_exp_unified`, tensor_ptr)
 }

@@ -74,13 +74,15 @@ NumericVector tensor_to_r_unified(SEXP tensor_ptr) {
         
         NumericVector result(host_data.begin(), host_data.end());
         
-        // Set shape as attribute
-        IntegerVector shape_attr(ptr->ndims());
-        auto shape = ptr->shape();
-        for (size_t i = 0; i < ptr->ndims(); ++i) {
-            shape_attr[i] = static_cast<int>(shape[i]);
+        // Set shape as attribute (only for non-scalar tensors)
+        if (ptr->ndims() > 0) {
+            IntegerVector shape_attr(ptr->ndims());
+            auto shape = ptr->shape();
+            for (size_t i = 0; i < ptr->ndims(); ++i) {
+                shape_attr[i] = static_cast<int>(shape[i]);
+            }
+            result.attr("dim") = shape_attr;
         }
-        result.attr("dim") = shape_attr;
         
         return result;
     } catch (const std::exception& e) {

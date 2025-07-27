@@ -2549,3 +2549,172 @@ which.min <- function(x, ...) {
 which.min.default <- function(x, ...) {
   base::which.min(x, ...)
 }
+
+# ==================== Linear Algebra Factorizations ====================
+
+#' LU Decomposition
+#'
+#' Performs LU decomposition of a square matrix using cuSOLVER.
+#'
+#' @param x A square gpuTensor matrix
+#' @return A list containing:
+#'   \item{lu}{The LU decomposition matrix (L and U combined)}
+#'   \item{ipiv}{Pivot indices}
+#' @export
+lu_decompose <- function(x) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (length(shape(x)) != 2) {
+    stop("LU decomposition requires a 2D tensor")
+  }
+  
+  if (shape(x)[1] != shape(x)[2]) {
+    stop("LU decomposition requires a square matrix")
+  }
+  
+  result <- tensor_lu_decompose_unified(x)
+  class(result$lu) <- c("gpuTensor", class(result$lu))
+  class(result$ipiv) <- c("gpuTensor", class(result$ipiv))
+  
+  return(result)
+}
+
+#' Solve Linear System
+#'
+#' Solves the linear system Ax = b using LU decomposition.
+#'
+#' @param a A square gpuTensor matrix
+#' @param b A gpuTensor vector or matrix (right-hand side)
+#' @return The solution x as a gpuTensor
+#' @export
+solve.gpuTensor <- function(a, b, ...) {
+  if (!inherits(a, "gpuTensor") || !inherits(b, "gpuTensor")) {
+    stop("Both arguments must be gpuTensor objects")
+  }
+  
+  result <- tensor_solve_unified(a, b)
+  class(result) <- c("gpuTensor", class(result))
+  return(result)
+}
+
+#' Determinant
+#'
+#' Computes the determinant of a square matrix using LU decomposition.
+#'
+#' @param x A square gpuTensor matrix
+#' @param logarithm Logical; if TRUE, return log determinant
+#' @param ... Additional arguments (ignored)
+#' @return The determinant (or log determinant) as required by base R
+#' @export
+determinant.gpuTensor <- function(x, logarithm = TRUE, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  result <- tensor_det_unified(x)
+  det_value <- as.numeric(tensor_to_r_unified(result))
+  
+  if (logarithm) {
+    # Return in the same format as base R's determinant()
+    sign_val <- if (det_value >= 0) 1 else -1
+    modulus_val <- log(abs(det_value))
+    return(list(modulus = modulus_val, sign = sign_val))
+  } else {
+    return(det_value)
+  }
+}
+
+#' QR Decomposition
+#'
+#' Computes the QR decomposition of a matrix using cuSOLVER.
+#'
+#' @param x A gpuTensor matrix
+#' @return A list containing:
+#'   \item{Q}{The orthogonal matrix Q}
+#'   \item{R}{The upper triangular matrix R}
+#' @export
+qr.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (length(shape(x)) != 2) {
+    stop("QR decomposition requires a 2D tensor")
+  }
+  
+  result <- tensor_qr_unified(x)
+  class(result$Q) <- c("gpuTensor", class(result$Q))
+  class(result$R) <- c("gpuTensor", class(result$R))
+  
+  return(result)
+}
+
+#' Cholesky Decomposition
+#'
+#' Computes the Cholesky decomposition of a positive definite matrix using cuSOLVER.
+#'
+#' @param x A positive definite gpuTensor matrix
+#' @return The lower triangular Cholesky factor L such that x = L * t(L)
+#' @export
+chol.gpuTensor <- function(x, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (length(shape(x)) != 2) {
+    stop("Cholesky decomposition requires a 2D tensor")
+  }
+  
+  if (shape(x)[1] != shape(x)[2]) {
+    stop("Cholesky decomposition requires a square matrix")
+  }
+  
+  result <- tensor_chol_unified(x)
+  class(result) <- c("gpuTensor", class(result))
+  
+  return(result)
+}
+
+#' GPU Eigenvalue Decomposition
+#'
+#' Computes eigenvalues and optionally eigenvectors of a symmetric matrix using cuSOLVER.
+#'
+#' @param x A symmetric gpuTensor matrix
+#' @param symmetric Logical; if TRUE (default), assumes x is symmetric
+#' @param only.values Logical; if TRUE, only eigenvalues are computed
+#' @param ... Additional arguments (ignored)
+#' @return If only.values=TRUE, returns eigenvalues as a gpuTensor vector.
+#'   Otherwise returns a list with:
+#'   \item{values}{Eigenvalues as a gpuTensor vector}
+#'   \item{vectors}{Eigenvectors as columns of a gpuTensor matrix}
+#' @export
+gpu_eigen <- function(x, symmetric = TRUE, only.values = FALSE, ...) {
+  if (!inherits(x, "gpuTensor")) {
+    stop("Object is not a gpuTensor")
+  }
+  
+  if (!symmetric) {
+    stop("Non-symmetric eigenvalue decomposition not yet supported. Use symmetric=TRUE.")
+  }
+  
+  if (length(shape(x)) != 2) {
+    stop("Eigenvalue decomposition requires a 2D tensor")
+  }
+  
+  if (shape(x)[1] != shape(x)[2]) {
+    stop("Eigenvalue decomposition requires a square matrix")
+  }
+  
+  result <- tensor_eigen_unified(x, vectors = !only.values)
+  
+  if (only.values) {
+    class(result) <- c("gpuTensor", class(result))
+    return(result)
+  } else {
+    class(result$values) <- c("gpuTensor", class(result$values))
+    class(result$vectors) <- c("gpuTensor", class(result$vectors))
+    return(result)
+  }
+}
