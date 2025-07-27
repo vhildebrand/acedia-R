@@ -176,6 +176,79 @@ mat_vec_prod <- matvec(mat_A, vec)      # Matrix-vector product
 outer_p <- outer_product(vec, vec)      # Outer product
 ```
 
+## 5.5. Advanced Linear Algebra with cuSOLVER
+
+For more complex matrix operations, `acediaR` integrates with NVIDIA's cuSOLVER library, which provides GPU-accelerated functions for matrix factorization and solving linear systems.
+
+### Solving Linear Systems
+Solve the system `Ax = b` where `A` is a square matrix and `b` is a vector or matrix.
+```R
+# Create a positive-definite matrix A and a vector b
+A <- as_tensor(matrix(c(4, 1, 1, 3), 2, 2))
+b <- as_tensor(c(1, 2))
+
+# Solve for x
+x <- solve(A, b)
+
+# x will be a gpuTensor containing the solution
+```
+
+### LU Decomposition
+Performs LU decomposition on a square matrix. This is often used as a preliminary step for solving linear systems or calculating the determinant.
+```R
+# A is a square gpuTensor
+lu_result <- lu_decompose(A)
+
+# Access the combined LU matrix and pivot indices
+lu_matrix <- lu_result$lu
+pivots <- lu_result$ipiv
+```
+
+### QR Decomposition
+Performs QR decomposition on a matrix `A` such that `A = Q %*% R`, where `Q` is an orthogonal matrix and `R` is an upper-triangular matrix.
+```R
+# A is a gpuTensor matrix
+qr_result <- qr(A)
+
+# Access the Q and R matrices
+Q_matrix <- qr_result$Q
+R_matrix <- qr_result$R
+```
+
+### Cholesky Decomposition
+Computes the Cholesky decomposition of a symmetric, positive-definite matrix `A` such that `A = L %*% t(L)`, where `L` is a lower triangular matrix.
+```R
+# A is a symmetric positive-definite gpuTensor
+L <- chol(A)
+
+# L is the lower triangular Cholesky factor
+```
+
+### Eigenvalue Decomposition
+Computes the eigenvalues and eigenvectors of a symmetric matrix.
+```R
+# A is a symmetric gpuTensor
+eigen_decomp <- gpu_eigen(A)
+
+# Access the eigenvalues and eigenvectors
+eigenvalues <- eigen_decomp$values
+eigenvectors <- eigen_decomp$vectors
+
+# To compute only the eigenvalues for efficiency:
+eigenvalues_only <- gpu_eigen(A, only.values = TRUE)
+```
+
+### Determinant
+Computes the determinant of a square matrix. For numerical stability, it's often better to work with the log-determinant.
+```R
+# A is a square gpuTensor
+# Get the log-determinant (modulus and sign)
+log_det_result <- determinant(A, logarithm = TRUE)
+
+# Get the raw determinant value
+det_value <- determinant(A, logarithm = FALSE)
+```
+
 ## 6. Reduction Operations
 
 Aggregate tensor values across the entire tensor or along a specific axis.
