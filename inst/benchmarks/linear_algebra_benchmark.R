@@ -60,19 +60,12 @@ for (n in sizes) {
   # Try to create GPU tensors
   gpu_available <- FALSE
   tryCatch({
-    if (exists("create_tensor_unified")) {
-      A_spd_gpu <- create_tensor_unified(A_spd)
-      class(A_spd_gpu) <- c("gpuTensor", class(A_spd_gpu))
-      
-      A_general_gpu <- create_tensor_unified(A_general)
-      class(A_general_gpu) <- c("gpuTensor", class(A_general_gpu))
-      
-      b_gpu <- create_tensor_unified(b)
-      class(b_gpu) <- c("gpuTensor", class(b_gpu))
-      
-      gpu_available <- TRUE
-      cat("✅ GPU tensors created successfully\n")
-    }
+    A_spd_gpu <- as_tensor(A_spd)
+    A_general_gpu <- as_tensor(A_general)
+    b_gpu <- as_tensor(b)
+    
+    gpu_available <- TRUE
+    cat("✅ GPU tensors created successfully\n")
   }, error = function(e) {
     cat("❌ GPU tensors not available:", e$message, "\n")
   })

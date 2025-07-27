@@ -293,3 +293,10 @@ __global__ void axis_variance_kernel(
     const int* result_strides, const int* reduction_axes,
     int num_reduction_axes, int ndims, size_t output_size
 ); 
+
+// Linear algebra utility kernels
+template<typename T>
+__global__ void zero_upper_triangular_kernel(T* matrix, int n);
+
+template<typename T>
+void launch_zero_upper_triangular(T* matrix, int n, cudaStream_t stream = 0); 

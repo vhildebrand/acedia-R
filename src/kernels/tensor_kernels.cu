@@ -1696,6 +1696,40 @@ template __global__ void argmin_kernel<double>(int64_t*, const double*, size_t);
 template __global__ void copy_values_at_indices_kernel<float>(float*, const float*, const int64_t*, int, float);
 template __global__ void copy_values_at_indices_kernel<double>(double*, const double*, const int64_t*, int, double);
 
+// Linear algebra utility kernels implementation
+template<typename T>
+__global__ void zero_upper_triangular_kernel(T* matrix, int n) {
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    // Zero upper triangular elements: j > i
+    if (i < n && j < n && j > i) {
+        matrix[i * n + j] = T(0);
+    }
+}
+
+template<typename T>
+void launch_zero_upper_triangular(T* matrix, int n, cudaStream_t stream) {
+    // Use 32x8 block size for good occupancy
+    dim3 blockSize(32, 8);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, 
+                  (n + blockSize.y - 1) / blockSize.y);
+    
+    zero_upper_triangular_kernel<T><<<gridSize, blockSize, 0, stream>>>(matrix, n);
+    
+    // Only synchronize if using the default stream
+    if (stream == 0) {
+        cudaDeviceSynchronize();
+    }
+}
+
+// Explicit template instantiations for the new kernels
+template __global__ void zero_upper_triangular_kernel<float>(float*, int);
+template __global__ void zero_upper_triangular_kernel<double>(double*, int);
+
+template void launch_zero_upper_triangular<float>(float*, int, cudaStream_t);
+template void launch_zero_upper_triangular<double>(double*, int, cudaStream_t);
+
 
 
  

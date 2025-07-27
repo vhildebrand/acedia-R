@@ -3,6 +3,7 @@
 #include "TensorRegistry.h"
 #include "cuda_utils.h"
 #include "cusolver_utils.h"
+#include "kernels/tensor_kernels.cuh"
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 #include <memory>
@@ -2000,12 +2001,7 @@ SEXP tensor_chol_unified(SEXP a_ptr) {
                 }
                 
                 // Zero out upper triangular part (cuSOLVER only computes lower triangular)
-                for (size_t i = 0; i < n; i++) {
-                    for (size_t j = i + 1; j < n; j++) {
-                        float zero = 0.0f;
-                        cudaMemcpy(result->data() + i * n + j, &zero, sizeof(float), cudaMemcpyHostToDevice);
-                    }
-                }
+                launch_zero_upper_triangular<float>(result->data(), static_cast<int>(n));
                 
                 // Clean up
                 cudaFree(workspace);
@@ -2080,12 +2076,7 @@ SEXP tensor_chol_unified(SEXP a_ptr) {
                 }
                 
                 // Zero out upper triangular part (cuSOLVER only computes lower triangular)
-                for (size_t i = 0; i < n; i++) {
-                    for (size_t j = i + 1; j < n; j++) {
-                        double zero = 0.0;
-                        cudaMemcpy(result->data() + i * n + j, &zero, sizeof(double), cudaMemcpyHostToDevice);
-                    }
-                }
+                launch_zero_upper_triangular<double>(result->data(), static_cast<int>(n));
                 
                 // Clean up
                 cudaFree(workspace);
