@@ -126,12 +126,20 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                     opB    = CUBLAS_OP_N;
                 }
 
+                // Allocate result tensor. The tensor constructor internally creates its own
+                // CUDA stream (result->get_stream()). We MUST ensure that cuBLAS executes on
+                // that exact stream; otherwise, later calls such as synchronize(result)
+                // will not wait for the GEMM kernel to finish, leading to erroneously low
+                // timing numbers and exaggerated speed-up calculations.
                 auto result = std::make_shared<gpuTensor<float>>(result_shape);
 
                 const float alpha = 1.0f;
                 const float beta  = 0.0f;
 
-                cublasHandle_t handle = cuda_utils::get_cublas_handle();
+                // Bind cuBLAS to the result tensor's stream so that stream-level
+                // synchronization works correctly.
+                cudaStream_t stream = result->get_stream()->get();
+                cublasHandle_t handle = cuda_utils::get_cublas_handle(stream);
 
                 cublasStatus_t stat = cublasSgemm(
                     handle,
@@ -193,13 +201,16 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                     b_mat  = &(*b_temp);
                 }
 
+                // As with FLOAT32, ensure cuBLAS operates on the same stream that we will
+                // later synchronize on.
                 auto result = std::make_shared<gpuTensor<double>>(result_shape);
 
                 const double alpha = 1.0;
                 const double beta  = 0.0;
 
-                cublasHandle_t handle = cuda_utils::get_cublas_handle();
-
+                cudaStream_t stream = result->get_stream()->get();
+                cublasHandle_t handle = cuda_utils::get_cublas_handle(stream);
+                
                 cublasStatus_t stat = cublasDgemm(
                     handle,
                     opA,
@@ -260,13 +271,16 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                     b_mat  = &(*b_temp);
                 }
 
+                // Ensure half-precision GEMM also executes on the correct stream.
                 auto result = std::make_shared<gpuTensor<half>>(result_shape);
 
-                const float alpha_f = 1.0f;
-                const float beta_f  = 0.0f;
+                const half alpha = __float2half(1.0f);
+                const half beta  = __float2half(0.0f);
 
-                cublasHandle_t handle = cuda_utils::get_cublas_handle();
-
+                cudaStream_t stream = result->get_stream()->get();
+                // cuBLAS half-precision GEMM uses Tensor Core path via cublasGemmEx
+                cublasHandle_t handle = cuda_utils::get_cublas_handle(stream);
+                
                 cublasStatus_t stat = cublasGemmEx(
                     handle,
                     opA,
@@ -274,15 +288,16 @@ SEXP tensor_matmul_unified(SEXP a_ptr, SEXP b_ptr) {
                     static_cast<int>(M),
                     static_cast<int>(N),
                     static_cast<int>(K),
-                    &alpha_f,
+                    &alpha,
                     a_mat->data(), CUDA_R_16F,
                     (opA == CUBLAS_OP_N) ? static_cast<int>(M) : static_cast<int>(K),
                     b_mat->data(), CUDA_R_16F,
                     (opB == CUBLAS_OP_N) ? static_cast<int>(K) : static_cast<int>(N),
-                    &beta_f,
+                    &beta,
                     result->data(), CUDA_R_16F,
                     static_cast<int>(M),
-                    CUDA_R_32F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
+                    CUBLAS_COMPUTE_32F_FAST_TF32,
+                    CUBLAS_GEMM_DEFAULT);
 
                 if (stat != CUBLAS_STATUS_SUCCESS) {
                     throw std::runtime_error("cublasGemmEx (float16) failed");
