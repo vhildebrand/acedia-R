@@ -1,6 +1,6 @@
-# acediaR: High-Performance GPU Computing in R
+# acediaR: CUDA support for R
 
-**`acediaR`** is an R package that brings the massive parallel processing power of NVIDIA GPUs to your R environment. It provides a core `gpuTensor` object and a comprehensive suite of functions for tensor creation, manipulation, and computation, all executed directly on the GPU. This allows for significant acceleration of numerical and linear algebra workloads.
+**`acediaR`** is an R package that brings parallel processing power of NVIDIA GPUs to your R environment. It provides a core `gpuTensor` object and a suite of core R functions for tensor creation, manipulation, and computation, all processed on GPU. This allows for faster processing of numerical and linear algebra workloads (hopefully).
 
 This guide provides a complete walkthrough of the library's features, from initial setup to advanced operations.
 
@@ -32,7 +32,6 @@ This guide provides a complete walkthrough of the library's features, from initi
 ## Installation
 
 ```R
-# Coming soon to CRAN
 # For now, install from source or using devtools:
 # devtools::install_github("path/to/acediaR")
 ```
